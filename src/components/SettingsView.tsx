@@ -21,8 +21,8 @@ import { exportDataAsJson, importDataFromJson, clearAllData } from '../utils/sto
 
 interface SettingsViewProps {
   settings: SystemSettings;
-  onSaveSettings: (newSettings: SystemSettings) => void;
-  onReloadData: () => void;
+  onSaveSettings: (newSettings: SystemSettings) => void | Promise<void>;
+  onReloadData: () => void | Promise<void>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -43,22 +43,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings(formData);
+    await onSaveSettings(formData);
     setSuccessMsg('Configurações da régua salvas com sucesso!');
     setTimeout(() => setSuccessMsg(null), 3500);
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
     setFormData(DEFAULT_SETTINGS);
-    onSaveSettings(DEFAULT_SETTINGS);
+    await onSaveSettings(DEFAULT_SETTINGS);
     setSuccessMsg('Configurações restauradas para os valores padrão de fábrica.');
     setTimeout(() => setSuccessMsg(null), 3500);
   };
 
-  const handleExportBackup = () => {
-    const jsonStr = exportDataAsJson();
+  const handleExportBackup = async () => {
+    const jsonStr = await exportDataAsJson();
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -75,12 +75,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result as string;
-      const res = importDataFromJson(content);
+      const res = await importDataFromJson(content);
       setImportStatus(res);
       if (res.success) {
-        onReloadData();
+        await onReloadData();
       }
       setTimeout(() => setImportStatus(null), 4000);
     };
@@ -88,9 +88,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     e.target.value = '';
   };
 
-  const handleConfirmClear = () => {
-    clearAllData();
-    onReloadData();
+  const handleConfirmClear = async () => {
+    await clearAllData();
+    await onReloadData();
     setShowClearConfirm(false);
     setSuccessMsg('Todos os dados foram resetados.');
     setTimeout(() => setSuccessMsg(null), 3500);
