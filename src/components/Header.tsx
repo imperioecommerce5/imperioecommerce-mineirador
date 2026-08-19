@@ -18,9 +18,9 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200/90 dark:border-slate-800 shadow-2xs transition-colors duration-150">
       <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 gap-2 min-w-0">
           {/* Left Brand */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={onOpenMobileMenu}
@@ -33,21 +33,21 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('dashboard')}
-              className="flex items-center gap-2.5 text-left group"
+              className="flex items-center gap-2 sm:gap-2.5 text-left group min-w-0"
             >
               <div className="w-9 h-9 rounded-xl bg-slate-950 flex items-center justify-center font-black text-amber-400 text-base shadow-2xs group-hover:scale-105 transition-transform border border-slate-800">
                 I<span className="text-white text-xs">M</span>
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-black text-sm tracking-tight text-slate-950 dark:text-white">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                  <span className="font-black text-xs sm:text-sm tracking-tight text-slate-950 dark:text-white truncate">
                     IMPERIO<span className="text-amber-500">ECOMMERCE</span>
                   </span>
-                  <span className="text-2xs font-extrabold px-1.5 py-0.5 rounded bg-slate-900 text-amber-400 border border-slate-800 uppercase tracking-wider">
+                  <span className="hidden sm:inline text-2xs font-extrabold px-1.5 py-0.5 rounded bg-slate-900 text-amber-400 border border-slate-800 uppercase tracking-wider">
                     Mineirador
                   </span>
                 </div>
-                <p className="text-2xs text-slate-400 font-medium">
+                <p className="hidden md:block text-2xs text-slate-400 font-medium">
                   Análise & Mineração de Produtos Mercado Livre
                 </p>
               </div>
@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right Action & Theme Toggle */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Theme Switcher */}
-            <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 text-slate-500 dark:text-slate-400">
+            <div className="hidden sm:flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 text-slate-500 dark:text-slate-400">
               <button
                 type="button"
                 onClick={() => setTheme('light')}
@@ -117,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('nova-analise')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+              className={`flex shrink-0 items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
                 currentView === 'nova-analise'
                   ? 'bg-amber-500 text-slate-950 border border-amber-400'
                   : 'bg-amber-400 hover:bg-amber-500 text-slate-950 border border-amber-300'

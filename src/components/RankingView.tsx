@@ -426,7 +426,7 @@ export const RankingView: React.FC<RankingViewProps> = ({
                     </div>
 
                     {/* Card Metrics Grid */}
-                    <div className="grid grid-cols-3 gap-2 bg-slate-50/80 dark:bg-slate-800/70 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-center">
+                    <div className="grid grid-cols-2 min-[390px]:grid-cols-3 gap-2 bg-slate-50/80 dark:bg-slate-800/70 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-center">
                       <div className="space-y-0.5">
                         <span className="text-3xs font-bold text-slate-400 uppercase block">
                           Demanda

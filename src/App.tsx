@@ -83,9 +83,9 @@ export default function App() {
       <div className="fixed bottom-5 left-5 z-40 hidden sm:flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 shadow-lg text-xs">
         <span className="max-w-44 truncate font-semibold">{user.email}</span><button onClick={() => signOut(auth)} title="Sair" className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"><LogOut className="w-4 h-4" /></button>
       </div>
-      <div className="flex-1 flex w-full">
+      <div className="flex-1 flex w-full min-w-0 overflow-x-hidden">
         <Sidebar currentView={currentView} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} products={products} isMobileOpen={isMobileMenuOpen} onCloseMobile={() => setIsMobileMenuOpen(false)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+        <main className="flex-1 w-full max-w-full p-3 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">
           {dataLoading ? <div className="min-h-[50vh] grid place-items-center"><LoaderCircle className="w-7 h-7 animate-spin text-amber-500" /></div> : <>
             {currentView === 'dashboard' && <DashboardView products={products} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} onSelectProduct={handleSelectProduct} />}
             {currentView === 'nova-analise' && <NewAnalysisView initialData={editingProduct} settings={settings} onSave={handleSaveProduct} onCancel={() => { setEditingProduct(null); setCurrentView('dashboard'); }} />}
@@ -97,7 +97,7 @@ export default function App() {
         </main>
       </div>
       {selectedProductForModal && <AnalysisResultModal product={selectedProductForModal} isOpen={isResultModalOpen} onClose={() => setIsResultModalOpen(false)} onEdit={(p) => handleEditProduct(p)} onDuplicate={(p) => handleDuplicateProduct(p.id)} />}
-      {toastMessage && <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl border border-slate-800 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-400" /><span>{toastMessage}</span></div>}
+      {toastMessage && <div className="fixed bottom-3 left-3 right-3 sm:left-auto sm:bottom-5 sm:right-5 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl border border-slate-800 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-400" /><span>{toastMessage}</span></div>}
     </div>
   );
 }

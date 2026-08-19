@@ -10,3 +10,20 @@
     color-scheme: dark;
   }
 }
+
+
+@layer base {
+  html, body, #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-width: 0;
+  }
+
+  input, select, textarea, button {
+    max-width: 100%;
+  }
+}

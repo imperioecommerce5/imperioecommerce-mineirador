@@ -374,7 +374,7 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
                   </label>
                   <span className="text-3xs text-slate-400 font-semibold">Rotatividade</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 min-[390px]:grid-cols-3 gap-2">
                   <div>
                     <span className="block text-3xs font-bold text-slate-500 dark:text-slate-400 mb-1">&lt; 180 dias</span>
                     <input

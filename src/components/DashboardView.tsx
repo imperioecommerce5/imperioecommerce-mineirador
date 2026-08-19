@@ -92,7 +92,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[390px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Analisados */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-400">
@@ -303,7 +303,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1.5 bg-slate-50 dark:bg-slate-800/70 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-center">
+                  <div className="grid grid-cols-2 min-[390px]:grid-cols-4 gap-1.5 bg-slate-50 dark:bg-slate-800/70 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-center">
                     <div>
                       <span className="text-3xs text-slate-400 font-bold uppercase block">Demanda</span>
                       <strong className="text-xs text-slate-800 dark:text-slate-200 font-bold whitespace-nowrap block">
