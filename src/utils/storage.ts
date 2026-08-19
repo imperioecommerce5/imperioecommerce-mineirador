@@ -6,6 +6,20 @@ import { db } from '../firebase';
 const PRODUCTS_COLLECTION = 'products';
 const SETTINGS_DOC = doc(db, 'appData', 'settings');
 
+function removeUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => removeUndefinedDeep(item)) as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined)
+        .map(([key, item]) => [key, removeUndefinedDeep(item)])
+    ) as T;
+  }
+  return value;
+}
+
 function recalculateProduct(p: ProductAnalysis, settings: SystemSettings): ProductAnalysis {
   const { scoreBreakdown, diagnosis } = calculateScoreAndDiagnosis(p.metrics, settings);
   const calculatedFinancials = p.financials?.enabled
@@ -67,7 +81,7 @@ export async function saveProductAnalysis(
     calculatedFinancials,
   };
 
-  await setDoc(doc(db, PRODUCTS_COLLECTION, id), savedProduct);
+  await setDoc(doc(db, PRODUCTS_COLLECTION, id), removeUndefinedDeep(savedProduct));
   return savedProduct;
 }
 
@@ -104,7 +118,7 @@ export async function importDataFromJson(jsonString: string): Promise<{ success:
     if (parsed.settings) await saveStoredSettings({ ...DEFAULT_SETTINGS, ...parsed.settings });
     const batch = writeBatch(db);
     parsed.products.forEach((p: ProductAnalysis) => {
-      if (p?.id) batch.set(doc(db, PRODUCTS_COLLECTION, p.id), p);
+      if (p?.id) batch.set(doc(db, PRODUCTS_COLLECTION, p.id), removeUndefinedDeep(p));
     });
     await batch.commit();
     return { success: true, message: `${parsed.products.length} produtos importados com sucesso!` };
