@@ -1,0 +1,6 @@
+{
+  "name": "IMPERIOECOMMERCE MINEIRADOR",
+  "description": "Ferramenta profissional para análise e mineração de produtos no Mercado Livre com foco na meta mínima de 3 vendas/dia (≈ 90 vendas/mês) na operação Full.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
