@@ -222,10 +222,11 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-tight mb-1">
-                  Link de Referência no Mercado Livre
+                  Link de Referência no Mercado Livre <span className="normal-case font-medium text-slate-400">(opcional)</span>
                 </label>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   placeholder="https://produto.mercadolivre.com.br/..."
                   value={mlLink}
                   onChange={(e) => setMlLink(e.target.value)}
@@ -235,10 +236,11 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-tight mb-1">
-                  Link do Fornecedor / Fabricante
+                  Link do Fornecedor / Fabricante <span className="normal-case font-medium text-slate-400">(opcional)</span>
                 </label>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   placeholder="Ex: https://fornecedor.com.br/produto..."
                   value={supplierLink}
                   onChange={(e) => setSupplierLink(e.target.value)}
