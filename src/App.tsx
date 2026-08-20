@@ -10,12 +10,14 @@ import { RankingView } from './components/RankingView';
 import { ComparatorView } from './components/ComparatorView';
 import { SettingsView } from './components/SettingsView';
 import { InventoryView } from './components/InventoryView';
+import { FinanceView } from './components/FinanceView';
 import { AnalysisResultModal } from './components/AnalysisResultModal';
-import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, InventoryMovementType } from './types';
+import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, InventoryMovementType, SaleRecord } from './types';
 import { DEFAULT_SETTINGS } from './utils/calculator';
 import { auth, googleProvider } from './firebase';
 import { getStoredProducts, getStoredSettings, saveProductAnalysis, saveStoredSettings, deleteProductAnalysis, duplicateProductAnalysis } from './utils/storage';
 import { getInventory, saveInventoryItem, deleteInventoryItem, getInventoryMovements, createInventoryMovement, deleteInventoryMovement } from './utils/inventory';
+import { getSales, saveSale, deleteSale } from './utils/sales';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,6 +27,7 @@ export default function App() {
   const [products, setProducts] = useState<ProductAnalysis[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>([]);
+  const [sales, setSales] = useState<SaleRecord[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedProductForModal, setSelectedProductForModal] = useState<ProductAnalysis | null>(null);
@@ -42,12 +45,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!user) { setProducts([]); setInventory([]); setInventoryMovements([]); return; }
+    if (!user) { setProducts([]); setInventory([]); setInventoryMovements([]); setSales([]); return; }
     (async () => {
       setDataLoading(true);
       try {
-        const [loadedProducts, loadedSettings, loadedInventory, loadedMovements] = await Promise.all([getStoredProducts(), getStoredSettings(), getInventory(), getInventoryMovements()]);
-        setProducts(loadedProducts); setSettings(loadedSettings); setInventory(loadedInventory); setInventoryMovements(loadedMovements);
+        const [loadedProducts, loadedSettings, loadedInventory, loadedMovements, loadedSales] = await Promise.all([getStoredProducts(), getStoredSettings(), getInventory(), getInventoryMovements(), getSales()]);
+        setProducts(loadedProducts); setSettings(loadedSettings); setInventory(loadedInventory); setInventoryMovements(loadedMovements); setSales(loadedSales);
       } catch (e) { console.error(e); }
       finally { setDataLoading(false); }
     })();
@@ -92,6 +95,10 @@ export default function App() {
     catch(e:any){ console.error(e); showToast(e?.message || 'Erro ao excluir movimentação.'); throw e; }
   };
 
+  const refreshSalesAndInventory = async () => { const [ss,ii]=await Promise.all([getSales(),getInventory()]); setSales(ss); setInventory(ii); };
+  const handleSaveSale = async (data:any) => { try { await saveSale(data); await refreshSalesAndInventory(); showToast('Venda salva e estoque atualizado!'); } catch(e:any){ console.error(e); showToast(e?.message||'Erro ao salvar venda.'); throw e; } };
+  const handleDeleteSale = async (id:string) => { try { await deleteSale(id); await refreshSalesAndInventory(); showToast('Venda excluída e estoque devolvido!'); } catch(e:any){ showToast(e?.message||'Erro ao excluir venda.'); throw e; } };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-amber-300 selection:text-slate-950 transition-colors duration-150">
       <Header onOpenMobileMenu={() => setIsMobileMenuOpen(true)} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} currentView={currentView} />
@@ -108,6 +115,7 @@ export default function App() {
             {currentView === 'ranking' && <RankingView products={products} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'comparador' && <ComparatorView products={products} initialSelectedIds={selectedForCompare} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'estoque' && <InventoryView items={inventory} movements={inventoryMovements} onSave={handleSaveInventory} onDelete={handleDeleteInventory} onMove={handleInventoryMovement} onDeleteMovement={handleDeleteInventoryMovement} />}
+            {currentView === 'financeiro' && <FinanceView sales={sales} items={inventory} onSave={handleSaveSale} onDelete={handleDeleteSale} />}
             {currentView === 'configuracoes' && <SettingsView settings={settings} onSaveSettings={handleSaveSettings} onReloadData={refreshProducts} />}
           </>}
         </main>

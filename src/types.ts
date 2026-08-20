@@ -188,3 +188,23 @@ export interface InventoryMovement {
     fullInbound: number;
   };
 }
+
+
+export interface SaleRecord {
+  id: string;
+  orderNumber: string;
+  soldAt: string;
+  inventoryId: string;
+  sku: string;
+  productName: string;
+  quantity: number;
+  source: 'LOCAL' | 'FULL';
+  salePriceUnit: number;
+  receivedAmount: number;
+  unitCostSnapshot: number;
+  cmv: number;
+  extraCosts: number;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
