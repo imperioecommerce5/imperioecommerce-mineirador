@@ -1,6 +1,10 @@
 export type RecommendationStatus = 'ENTRAR' | 'ANALISAR' | 'ALTO_RISCO' | 'DESCARTAR';
 
 export interface AvantproMetrics {
+  totalRecentAds: number; // Quantidade de resultados após filtrar anúncios criados há <=180 dias
+  recentAds100Plus: number; // Entre os <=180d, quantos possuem 100+ vendas acumuladas
+  recentAds300Plus: number; // Entre os <=180d, quantos possuem 300+ vendas acumuladas
+  recentAds500Plus: number; // Entre os <=180d, quantos possuem 500+ vendas acumuladas
   totalPageSales: number; // Demanda total da página 1 (ex: 8500)
   adsMaking150Plus: number; // Anúncios fazendo 150+ vendas/mês (~5 vendas/dia)
   adsMaking300Plus: number; // Anúncios fazendo 300+ vendas/mês (~10 vendas/dia)

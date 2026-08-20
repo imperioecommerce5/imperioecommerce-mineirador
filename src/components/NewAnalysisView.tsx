@@ -29,6 +29,10 @@ interface NewAnalysisViewProps {
 }
 
 const DEFAULT_METRICS: AvantproMetrics = {
+  totalRecentAds: 0,
+  recentAds100Plus: 0,
+  recentAds300Plus: 0,
+  recentAds500Plus: 0,
   totalPageSales: 6500,
   adsMaking150Plus: 6,
   adsMaking300Plus: 3,
@@ -63,9 +67,10 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
   const [supplierLink, setSupplierLink] = useState(initialData?.supplierLink || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
 
-  const [metrics, setMetrics] = useState<AvantproMetrics>(
-    initialData?.metrics || DEFAULT_METRICS
-  );
+  const [metrics, setMetrics] = useState<AvantproMetrics>({
+    ...DEFAULT_METRICS,
+    ...(initialData?.metrics || {}),
+  });
 
   const [financials, setFinancials] = useState<FinancialData>(
     initialData?.financials || DEFAULT_FINANCIALS
@@ -73,10 +78,22 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
 
   const handleMetricChange = (field: keyof AvantproMetrics, val: string | number) => {
     const num = Math.max(0, Number(val) || 0);
-    setMetrics((prev) => ({
-      ...prev,
-      [field]: num,
-    }));
+    setMetrics((prev) => {
+      const next = { ...prev, [field]: num };
+
+      // Compatibilidade com o motor de score atual:
+      // a coleta agora é SEMPRE feita após o filtro <=180 dias.
+      if (field === 'totalRecentAds') {
+        next.adsUnder180Days = num;
+        next.ads180To365Days = 0;
+        next.adsOver365Days = 0;
+      }
+      if (field === 'recentAds100Plus') next.adsMaking150Plus = num;
+      if (field === 'recentAds300Plus') next.adsMaking300Plus = num;
+      if (field === 'recentAds500Plus') next.newEntrants300Plus = num;
+
+      return next;
+    });
   };
 
   const handleFinancialChange = (field: keyof FinancialData, val: string | number | boolean) => {
@@ -107,9 +124,9 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
       id: initialData?.id,
       name: name.trim(),
       keyword: keyword.trim(),
-      mlLink: mlLink.trim() || undefined,
-      supplierLink: supplierLink.trim() || undefined,
-      notes: notes.trim() || undefined,
+      mlLink: mlLink.trim(),
+      supplierLink: supplierLink.trim(),
+      notes: notes.trim(),
       metrics,
       financials,
     });
@@ -279,157 +296,112 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* 1. Demanda Total */}
-              <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                    Demanda Total da Página
-                  </label>
-                  <span className="text-3xs text-slate-400 font-semibold">Soma 1ª pág</span>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={metrics.totalPageSales}
-                  onChange={(e) => handleMetricChange('totalPageSales', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                />
-                <p className="text-3xs text-slate-500 dark:text-slate-400">
-                  Ideal: &gt; 5.000 un/mês (&gt;10k = excelente, &lt;3k = fraco).
-                </p>
-              </div>
-
-              {/* 2. Anúncios com 150+ vendas/mês */}
-              <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                    Anúncios com 150+ vendas/mês
-                  </label>
-                  <span className="text-3xs font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-1.5 py-0.5 rounded">
-                    ~5 vendas/dia
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={metrics.adsMaking150Plus}
-                  onChange={(e) => handleMetricChange('adsMaking150Plus', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                />
-                <p className="text-3xs text-slate-500 dark:text-slate-400">
-                  Ideal: 5 a 8 anúncios (9+ = excelente, 0-2 = concentrado).
-                </p>
-              </div>
-
-              {/* 3. Anúncios com 300+ vendas/mês */}
-              <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                    Anúncios com 300+ vendas/mês
-                  </label>
-                  <span className="text-3xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded">
-                    ~10 vendas/dia
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={metrics.adsMaking300Plus}
-                  onChange={(e) => handleMetricChange('adsMaking300Plus', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                />
-                <p className="text-3xs text-slate-500 dark:text-slate-400">
-                  Ideal: 3 a 5 anúncios (mostra teto alto de escala no nicho).
-                </p>
-              </div>
-
-              {/* 4. Novos Entrantes com 300+ */}
-              <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                    Novos Entrantes (&lt;180d) com 300+
-                  </label>
-                  <span className="text-3xs font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/80 px-1.5 py-0.5 rounded">
-                    Validador
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={metrics.newEntrants300Plus}
-                  onChange={(e) => handleMetricChange('newEntrants300Plus', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                />
-                <p className="text-3xs text-slate-500 dark:text-slate-400">
-                  Prova de entrada: 1 ou mais anúncios recentes já no topo.
-                </p>
-              </div>
-
-              {/* 5. Idade dos Anúncios */}
-              <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                    Distribuição da Idade dos Anúncios (Total 1ª Página)
-                  </label>
-                  <span className="text-3xs text-slate-400 font-semibold">Rotatividade</span>
-                </div>
-                <div className="grid grid-cols-1 min-[390px]:grid-cols-3 gap-2">
+            <div className="space-y-4">
+              <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 p-4">
+                <div className="flex items-start gap-3">
+                  <span className="shrink-0 w-7 h-7 rounded-lg bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center">1</span>
                   <div>
-                    <span className="block text-3xs font-bold text-slate-500 dark:text-slate-400 mb-1">&lt; 180 dias</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={metrics.adsUnder180Days}
-                      onChange={(e) => handleMetricChange('adsUnder180Days', e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <span className="block text-3xs font-bold text-slate-500 dark:text-slate-400 mb-1">180 a 365 dias</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={metrics.ads180To365Days}
-                      onChange={(e) => handleMetricChange('ads180To365Days', e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <span className="block text-3xs font-bold text-slate-500 dark:text-slate-400 mb-1">&gt; 365 dias</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={metrics.adsOver365Days}
-                      onChange={(e) => handleMetricChange('adsOver365Days', e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                    />
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-white">Antes de preencher</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                      No Mercado Livre, pesquise o produto e aplique o filtro de anúncios criados há <strong>180 dias ou menos</strong>.
+                      As métricas de concorrência abaixo devem ser coletadas somente dentro desse filtro.
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* 6. Concorrência no Full */}
-              <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                <div className="flex items-center justify-between">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
+                      Vendas totais da página
+                    </label>
+                    <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200/70 dark:bg-slate-700 px-1.5 py-0.5 rounded">GERAL</span>
+                  </div>
+                  <input type="number" min="0" value={metrics.totalPageSales}
+                    onChange={(e) => handleMetricChange('totalPageSales', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
+                  <p className="text-3xs text-slate-500 dark:text-slate-400">
+                    Número geral exibido pelo Mercado Livre. <strong>Não representa apenas os últimos 180 dias.</strong>
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
+                      Resultados após filtro ≤180d
+                    </label>
+                    <span className="text-3xs font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/80 px-1.5 py-0.5 rounded">BASE RECENTE</span>
+                  </div>
+                  <input type="number" min="0" value={metrics.totalRecentAds}
+                    onChange={(e) => handleMetricChange('totalRecentAds', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
+                  <p className="text-3xs text-slate-500 dark:text-slate-400">Quantidade de anúncios encontrados depois de aplicar o filtro de até 180 dias.</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="px-4 py-3 bg-slate-100/80 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                  <p className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-white">Tração dos anúncios recentes</p>
+                  <p className="text-3xs text-slate-500 dark:text-slate-400 mt-0.5">Conte somente anúncios dentro do filtro ≤180 dias. As faixas são cumulativas.</p>
+                </div>
+                <div className="grid grid-cols-1 min-[390px]:grid-cols-3 gap-3 p-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1">100+ vendas</label>
+                    <input type="number" min="0" value={metrics.recentAds100Plus}
+                      onChange={(e) => handleMetricChange('recentAds100Plus', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
+                    <p className="text-3xs text-slate-500 mt-1">
+                      {metrics.totalRecentAds > 0 ? `${Math.round((metrics.recentAds100Plus / metrics.totalRecentAds) * 100)}% dos recentes` : 'Taxa calculada automaticamente'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1">300+ vendas</label>
+                    <input type="number" min="0" value={metrics.recentAds300Plus}
+                      onChange={(e) => handleMetricChange('recentAds300Plus', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
+                    <p className="text-3xs text-slate-500 mt-1">
+                      {metrics.totalRecentAds > 0 ? `${Math.round((metrics.recentAds300Plus / metrics.totalRecentAds) * 100)}% dos recentes` : 'Taxa calculada automaticamente'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1">500+ vendas</label>
+                    <input type="number" min="0" value={metrics.recentAds500Plus}
+                      onChange={(e) => handleMetricChange('recentAds500Plus', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
+                    <p className="text-3xs text-slate-500 mt-1">
+                      {metrics.totalRecentAds > 0 ? `${Math.round((metrics.recentAds500Plus / metrics.totalRecentAds) * 100)}% dos recentes` : 'Taxa calculada automaticamente'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                      Concorrência no Mercado Livre Full
+                      Anúncios no Full dentro dos ≤180d
                     </label>
                   </div>
                   <span className="text-3xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded">
-                    Qtd sellers no Full
+                    CONCORRÊNCIA RECENTE
                   </span>
                 </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={metrics.fullCompetitors}
+                <input type="number" min="0" value={metrics.fullCompetitors}
                   onChange={(e) => handleMetricChange('fullCompetitors', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800"
-                />
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
                 <p className="text-3xs text-slate-500 dark:text-slate-400">
-                  Ideal: 0 a 10 no Full (11-15 atenção, &gt;20 saturado/guerra de preço).
+                  {metrics.totalRecentAds > 0
+                    ? `${Math.round((metrics.fullCompetitors / metrics.totalRecentAds) * 100)}% dos anúncios recentes estão no Full.`
+                    : 'Informe primeiro a quantidade de resultados ≤180d para calcular a pressão do Full.'}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-4">
+                <p className="text-xs font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-wide">Sequência de coleta</p>
+                <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-1">
+                  1. Vendas gerais da página → 2. Aplicar filtro ≤180d → 3. Resultados recentes → 4. Contar 100+ / 300+ / 500+ → 5. Contar quantos recentes estão no Full.
                 </p>
               </div>
             </div>

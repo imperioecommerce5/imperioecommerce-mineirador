@@ -212,6 +212,22 @@ export function calculateScoreAndDiagnosis(
   metrics: AvantproMetrics,
   settings: SystemSettings = DEFAULT_SETTINGS
 ): { scoreBreakdown: ScoreBreakdown; diagnosis: ProductDiagnosis } {
+  // A coleta atual trabalha somente com anúncios filtrados em <=180 dias.
+  // Mantemos os campos legados internamente para preservar compatibilidade com análises antigas.
+  const recentTotal = metrics.totalRecentAds ?? metrics.adsUnder180Days ?? 0;
+  const recent100 = metrics.recentAds100Plus ?? metrics.adsMaking150Plus ?? 0;
+  const recent300 = metrics.recentAds300Plus ?? metrics.adsMaking300Plus ?? 0;
+  const recent500 = metrics.recentAds500Plus ?? metrics.newEntrants300Plus ?? 0;
+  metrics = {
+    ...metrics,
+    adsUnder180Days: recentTotal,
+    ads180To365Days: 0,
+    adsOver365Days: 0,
+    adsMaking150Plus: recent100,
+    adsMaking300Plus: recent300,
+    newEntrants300Plus: recent500,
+  };
+
   const metricDiagnostics: MetricDiagnostic[] = [];
   const positivePoints: string[] = [];
   const attentionPoints: string[] = [];
@@ -250,7 +266,7 @@ export function calculateScoreAndDiagnosis(
 
   metricDiagnostics.push({
     key: 'demand',
-    name: 'Demanda Total da Página',
+    name: 'Vendas Totais da Página (Geral)',
     displayValue: `${metrics.totalPageSales.toLocaleString('pt-BR')} vendas`,
     level: demandLevel,
     statusColor: demandColor,
@@ -259,7 +275,7 @@ export function calculateScoreAndDiagnosis(
     maxScore: settings.weightDemand,
   });
 
-  // 2. RITMO ATUAL: ANÚNCIOS COM 150+ VENDAS/MÊS (Max: weightRate150, default 20)
+  // 2. RITMO ATUAL: ANÚNCIOS RECENTES COM 100+ VENDAS (Max: weightRate150, default 20)
   let rate150Score = 0;
   let rate150Level: MetricDiagnostic['level'] = 'FRACA';
   let rate150Color: MetricDiagnostic['statusColor'] = 'rose';
@@ -301,7 +317,7 @@ export function calculateScoreAndDiagnosis(
     maxScore: settings.weightRate150,
   });
 
-  // 3. RITMO FORTE: ANÚNCIOS COM 300+ VENDAS/MÊS (Max: weightRate300, default 15)
+  // 3. RITMO FORTE: ANÚNCIOS RECENTES COM 300+ VENDAS (Max: weightRate300, default 15)
   let rate300Score = 0;
   let rate300Level: MetricDiagnostic['level'] = 'FRACA';
   let rate300Color: MetricDiagnostic['statusColor'] = 'rose';
