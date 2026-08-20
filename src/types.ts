@@ -213,4 +213,4 @@ export type CashArea='BUSINESS'|'PERSONAL';
 export type CashKind='INCOME'|'EXPENSE'|'TRANSFER'|'INVESTMENT'|'DEBT_PAYMENT';
 export interface CashEntry{id:string;area:CashArea;kind:CashKind;category:string;description:string;amount:number;date:string;createdAt:string;}
 export interface DebtRecord{id:string;name:string;balance:number;installment:number;dueDay:number;note:string;createdAt:string;updatedAt:string;}
-export interface FinancePlan{id:string;mercadoPagoBalance:number;businessCash:number;personalCash:number;personalSpendPct:number;debtPct:number;reservePct:number;investPct:number;businessReinvestPct:number;businessMinCash:number;updatedAt:string;}
+export interface FinancePlan{id:string;mercadoPagoBalance:number;businessCash:number;personalCash:number;personalSpendPct:number;debtPct:number;reservePct:number;investPct:number;businessReinvestPct:number;businessReservePct?:number;businessWithdrawalPct?:number;businessOtherPct?:number;personalEssentialPct?:number;personalFreePct?:number;businessMinCash:number;updatedAt:string;}

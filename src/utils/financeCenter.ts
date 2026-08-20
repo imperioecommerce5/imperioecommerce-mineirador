@@ -1,7 +1,7 @@
 import {collection,deleteDoc,doc,getDoc,getDocs,setDoc} from 'firebase/firestore';import{db}from'../firebase';import{CashEntry,DebtRecord,FinancePlan}from'../types';
 const PLAN='financePlan',MOV='cashEntries',DEBT='debts';
-export const defaultPlan:FinancePlan={id:'main',mercadoPagoBalance:0,businessCash:0,personalCash:0,personalSpendPct:40,debtPct:35,reservePct:15,investPct:10,businessReinvestPct:70,businessMinCash:0,updatedAt:new Date().toISOString()};
-export async function getFinanceCenter(){const[p,m,d]=await Promise.all([getDoc(doc(db,PLAN,'main')),getDocs(collection(db,MOV)),getDocs(collection(db,DEBT))]);return{plan:p.exists()?p.data()as FinancePlan:defaultPlan,entries:m.docs.map(x=>x.data()as CashEntry).sort((a,b)=>b.date.localeCompare(a.date)),debts:d.docs.map(x=>x.data()as DebtRecord)}}
+export const defaultPlan:FinancePlan={id:'main',mercadoPagoBalance:0,businessCash:0,personalCash:0,personalSpendPct:40,debtPct:35,reservePct:15,investPct:10,businessReinvestPct:70,businessReservePct:15,businessWithdrawalPct:10,businessOtherPct:5,personalEssentialPct:40,personalFreePct:10,businessMinCash:0,updatedAt:new Date().toISOString()};
+export async function getFinanceCenter(){const[p,m,d]=await Promise.all([getDoc(doc(db,PLAN,'main')),getDocs(collection(db,MOV)),getDocs(collection(db,DEBT))]);return{plan:p.exists()?{...defaultPlan,...(p.data()as FinancePlan)}:defaultPlan,entries:m.docs.map(x=>x.data()as CashEntry).sort((a,b)=>b.date.localeCompare(a.date)),debts:d.docs.map(x=>x.data()as DebtRecord)}}
 export async function savePlan(p:FinancePlan){const x={...p,id:'main',updatedAt:new Date().toISOString()};await setDoc(doc(db,PLAN,'main'),x);return x}
 export async function saveCashEntry(x:Omit<CashEntry,'id'|'createdAt'>){const id=`cash-${Date.now()}`,v={...x,id,createdAt:new Date().toISOString()};await setDoc(doc(db,MOV,id),v);return v}
 export async function deleteCashEntry(id:string){await deleteDoc(doc(db,MOV,id))}
