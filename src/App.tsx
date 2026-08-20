@@ -15,7 +15,7 @@ import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, Inve
 import { DEFAULT_SETTINGS } from './utils/calculator';
 import { auth, googleProvider } from './firebase';
 import { getStoredProducts, getStoredSettings, saveProductAnalysis, saveStoredSettings, deleteProductAnalysis, duplicateProductAnalysis } from './utils/storage';
-import { getInventory, saveInventoryItem, deleteInventoryItem, getInventoryMovements, createInventoryMovement } from './utils/inventory';
+import { getInventory, saveInventoryItem, deleteInventoryItem, getInventoryMovements, createInventoryMovement, deleteInventoryMovement } from './utils/inventory';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -87,6 +87,10 @@ export default function App() {
     try { await createInventoryMovement(data); await refreshInventory(); showToast('Movimentação registrada e estoque atualizado!'); }
     catch(e:any){ console.error(e); showToast(e?.message || 'Erro ao movimentar estoque.'); throw e; }
   };
+  const handleDeleteInventoryMovement = async (id:string) => {
+    try { await deleteInventoryMovement(id); await refreshInventory(); showToast('Movimentação excluída e estoque revertido!'); }
+    catch(e:any){ console.error(e); showToast(e?.message || 'Erro ao excluir movimentação.'); throw e; }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-amber-300 selection:text-slate-950 transition-colors duration-150">
@@ -103,7 +107,7 @@ export default function App() {
             {currentView === 'produtos' && <ProductsListView products={products} onSelectProduct={handleSelectProduct} onEditProduct={handleEditProduct} onDuplicateProduct={handleDuplicateProduct} onDeleteProduct={handleDeleteProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} selectedForCompare={selectedForCompare} onToggleCompare={handleToggleCompare} onGoToCompare={() => setCurrentView('comparador')} />}
             {currentView === 'ranking' && <RankingView products={products} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'comparador' && <ComparatorView products={products} initialSelectedIds={selectedForCompare} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
-            {currentView === 'estoque' && <InventoryView items={inventory} movements={inventoryMovements} onSave={handleSaveInventory} onDelete={handleDeleteInventory} onMove={handleInventoryMovement} />}
+            {currentView === 'estoque' && <InventoryView items={inventory} movements={inventoryMovements} onSave={handleSaveInventory} onDelete={handleDeleteInventory} onMove={handleInventoryMovement} onDeleteMovement={handleDeleteInventoryMovement} />}
             {currentView === 'configuracoes' && <SettingsView settings={settings} onSaveSettings={handleSaveSettings} onReloadData={refreshProducts} />}
           </>}
         </main>

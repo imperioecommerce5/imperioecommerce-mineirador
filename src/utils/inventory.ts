@@ -91,3 +91,70 @@ export async function createInventoryMovement(input:{
   await batch.commit();
   return movement;
 }
+
+
+export async function deleteInventoryMovement(movementId:string): Promise<void> {
+  const movementRef = doc(db, MOVEMENTS, movementId);
+  const movementSnap = await getDoc(movementRef);
+  if (!movementSnap.exists()) throw new Error('Movimentação não encontrada.');
+
+  const movement = movementSnap.data() as InventoryMovement;
+  const itemRef = doc(db, COLLECTION, movement.inventoryId);
+  const itemSnap = await getDoc(itemRef);
+  if (!itemSnap.exists()) throw new Error('SKU desta movimentação não foi encontrado.');
+
+  const item = itemSnap.data() as InventoryItem;
+  const qty = movement.quantity;
+  const next = { ...item };
+
+  const need = (available:number, label:string) => {
+    if (available < qty) {
+      throw new Error(`Não é possível excluir: o saldo atual de ${label} não permite desfazer esta movimentação.`);
+    }
+  };
+
+  // Reverse exactly the inventory effect created by the movement.
+  switch (movement.type) {
+    case 'PURCHASE_SUPPLIER':
+      need(next.supplierInbound, 'A receber');
+      next.supplierInbound -= qty;
+      break;
+    case 'RECEIVE_SUPPLIER':
+      need(next.localStock, 'Estoque Local');
+      next.localStock -= qty;
+      next.supplierInbound += qty;
+      break;
+    case 'SEND_TO_FULL':
+      need(next.fullInbound, 'Em trânsito Full');
+      next.fullInbound -= qty;
+      next.localStock += qty;
+      break;
+    case 'FULL_RECEIVED':
+      need(next.fullStock, 'Estoque Full');
+      next.fullStock -= qty;
+      next.fullInbound += qty;
+      break;
+    case 'SALE_LOCAL':
+      next.localStock += qty;
+      break;
+    case 'SALE_FULL':
+      next.fullStock += qty;
+      break;
+    case 'RETURN_LOCAL':
+    case 'ADJUST_LOCAL':
+      need(next.localStock, 'Estoque Local');
+      next.localStock -= qty;
+      break;
+    case 'RETURN_FULL':
+    case 'ADJUST_FULL':
+      need(next.fullStock, 'Estoque Full');
+      next.fullStock -= qty;
+      break;
+  }
+
+  next.updatedAt = new Date().toISOString();
+  const batch = writeBatch(db);
+  batch.set(itemRef, next);
+  batch.delete(movementRef);
+  await batch.commit();
+}

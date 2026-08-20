@@ -27,3 +27,14 @@
     max-width: 100%;
   }
 }
+
+
+/* Native select dropdown contrast */
+select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+.dark select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
