@@ -152,3 +152,39 @@ export interface InventoryItem {
   createdAt: string;
   updatedAt: string;
 }
+
+
+export type InventoryMovementType =
+  | 'PURCHASE_SUPPLIER'
+  | 'RECEIVE_SUPPLIER'
+  | 'SEND_TO_FULL'
+  | 'FULL_RECEIVED'
+  | 'SALE_LOCAL'
+  | 'SALE_FULL'
+  | 'RETURN_LOCAL'
+  | 'RETURN_FULL'
+  | 'ADJUST_LOCAL'
+  | 'ADJUST_FULL';
+
+export interface InventoryMovement {
+  id: string;
+  inventoryId: string;
+  sku: string;
+  productName: string;
+  type: InventoryMovementType;
+  quantity: number;
+  note: string;
+  createdAt: string;
+  before: {
+    localStock: number;
+    fullStock: number;
+    supplierInbound: number;
+    fullInbound: number;
+  };
+  after: {
+    localStock: number;
+    fullStock: number;
+    supplierInbound: number;
+    fullInbound: number;
+  };
+}
