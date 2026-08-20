@@ -21,7 +21,7 @@ function removeUndefinedDeep<T>(value: T): T {
 }
 
 function recalculateProduct(p: ProductAnalysis, settings: SystemSettings): ProductAnalysis {
-  const { scoreBreakdown, diagnosis } = calculateScoreAndDiagnosis(p.metrics, settings);
+  const { scoreBreakdown, diagnosis } = calculateScoreAndDiagnosis(p.metrics, settings, p.financials);
   const calculatedFinancials = p.financials?.enabled
     ? calculateFinancials(p.financials, settings)
     : undefined;
@@ -66,7 +66,7 @@ export async function saveProductAnalysis(
     if (existing.exists()) createdAt = (existing.data() as ProductAnalysis).createdAt || now;
   }
 
-  const { scoreBreakdown, diagnosis } = calculateScoreAndDiagnosis(productData.metrics, settings);
+  const { scoreBreakdown, diagnosis } = calculateScoreAndDiagnosis(productData.metrics, settings, productData.financials);
   const calculatedFinancials = productData.financials.enabled
     ? calculateFinancials(productData.financials, settings)
     : undefined;

@@ -105,8 +105,8 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
 
   // Real-time calculation of score and diagnostics
   const { scoreBreakdown, diagnosis } = useMemo(() => {
-    return calculateScoreAndDiagnosis(metrics, settings);
-  }, [metrics, settings]);
+    return calculateScoreAndDiagnosis(metrics, settings, financials);
+  }, [metrics, settings, financials]);
 
   const calcFinancials = useMemo(() => {
     if (!financials.enabled) return null;
