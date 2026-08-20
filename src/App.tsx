@@ -9,11 +9,13 @@ import { ProductsListView } from './components/ProductsListView';
 import { RankingView } from './components/RankingView';
 import { ComparatorView } from './components/ComparatorView';
 import { SettingsView } from './components/SettingsView';
+import { InventoryView } from './components/InventoryView';
 import { AnalysisResultModal } from './components/AnalysisResultModal';
-import { ProductAnalysis, SystemSettings } from './types';
+import { ProductAnalysis, SystemSettings, InventoryItem } from './types';
 import { DEFAULT_SETTINGS } from './utils/calculator';
 import { auth, googleProvider } from './firebase';
 import { getStoredProducts, getStoredSettings, saveProductAnalysis, saveStoredSettings, deleteProductAnalysis, duplicateProductAnalysis } from './utils/storage';
+import { getInventory, saveInventoryItem, deleteInventoryItem } from './utils/inventory';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -21,6 +23,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(false);
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [products, setProducts] = useState<ProductAnalysis[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedProductForModal, setSelectedProductForModal] = useState<ProductAnalysis | null>(null);
@@ -38,12 +41,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!user) { setProducts([]); return; }
+    if (!user) { setProducts([]); setInventory([]); return; }
     (async () => {
       setDataLoading(true);
       try {
-        const [loadedProducts, loadedSettings] = await Promise.all([getStoredProducts(), getStoredSettings()]);
-        setProducts(loadedProducts); setSettings(loadedSettings);
+        const [loadedProducts, loadedSettings, loadedInventory] = await Promise.all([getStoredProducts(), getStoredSettings(), getInventory()]);
+        setProducts(loadedProducts); setSettings(loadedSettings); setInventory(loadedInventory);
       } catch (e) { console.error(e); }
       finally { setDataLoading(false); }
     })();
@@ -76,6 +79,9 @@ export default function App() {
   const handleSelectProduct = (product: ProductAnalysis) => { setSelectedProductForModal(product); setIsResultModalOpen(true); };
   const handleToggleCompare = (id: string) => setSelectedForCompare((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : prev.length >= 3 ? (showToast('Máximo de 3 produtos para comparação simultânea.'), prev) : [...prev, id]);
   const handleSaveSettings = async (newSettings: SystemSettings) => { setSettings(newSettings); await saveStoredSettings(newSettings); await refreshProducts(); };
+  const refreshInventory = async () => { if (auth.currentUser) setInventory(await getInventory()); };
+  const handleSaveInventory = async (data: any) => { try { await saveInventoryItem(data); await refreshInventory(); showToast(`SKU ${data.sku} salvo com sucesso!`); } catch(e){ console.error(e); showToast('Erro ao salvar estoque no Firestore.'); throw e; } };
+  const handleDeleteInventory = async (id: string) => { await deleteInventoryItem(id); await refreshInventory(); showToast('SKU excluído do estoque.'); };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-amber-300 selection:text-slate-950 transition-colors duration-150">
@@ -92,6 +98,7 @@ export default function App() {
             {currentView === 'produtos' && <ProductsListView products={products} onSelectProduct={handleSelectProduct} onEditProduct={handleEditProduct} onDuplicateProduct={handleDuplicateProduct} onDeleteProduct={handleDeleteProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} selectedForCompare={selectedForCompare} onToggleCompare={handleToggleCompare} onGoToCompare={() => setCurrentView('comparador')} />}
             {currentView === 'ranking' && <RankingView products={products} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'comparador' && <ComparatorView products={products} initialSelectedIds={selectedForCompare} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
+            {currentView === 'estoque' && <InventoryView items={inventory} onSave={handleSaveInventory} onDelete={handleDeleteInventory} />}
             {currentView === 'configuracoes' && <SettingsView settings={settings} onSaveSettings={handleSaveSettings} onReloadData={refreshProducts} />}
           </>}
         </main>

@@ -137,3 +137,18 @@ export interface SystemSettings {
   weightAdAge: number; // 10
   weightFullComp: number; // 15
 }
+
+
+export interface InventoryItem {
+  id: string;
+  sku: string;
+  name: string;
+  unitCost: number;
+  localStock: number;
+  fullStock: number;
+  supplierInbound: number;
+  fullInbound: number;
+  minStock: number;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -11,6 +11,7 @@ import {
   Truck,
   Sparkles,
   TrendingUp,
+  Warehouse,
 } from 'lucide-react';
 import { ProductAnalysis } from '../types';
 
@@ -64,6 +65,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'comparador',
       label: 'Comparador',
       icon: Scale,
+      badge: null,
+    },
+    {
+      id: 'estoque',
+      label: 'Estoque',
+      icon: Warehouse,
       badge: null,
     },
     {
