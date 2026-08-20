@@ -11,13 +11,15 @@ import { ComparatorView } from './components/ComparatorView';
 import { SettingsView } from './components/SettingsView';
 import { InventoryView } from './components/InventoryView';
 import { FinanceView } from './components/FinanceView';
+import { FinanceCenterView } from './components/FinanceCenterView';
 import { AnalysisResultModal } from './components/AnalysisResultModal';
-import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, InventoryMovementType, SaleRecord } from './types';
+import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, InventoryMovementType, SaleRecord, FinancePlan, CashEntry, DebtRecord } from './types';
 import { DEFAULT_SETTINGS } from './utils/calculator';
 import { auth, googleProvider } from './firebase';
 import { getStoredProducts, getStoredSettings, saveProductAnalysis, saveStoredSettings, deleteProductAnalysis, duplicateProductAnalysis } from './utils/storage';
 import { getInventory, saveInventoryItem, deleteInventoryItem, getInventoryMovements, createInventoryMovement, deleteInventoryMovement } from './utils/inventory';
 import { getSales, saveSale, deleteSale } from './utils/sales';
+import { getFinanceCenter, savePlan, saveCashEntry, deleteCashEntry, saveDebt, deleteDebt, defaultPlan } from './utils/financeCenter';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,6 +30,9 @@ export default function App() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [financePlan,setFinancePlan]=useState<FinancePlan>(defaultPlan);
+  const [cashEntries,setCashEntries]=useState<CashEntry[]>([]);
+  const [debts,setDebts]=useState<DebtRecord[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedProductForModal, setSelectedProductForModal] = useState<ProductAnalysis | null>(null);
@@ -45,12 +50,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!user) { setProducts([]); setInventory([]); setInventoryMovements([]); setSales([]); return; }
+    if (!user) { setProducts([]); setInventory([]); setInventoryMovements([]); setSales([]); setCashEntries([]); setDebts([]); return; }
     (async () => {
       setDataLoading(true);
       try {
-        const [loadedProducts, loadedSettings, loadedInventory, loadedMovements, loadedSales] = await Promise.all([getStoredProducts(), getStoredSettings(), getInventory(), getInventoryMovements(), getSales()]);
-        setProducts(loadedProducts); setSettings(loadedSettings); setInventory(loadedInventory); setInventoryMovements(loadedMovements); setSales(loadedSales);
+        const [loadedProducts, loadedSettings, loadedInventory, loadedMovements, loadedSales, fc] = await Promise.all([getStoredProducts(), getStoredSettings(), getInventory(), getInventoryMovements(), getSales(), getFinanceCenter()]);
+        setProducts(loadedProducts); setSettings(loadedSettings); setInventory(loadedInventory); setInventoryMovements(loadedMovements); setSales(loadedSales); setFinancePlan(fc.plan); setCashEntries(fc.entries); setDebts(fc.debts);
       } catch (e) { console.error(e); }
       finally { setDataLoading(false); }
     })();
@@ -99,6 +104,13 @@ export default function App() {
   const handleSaveSale = async (data:any) => { try { await saveSale(data); await refreshSalesAndInventory(); showToast('Venda salva e estoque atualizado!'); } catch(e:any){ console.error(e); showToast(e?.message||'Erro ao salvar venda.'); throw e; } };
   const handleDeleteSale = async (id:string) => { try { await deleteSale(id); await refreshSalesAndInventory(); showToast('Venda excluída e estoque devolvido!'); } catch(e:any){ showToast(e?.message||'Erro ao excluir venda.'); throw e; } };
 
+  const refreshFinanceCenter=async()=>{const x=await getFinanceCenter();setFinancePlan(x.plan);setCashEntries(x.entries);setDebts(x.debts);};
+  const handlePlan=async(p:FinancePlan)=>{await savePlan(p);await refreshFinanceCenter();showToast('Planejamento financeiro salvo!');};
+  const handleCash=async(x:any)=>{await saveCashEntry(x);await refreshFinanceCenter();showToast('Movimentação financeira salva!');};
+  const handleDeleteCash=async(id:string)=>{await deleteCashEntry(id);await refreshFinanceCenter();showToast('Movimentação excluída.');};
+  const handleDebt=async(x:any)=>{await saveDebt(x);await refreshFinanceCenter();showToast('Dívida cadastrada!');};
+  const handleDeleteDebt=async(id:string)=>{await deleteDebt(id);await refreshFinanceCenter();showToast('Dívida excluída.');};
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-amber-300 selection:text-slate-950 transition-colors duration-150">
       <Header onOpenMobileMenu={() => setIsMobileMenuOpen(true)} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} currentView={currentView} />
@@ -116,6 +128,7 @@ export default function App() {
             {currentView === 'comparador' && <ComparatorView products={products} initialSelectedIds={selectedForCompare} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'estoque' && <InventoryView items={inventory} movements={inventoryMovements} onSave={handleSaveInventory} onDelete={handleDeleteInventory} onMove={handleInventoryMovement} onDeleteMovement={handleDeleteInventoryMovement} />}
             {currentView === 'financeiro' && <FinanceView sales={sales} items={inventory} onSave={handleSaveSale} onDelete={handleDeleteSale} />}
+            {currentView === 'centro-financeiro' && <FinanceCenterView plan={financePlan} entries={cashEntries} debts={debts} onPlan={handlePlan} onEntry={handleCash} onDeleteEntry={handleDeleteCash} onDebt={handleDebt} onDeleteDebt={handleDeleteDebt} />}
             {currentView === 'configuracoes' && <SettingsView settings={settings} onSaveSettings={handleSaveSettings} onReloadData={refreshProducts} />}
           </>}
         </main>

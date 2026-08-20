@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Warehouse,
   DollarSign,
+  Wallet,
 } from 'lucide-react';
 import { ProductAnalysis } from '../types';
 
@@ -76,8 +77,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'financeiro',
-      label: 'Financeiro',
+      label: 'Vendas & Lucro',
       icon: DollarSign,
+      badge: null,
+    },
+    {
+      id: 'centro-financeiro',
+      label: 'Centro Financeiro',
+      icon: Wallet,
       badge: null,
     },
     {
