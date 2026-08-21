@@ -19,14 +19,14 @@ const CircularControl=({category,base,onChange,onEdit,onDelete}:{category:Financ
  return <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
   <div className="flex items-start justify-between gap-2 min-h-9"><b className="text-sm">{category.name}</b><div className="flex items-center gap-1"><b className="text-xs text-amber-500 mr-1">{pct}%</b><button title="Editar" onClick={onEdit} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><Pencil className="w-3.5 h-3.5"/></button><button title="Excluir" onClick={onDelete} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="w-3.5 h-3.5"/></button></div></div>
   <div className="relative w-36 h-36 mx-auto my-2 select-none touch-none">
-   <svg ref={ref} viewBox="0 0 120 120" className="w-full h-full -rotate-90 touch-none" onPointerMove={movePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer}>
+   <svg ref={ref} viewBox="0 0 120 120" className="w-full h-full touch-none" onPointerMove={movePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer}>
     <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-slate-200 dark:text-slate-800"/>
-    <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${d} ${c-d}`} className="text-amber-400 pointer-events-none"/>
+    <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" pathLength="100" strokeDasharray={`${pct} ${100-pct}`} strokeDashoffset="25" className="text-amber-400 pointer-events-none"/>
     <circle cx={60+r*Math.sin(pct/100*Math.PI*2)} cy={60-r*Math.cos(pct/100*Math.PI*2)} r="8" className="fill-amber-400 stroke-white dark:stroke-slate-900 cursor-grab active:cursor-grabbing" strokeWidth="3" onPointerDown={pointer}/>
    </svg>
    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><b className="text-base">{money(base*pct/100)}</b><span className="text-[10px] text-slate-500">destinados</span><b className="text-xs text-amber-500 mt-1">{pct}%</b></div>
   </div>
-  <p className="text-[11px] text-center text-slate-500">Arraste a bolinha amarela • 0% e 100% têm limite</p>
+  <p className="text-[11px] text-center text-slate-500">0% começa sempre no topo • arraste a bolinha para definir o final</p>
   <div className="flex justify-center mt-2"><div className="flex items-center rounded-xl border dark:border-slate-700 overflow-hidden"><button onClick={()=>onChange(Math.max(0,pct-1))} className="px-3 py-2 font-black">−</button><input aria-label={`Porcentagem ${category.name}`} type="number" min="0" max="100" value={pct} onChange={e=>onChange(Math.max(0,Math.min(100,Number(e.target.value)||0)))} className="w-14 text-center bg-transparent outline-none font-black"/><span className="pr-2 text-xs">%</span><button onClick={()=>onChange(Math.min(100,pct+1))} className="px-3 py-2 font-black">+</button></div></div>
  </div>
 };
