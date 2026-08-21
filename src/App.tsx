@@ -19,7 +19,7 @@ import { auth, googleProvider } from './firebase';
 import { getStoredProducts, getStoredSettings, saveProductAnalysis, saveStoredSettings, deleteProductAnalysis, duplicateProductAnalysis } from './utils/storage';
 import { getInventory, saveInventoryItem, deleteInventoryItem, getInventoryMovements, createInventoryMovement, deleteInventoryMovement } from './utils/inventory';
 import { getSales, saveSale, deleteSale } from './utils/sales';
-import { getFinanceCenter, savePlan, saveCashEntry, deleteCashEntry, saveDebt, deleteDebt, defaultPlan } from './utils/financeCenter';
+import { getFinanceCenter, savePlan, saveCashEntry, deleteCashEntry, saveDebt, deleteDebt, defaultPlan, transferBetweenCashboxes } from './utils/financeCenter';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -110,6 +110,7 @@ export default function App() {
   const handleDeleteCash=async(id:string)=>{await deleteCashEntry(id);await refreshFinanceCenter();showToast('Movimentação excluída.');};
   const handleDebt=async(x:any)=>{await saveDebt(x);await refreshFinanceCenter();showToast('Dívida cadastrada!');};
   const handleDeleteDebt=async(id:string)=>{await deleteDebt(id);await refreshFinanceCenter();showToast('Dívida excluída.');};
+  const handleTransfer=async(direction:'BUSINESS_TO_PERSONAL'|'PERSONAL_TO_BUSINESS',amount:number,date:string,note:string)=>{await transferBetweenCashboxes(direction,amount,date,note);await refreshFinanceCenter();showToast('Transferência realizada!');};
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-amber-300 selection:text-slate-950 transition-colors duration-150">
@@ -128,7 +129,7 @@ export default function App() {
             {currentView === 'comparador' && <ComparatorView products={products} initialSelectedIds={selectedForCompare} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'estoque' && <InventoryView items={inventory} movements={inventoryMovements} onSave={handleSaveInventory} onDelete={handleDeleteInventory} onMove={handleInventoryMovement} onDeleteMovement={handleDeleteInventoryMovement} />}
             {currentView === 'financeiro' && <FinanceView sales={sales} items={inventory} onSave={handleSaveSale} onDelete={handleDeleteSale} />}
-            {currentView === 'centro-financeiro' && <FinanceCenterView plan={financePlan} entries={cashEntries} debts={debts} onPlan={handlePlan} onEntry={handleCash} onDeleteEntry={handleDeleteCash} onDebt={handleDebt} onDeleteDebt={handleDeleteDebt} />}
+            {currentView === 'centro-financeiro' && <FinanceCenterView plan={financePlan} entries={cashEntries} debts={debts} onPlan={handlePlan} onEntry={handleCash} onDeleteEntry={handleDeleteCash} onDebt={handleDebt} onDeleteDebt={handleDeleteDebt} onTransfer={handleTransfer} />}
             {currentView === 'configuracoes' && <SettingsView settings={settings} onSaveSettings={handleSaveSettings} onReloadData={refreshProducts} />}
           </>}
         </main>
