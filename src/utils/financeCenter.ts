@@ -1,5 +1,5 @@
-import {collection,deleteDoc,doc,getDoc,getDocs,setDoc,writeBatch} from 'firebase/firestore';import{db}from'../firebase';import{CashEntry,DebtRecord,FinancePlan}from'../types';
-const PLAN='financePlan',MOV='cashEntries',DEBT='debts';
+import {collection,deleteDoc,doc,getDoc,getDocs,setDoc,writeBatch} from 'firebase/firestore';import{db}from'../firebase';import{CashEntry,DebtRecord,FinancePlan,FinanceCategory}from'../types';
+const PLAN='financePlan',MOV='cashEntries',DEBT='debts',CATS='financeCategories';
 export const defaultPlan:FinancePlan={id:'main',mercadoPagoBalance:0,businessCash:0,personalCash:0,personalSpendPct:40,debtPct:35,reservePct:15,investPct:10,businessReinvestPct:70,businessReservePct:15,businessWithdrawalPct:10,businessOtherPct:5,personalEssentialPct:40,personalFreePct:10,businessMinCash:0,updatedAt:new Date().toISOString()};
 export async function getFinanceCenter(){const[p,m,d]=await Promise.all([getDoc(doc(db,PLAN,'main')),getDocs(collection(db,MOV)),getDocs(collection(db,DEBT))]);return{plan:p.exists()?{...defaultPlan,...(p.data()as FinancePlan)}:defaultPlan,entries:m.docs.map(x=>x.data()as CashEntry).sort((a,b)=>b.date.localeCompare(a.date)),debts:d.docs.map(x=>x.data()as DebtRecord)}}
 export async function savePlan(p:FinancePlan){const x={...p,id:'main',updatedAt:new Date().toISOString()};await setDoc(doc(db,PLAN,'main'),x);return x}
@@ -22,3 +22,21 @@ export async function transferBetweenCashboxes(direction:'BUSINESS_TO_PERSONAL'|
  b.set(doc(db,MOV,`${pair}-in`),{id:`${pair}-in`,area:toArea,kind:'TRANSFER',category:'Transferência',description:note||label,amount:value,date,createdAt:now,transferPairId:pair,transferDirection:direction});
  await b.commit();
 }
+
+const defaultBusinessCats=[['Reposição / Reinvestimento',70],['Reserva da empresa',15],['Retirada pessoal',10],['Outros',5]] as const;
+const defaultPersonalCats=[['Gastos essenciais',40],['Dívidas',25],['Gastos livres',10],['Reserva',15],['Investimentos',10]] as const;
+export async function getFinanceCategories(){
+ const snap=await getDocs(collection(db,CATS));
+ if(!snap.empty)return snap.docs.map(x=>x.data()as FinanceCategory).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+ const now=new Date().toISOString(),rows:FinanceCategory[]=[];
+ for(const [area,defs] of [['BUSINESS',defaultBusinessCats],['PERSONAL',defaultPersonalCats]] as const){
+  for(let i=0;i<defs.length;i++){const[name,percentage]=defs[i],id=`${area.toLowerCase()}-${i}`,v:FinanceCategory={id,area,name,percentage,createdAt:now,updatedAt:now};await setDoc(doc(db,CATS,id),v);rows.push(v)}
+ }
+ return rows;
+}
+export async function saveFinanceCategory(x:Partial<FinanceCategory>&Pick<FinanceCategory,'area'|'name'|'percentage'>){
+ const id=x.id||`cat-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,now=new Date().toISOString();
+ const v:FinanceCategory={id,area:x.area,name:x.name.trim(),percentage:Math.max(0,Math.min(100,Number(x.percentage)||0)),createdAt:x.createdAt||now,updatedAt:now};
+ await setDoc(doc(db,CATS,id),v);return v;
+}
+export async function deleteFinanceCategory(id:string){await deleteDoc(doc(db,CATS,id))}

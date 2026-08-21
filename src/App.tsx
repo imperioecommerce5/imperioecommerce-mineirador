@@ -13,13 +13,13 @@ import { InventoryView } from './components/InventoryView';
 import { FinanceView } from './components/FinanceView';
 import { FinanceCenterView } from './components/FinanceCenterView';
 import { AnalysisResultModal } from './components/AnalysisResultModal';
-import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, InventoryMovementType, SaleRecord, FinancePlan, CashEntry, DebtRecord } from './types';
+import { ProductAnalysis, SystemSettings, InventoryItem, InventoryMovement, InventoryMovementType, SaleRecord, FinancePlan, CashEntry, DebtRecord, FinanceCategory } from './types';
 import { DEFAULT_SETTINGS } from './utils/calculator';
 import { auth, googleProvider } from './firebase';
 import { getStoredProducts, getStoredSettings, saveProductAnalysis, saveStoredSettings, deleteProductAnalysis, duplicateProductAnalysis } from './utils/storage';
 import { getInventory, saveInventoryItem, deleteInventoryItem, getInventoryMovements, createInventoryMovement, deleteInventoryMovement } from './utils/inventory';
 import { getSales, saveSale, deleteSale } from './utils/sales';
-import { getFinanceCenter, savePlan, saveCashEntry, deleteCashEntry, saveDebt, deleteDebt, defaultPlan, transferBetweenCashboxes } from './utils/financeCenter';
+import { getFinanceCenter, savePlan, saveCashEntry, deleteCashEntry, saveDebt, deleteDebt, defaultPlan, transferBetweenCashboxes, getFinanceCategories, saveFinanceCategory, deleteFinanceCategory } from './utils/financeCenter';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,6 +33,7 @@ export default function App() {
   const [financePlan,setFinancePlan]=useState<FinancePlan>(defaultPlan);
   const [cashEntries,setCashEntries]=useState<CashEntry[]>([]);
   const [debts,setDebts]=useState<DebtRecord[]>([]);
+  const [financeCategories,setFinanceCategories]=useState<FinanceCategory[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedProductForModal, setSelectedProductForModal] = useState<ProductAnalysis | null>(null);
@@ -56,6 +57,7 @@ export default function App() {
       try {
         const [loadedProducts, loadedSettings, loadedInventory, loadedMovements, loadedSales, fc] = await Promise.all([getStoredProducts(), getStoredSettings(), getInventory(), getInventoryMovements(), getSales(), getFinanceCenter()]);
         setProducts(loadedProducts); setSettings(loadedSettings); setInventory(loadedInventory); setInventoryMovements(loadedMovements); setSales(loadedSales); setFinancePlan(fc.plan); setCashEntries(fc.entries); setDebts(fc.debts);
+        setFinanceCategories(await getFinanceCategories());
       } catch (e) { console.error(e); }
       finally { setDataLoading(false); }
     })();
@@ -112,6 +114,11 @@ export default function App() {
   const handleDeleteDebt=async(id:string)=>{await deleteDebt(id);await refreshFinanceCenter();showToast('Dívida excluída.');};
   const handleTransfer=async(direction:'BUSINESS_TO_PERSONAL'|'PERSONAL_TO_BUSINESS',amount:number,date:string,note:string)=>{await transferBetweenCashboxes(direction,amount,date,note);await refreshFinanceCenter();showToast('Transferência realizada!');};
 
+  const refreshFinanceCategories=async()=>setFinanceCategories(await getFinanceCategories());
+  const handleFinanceCategory=async(x:any)=>{await saveFinanceCategory(x);await refreshFinanceCategories();showToast('Categoria salva!');};
+  const handleDeleteFinanceCategory=async(id:string)=>{await deleteFinanceCategory(id);await refreshFinanceCategories();showToast('Categoria excluída.');};
+
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col antialiased selection:bg-amber-300 selection:text-slate-950 transition-colors duration-150">
       <Header onOpenMobileMenu={() => setIsMobileMenuOpen(true)} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} currentView={currentView} />
@@ -129,7 +136,7 @@ export default function App() {
             {currentView === 'comparador' && <ComparatorView products={products} initialSelectedIds={selectedForCompare} onSelectProduct={handleSelectProduct} onNavigate={(view) => { if (view === 'nova-analise') setEditingProduct(null); setCurrentView(view); }} />}
             {currentView === 'estoque' && <InventoryView items={inventory} movements={inventoryMovements} onSave={handleSaveInventory} onDelete={handleDeleteInventory} onMove={handleInventoryMovement} onDeleteMovement={handleDeleteInventoryMovement} />}
             {currentView === 'financeiro' && <FinanceView sales={sales} items={inventory} onSave={handleSaveSale} onDelete={handleDeleteSale} />}
-            {currentView === 'centro-financeiro' && <FinanceCenterView plan={financePlan} entries={cashEntries} debts={debts} onPlan={handlePlan} onEntry={handleCash} onDeleteEntry={handleDeleteCash} onDebt={handleDebt} onDeleteDebt={handleDeleteDebt} onTransfer={handleTransfer} />}
+            {currentView === 'centro-financeiro' && <FinanceCenterView plan={financePlan} entries={cashEntries} debts={debts} onPlan={handlePlan} onEntry={handleCash} onDeleteEntry={handleDeleteCash} onDebt={handleDebt} onDeleteDebt={handleDeleteDebt} onTransfer={handleTransfer} categories={financeCategories} onCategory={handleFinanceCategory} onDeleteCategory={handleDeleteFinanceCategory} />}
             {currentView === 'configuracoes' && <SettingsView settings={settings} onSaveSettings={handleSaveSettings} onReloadData={refreshProducts} />}
           </>}
         </main>
