@@ -15,7 +15,7 @@ const AllocationBar=({title,subtitle,base,items,onChange}:{title:string;subtitle
 };
 
 export const FinanceCenterView:React.FC<{plan:FinancePlan;entries:CashEntry[];debts:DebtRecord[];onPlan:(p:FinancePlan)=>Promise<void>;onEntry:(x:any)=>Promise<void>;onDeleteEntry:(id:string)=>Promise<void>;onDebt:(x:any)=>Promise<void>;onDeleteDebt:(id:string)=>Promise<void>;onTransfer?:(direction:'BUSINESS_TO_PERSONAL'|'PERSONAL_TO_BUSINESS',amount:number,date:string,note:string)=>Promise<void>}>=({plan,entries,debts,onPlan,onEntry,onDeleteEntry,onDebt,onDeleteDebt,onTransfer})=>{
- const[p,setP]=useState(plan),[tab,setTab]=useState<Tab>('GERAL'),[entry,setEntry]=useState(false),[debt,setDebt]=useState(false),[saving,setSaving]=useState(false);
+ const[p,setP]=useState(plan),[tab,setTab]=useState<Tab>('GERAL'),[entry,setEntry]=useState(false),[debt,setDebt]=useState(false),[transfer,setTransfer]=useState(false),[saving,setSaving]=useState(false);
  useEffect(()=>setP(plan),[plan]);
  const month=entries.filter(x=>x.date.slice(0,7)===today().slice(0,7));
  const businessIncome=month.filter(x=>x.area==='BUSINESS'&&x.kind==='INCOME').reduce((a,x)=>a+x.amount,0);
