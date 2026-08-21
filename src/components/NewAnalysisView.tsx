@@ -29,7 +29,13 @@ interface NewAnalysisViewProps {
 }
 
 const DEFAULT_METRICS: AvantproMetrics = {
+  totalSearchResults: 0,
+  totalResultPages: 0,
   totalRecentAds: 0,
+  recentAds30Monthly: 0,
+  recentAds90Monthly: 0,
+  recentAds150Monthly: 0,
+  recentAds300Monthly: 0,
   recentAds100Plus: 0,
   recentAds300Plus: 0,
   recentAds500Plus: 0,
@@ -77,21 +83,28 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
   );
 
   const handleMetricChange = (field: keyof AvantproMetrics, val: string | number) => {
-    const num = Math.max(0, Number(val) || 0);
+    const raw = Math.max(0, Number(val) || 0);
     setMetrics((prev) => {
+      const recentTotal = field === 'totalRecentAds' ? raw : prev.totalRecentAds;
+      const recentFields: (keyof AvantproMetrics)[] = ['recentAds30Monthly','recentAds90Monthly','recentAds150Monthly','recentAds300Monthly','fullCompetitors'];
+      const num = recentFields.includes(field) && recentTotal > 0 ? Math.min(raw, recentTotal) : raw;
       const next = { ...prev, [field]: num };
-
-      // Compatibilidade com o motor de score atual:
-      // a coleta agora é SEMPRE feita após o filtro <=180 dias.
       if (field === 'totalRecentAds') {
-        next.adsUnder180Days = num;
-        next.ads180To365Days = 0;
-        next.adsOver365Days = 0;
+        next.adsUnder180Days = num; next.ads180To365Days = 0; next.adsOver365Days = 0;
+        next.fullCompetitors = Math.min(next.fullCompetitors, num);
+        next.recentAds30Monthly = Math.min(next.recentAds30Monthly, num);
+        next.recentAds90Monthly = Math.min(next.recentAds90Monthly, next.recentAds30Monthly);
+        next.recentAds150Monthly = Math.min(next.recentAds150Monthly, next.recentAds90Monthly);
+        next.recentAds300Monthly = Math.min(next.recentAds300Monthly, next.recentAds150Monthly);
       }
-      if (field === 'recentAds100Plus') next.adsMaking150Plus = num;
-      if (field === 'recentAds300Plus') next.adsMaking300Plus = num;
-      if (field === 'recentAds500Plus') next.newEntrants300Plus = num;
-
+      if (field === 'recentAds30Monthly') { next.recentAds90Monthly=Math.min(next.recentAds90Monthly,num); next.recentAds150Monthly=Math.min(next.recentAds150Monthly,next.recentAds90Monthly); next.recentAds300Monthly=Math.min(next.recentAds300Monthly,next.recentAds150Monthly); }
+      if (field === 'recentAds90Monthly') { next.recentAds90Monthly=Math.min(num,next.recentAds30Monthly); next.recentAds150Monthly=Math.min(next.recentAds150Monthly,next.recentAds90Monthly); next.recentAds300Monthly=Math.min(next.recentAds300Monthly,next.recentAds150Monthly); }
+      if (field === 'recentAds150Monthly') { next.recentAds150Monthly=Math.min(num,next.recentAds90Monthly); next.recentAds300Monthly=Math.min(next.recentAds300Monthly,next.recentAds150Monthly); }
+      if (field === 'recentAds300Monthly') next.recentAds300Monthly=Math.min(num,next.recentAds150Monthly);
+      // Compatibilidade com módulos antigos do app.
+      next.adsMaking150Plus = next.recentAds150Monthly;
+      next.adsMaking300Plus = next.recentAds300Monthly;
+      next.newEntrants300Plus = next.recentAds300Monthly;
       return next;
     });
   };
@@ -280,131 +293,18 @@ export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({
             </div>
           </div>
 
-          {/* SECTION 2: AVANTPRO METRICS (1ST PAGE) */}
+          {/* SECTION 2: AVANTPRO METRICS */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 font-black text-xs flex items-center justify-center">
-                  2
-                </span>
-                <h2 className="text-sm font-black uppercase text-slate-900 dark:text-white tracking-wider">
-                  Métricas Avantpro (1ª Página de Resultados)
-                </h2>
-              </div>
-              <span className="text-2xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                Filtros Avantpro
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 p-4">
-                <div className="flex items-start gap-3">
-                  <span className="shrink-0 w-7 h-7 rounded-lg bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center">1</span>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-white">Antes de preencher</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                      No Mercado Livre, pesquise o produto e aplique o filtro de anúncios criados há <strong>180 dias ou menos</strong>.
-                      As métricas de concorrência abaixo devem ser coletadas somente dentro desse filtro.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                      Vendas totais da página
-                    </label>
-                    <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200/70 dark:bg-slate-700 px-1.5 py-0.5 rounded">GERAL</span>
-                  </div>
-                  <input type="number" min="0" value={metrics.totalPageSales}
-                    onChange={(e) => handleMetricChange('totalPageSales', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
-                  <p className="text-3xs text-slate-500 dark:text-slate-400">
-                    Número geral exibido pelo Mercado Livre. <strong>Não representa apenas os últimos 180 dias.</strong>
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                      Resultados após filtro ≤180d
-                    </label>
-                    <span className="text-3xs font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/80 px-1.5 py-0.5 rounded">BASE RECENTE</span>
-                  </div>
-                  <input type="number" min="0" value={metrics.totalRecentAds}
-                    onChange={(e) => handleMetricChange('totalRecentAds', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
-                  <p className="text-3xs text-slate-500 dark:text-slate-400">Quantidade de anúncios encontrados depois de aplicar o filtro de até 180 dias.</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="px-4 py-3 bg-slate-100/80 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-white">Tração dos anúncios recentes</p>
-                  <p className="text-3xs text-slate-500 dark:text-slate-400 mt-0.5">Conte somente anúncios dentro do filtro ≤180 dias. As faixas são cumulativas.</p>
-                </div>
-                <div className="grid grid-cols-1 min-[390px]:grid-cols-3 gap-3 p-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1">100+ vendas</label>
-                    <input type="number" min="0" value={metrics.recentAds100Plus}
-                      onChange={(e) => handleMetricChange('recentAds100Plus', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
-                    <p className="text-3xs text-slate-500 mt-1">
-                      {metrics.totalRecentAds > 0 ? `${Math.round((metrics.recentAds100Plus / metrics.totalRecentAds) * 100)}% dos recentes` : 'Taxa calculada automaticamente'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1">300+ vendas</label>
-                    <input type="number" min="0" value={metrics.recentAds300Plus}
-                      onChange={(e) => handleMetricChange('recentAds300Plus', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
-                    <p className="text-3xs text-slate-500 mt-1">
-                      {metrics.totalRecentAds > 0 ? `${Math.round((metrics.recentAds300Plus / metrics.totalRecentAds) * 100)}% dos recentes` : 'Taxa calculada automaticamente'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-800 dark:text-slate-200 mb-1">500+ vendas</label>
-                    <input type="number" min="0" value={metrics.recentAds500Plus}
-                      onChange={(e) => handleMetricChange('recentAds500Plus', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
-                    <p className="text-3xs text-slate-500 mt-1">
-                      {metrics.totalRecentAds > 0 ? `${Math.round((metrics.recentAds500Plus / metrics.totalRecentAds) * 100)}% dos recentes` : 'Taxa calculada automaticamente'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">
-                      Anúncios no Full dentro dos ≤180d
-                    </label>
-                  </div>
-                  <span className="text-3xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded">
-                    CONCORRÊNCIA RECENTE
-                  </span>
-                </div>
-                <input type="number" min="0" value={metrics.fullCompetitors}
-                  onChange={(e) => handleMetricChange('fullCompetitors', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800" />
-                <p className="text-3xs text-slate-500 dark:text-slate-400">
-                  {metrics.totalRecentAds > 0
-                    ? `${Math.round((metrics.fullCompetitors / metrics.totalRecentAds) * 100)}% dos anúncios recentes estão no Full.`
-                    : 'Informe primeiro a quantidade de resultados ≤180d para calcular a pressão do Full.'}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-4">
-                <p className="text-xs font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-wide">Sequência de coleta</p>
-                <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-1">
-                  1. Vendas gerais da página → 2. Aplicar filtro ≤180d → 3. Resultados recentes → 4. Contar 100+ / 300+ / 500+ → 5. Contar quantos recentes estão no Full.
-                </p>
-              </div>
-            </div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800"><div className="flex items-center gap-2"><span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 font-black text-xs flex items-center justify-center">2</span><h2 className="text-sm font-black uppercase text-slate-900 dark:text-white tracking-wider">Métricas Avantpro — Demanda Atual</h2></div><span className="text-2xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">≤180 DIAS</span></div>
+            <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 p-4"><p className="text-xs font-black uppercase">Sequência correta</p><p className="text-xs mt-1 text-slate-600 dark:text-slate-300">1. Pesquise o produto → 2. Anote resultados, páginas e vendas gerais → 3. Aplique o filtro ≤180d → 4. Conte os anúncios por <strong>ritmo atual (vendas/mês)</strong> → 5. Conte os recentes no Full.</p></div>
+            <div><p className="text-xs font-black uppercase mb-2">1 • Tamanho do mercado</p><div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[['totalSearchResults','Resultados totais','Quantidade geral encontrada na pesquisa.'],['totalResultPages','Páginas de resultados','Profundidade da concorrência na busca.'],['totalPageSales','Vendas gerais','Histórico geral; não é limitado aos 180 dias.']].map(([key,label,hint])=><div key={key} className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"><label className="block text-xs font-black uppercase mb-1">{label}</label><input type="number" min="0" value={(metrics as any)[key]} onChange={e=>handleMetricChange(key as keyof AvantproMetrics,e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black bg-white dark:bg-slate-800"/><p className="text-3xs text-slate-500 mt-1">{hint}</p></div>)}
+            </div></div>
+            <div><p className="text-xs font-black uppercase mb-2">2 • Concorrência recente</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"><label className="block text-xs font-black uppercase mb-1">Resultados após filtro ≤180d</label><input type="number" min="0" value={metrics.totalRecentAds} onChange={e=>handleMetricChange('totalRecentAds',e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black bg-white dark:bg-slate-800"/></div><div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"><label className="block text-xs font-black uppercase mb-1">Full dentro dos ≤180d</label><input type="number" min="0" max={metrics.totalRecentAds||undefined} value={metrics.fullCompetitors} onChange={e=>handleMetricChange('fullCompetitors',e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black bg-white dark:bg-slate-800"/><p className="text-3xs text-slate-500 mt-1">{metrics.totalRecentAds?`${Math.round(metrics.fullCompetitors/metrics.totalRecentAds*100)}% dos recentes estão no Full.`:'Informe a base recente.'}</p></div></div></div>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"><div className="px-4 py-3 bg-slate-100/80 dark:bg-slate-800 border-b dark:border-slate-700"><p className="text-xs font-black uppercase">3 • Ritmo atual dos anúncios ≤180d</p><p className="text-3xs text-slate-500 mt-0.5">Faixas cumulativas. Ex.: um anúncio com 310 vendas/mês entra em 30+, 90+, 150+ e 300+.</p></div><div className="grid grid-cols-1 min-[390px]:grid-cols-2 lg:grid-cols-4 gap-3 p-4">
+              {[['recentAds30Monthly','30+ / mês','≥1 venda/dia'],['recentAds90Monthly','90+ / mês','≥3 vendas/dia'],['recentAds150Monthly','150+ / mês','≥5 vendas/dia'],['recentAds300Monthly','300+ / mês','≥10 vendas/dia']].map(([key,label,hint])=>{const v=(metrics as any)[key] as number;return <div key={key}><label className="block text-xs font-black mb-1">{label}</label><input type="number" min="0" max={metrics.totalRecentAds||undefined} value={v} onChange={e=>handleMetricChange(key as keyof AvantproMetrics,e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-black bg-white dark:bg-slate-800"/><p className="text-3xs text-slate-500 mt-1">{metrics.totalRecentAds?`${Math.round(v/metrics.totalRecentAds*100)}% dos recentes • ${hint}`:hint}</p></div>})}
+            </div></div>
+            {metrics.totalRecentAds>0&&<div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-4"><p className="text-xs font-black text-emerald-900 dark:text-emerald-300 uppercase">Densidade de vendedores ativos</p><p className="text-sm font-black mt-1">{Math.round(metrics.recentAds90Monthly/metrics.totalRecentAds*100)}% dos anúncios recentes fazem pelo menos 3 vendas/dia</p><p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-1">{Math.round(metrics.recentAds150Monthly/metrics.totalRecentAds*100)}% fazem ≥5/dia • {Math.round(metrics.recentAds300Monthly/metrics.totalRecentAds*100)}% fazem ≥10/dia.</p></div>}
           </div>
 
           {/* SECTION 3: UNIT FINANCIAL SIMULATOR (OPTIONAL) */}

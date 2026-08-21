@@ -213,52 +213,51 @@ export function calculateScoreAndDiagnosis(
   settings: SystemSettings = DEFAULT_SETTINGS,
   financials?: FinancialData
 ): { scoreBreakdown: ScoreBreakdown; diagnosis: ProductDiagnosis } {
-  const recentTotal = Math.max(0, metrics.totalRecentAds ?? metrics.adsUnder180Days ?? 0);
-  const recent100 = Math.max(0, metrics.recentAds100Plus ?? metrics.adsMaking150Plus ?? 0);
-  const recent300 = Math.max(0, metrics.recentAds300Plus ?? metrics.adsMaking300Plus ?? 0);
-  const recent500 = Math.max(0, metrics.recentAds500Plus ?? metrics.newEntrants300Plus ?? 0);
-  const full = Math.max(0, metrics.fullCompetitors || 0);
-  const pct100 = recentTotal ? Math.min(1,recent100/recentTotal) : 0;
-  const pct300 = recentTotal ? Math.min(1,recent300/recentTotal) : 0;
-  const pct500 = recentTotal ? Math.min(1,recent500/recentTotal) : 0;
-  const pctFull = recentTotal ? Math.min(1,full/recentTotal) : 0;
-  const metricDiagnostics: MetricDiagnostic[]=[]; const positivePoints:string[]=[]; const attentionPoints:string[]=[];
+  const recentTotal=Math.max(0,metrics.totalRecentAds||metrics.adsUnder180Days||0);
+  const m30=Math.min(recentTotal,Math.max(0,metrics.recentAds30Monthly||0));
+  const m90=Math.min(m30,Math.max(0,metrics.recentAds90Monthly||0));
+  const m150=Math.min(m90,Math.max(0,metrics.recentAds150Monthly||metrics.adsMaking150Plus||0));
+  const m300=Math.min(m150,Math.max(0,metrics.recentAds300Monthly||metrics.adsMaking300Plus||0));
+  const full=Math.min(recentTotal,Math.max(0,metrics.fullCompetitors||0));
+  const pct=(v:number)=>recentTotal?Math.min(1,v/recentTotal):0,p30=pct(m30),p90=pct(m90),p150=pct(m150),p300=pct(m300),pFull=pct(full);
+  const metricDiagnostics:MetricDiagnostic[]=[],positivePoints:string[]=[],attentionPoints:string[]=[];
   const color=(l:MetricDiagnostic['level']):MetricDiagnostic['statusColor']=>l==='EXCELENTE'||l==='BOM'?'emerald':l==='ACEITAVEL'?'yellow':'rose';
 
-  let tractionScore=Math.round(Math.min(40, Math.min(18,pct100/0.30*18)+Math.min(14,pct300/0.15*14)+Math.min(8,pct500/0.07*8)));
-  if(recentTotal>=10&&pct100<0.05) tractionScore=Math.round(tractionScore*0.45); else if(recentTotal>=10&&pct100<0.10) tractionScore=Math.round(tractionScore*0.70);
-  const tractionLevel:MetricDiagnostic['level']=tractionScore>=34?'EXCELENTE':tractionScore>=27?'BOM':tractionScore>=18?'ACEITAVEL':'FRACA';
-  metricDiagnostics.push({key:'traction180',name:'Tração dos Anúncios Recentes (≤180d)',displayValue:`${recent100} com 100+ • ${recent300} com 300+ • ${recent500} com 500+`,level:tractionLevel,statusColor:color(tractionLevel),summary:recentTotal?`${Math.round(pct100*100)}% chegaram a 100+, ${Math.round(pct300*100)}% a 300+ e ${Math.round(pct500*100)}% a 500+.`:'Informe os resultados do filtro ≤180 dias.',scoreAwarded:tractionScore,maxScore:40});
-  if(pct100>=.25) positivePoints.push(`${Math.round(pct100*100)}% dos anúncios recentes ultrapassaram 100 vendas.`);
-  if(recentTotal>=10&&pct100<.10) attentionPoints.push('Poucos anúncios recentes passam de 100 vendas: possível concentração da demanda.');
+  // Maior peso: anúncios recentes que continuam vendendo AGORA.
+  let tractionScore=Math.round(Math.min(45,Math.min(10,p30/.55*10)+Math.min(15,p90/.30*15)+Math.min(12,p150/.18*12)+Math.min(8,p300/.08*8)));
+  if(recentTotal>=10&&p90<.08)tractionScore=Math.round(tractionScore*.55);
+  const tractionLevel:MetricDiagnostic['level']=tractionScore>=38?'EXCELENTE':tractionScore>=30?'BOM':tractionScore>=20?'ACEITAVEL':'FRACA';
+  metricDiagnostics.push({key:'currentPace180',name:'Ritmo Atual dos Anúncios Recentes',displayValue:`${m90} com 90+/mês • ${m150} com 150+/mês • ${m300} com 300+/mês`,level:tractionLevel,statusColor:color(tractionLevel),summary:recentTotal?`${Math.round(p90*100)}% fazem ≥3/dia, ${Math.round(p150*100)}% ≥5/dia e ${Math.round(p300*100)}% ≥10/dia.`:'Informe os anúncios do filtro ≤180d.',scoreAwarded:tractionScore,maxScore:45});
+  if(p90>=.30)positivePoints.push(`${Math.round(p90*100)}% dos anúncios recentes mantêm ritmo de pelo menos 3 vendas/dia.`);
+  if(recentTotal>=10&&p90<.10)attentionPoints.push('Poucos anúncios recentes mantêm ritmo de 3 vendas/dia: demanda atual pode estar concentrada.');
 
-  let competitionScore=0; let competitionLevel:MetricDiagnostic['level']='FRACA';
-  if(recentTotal<=0){competitionScore=0}else if(recentTotal<=10){competitionScore=20;competitionLevel='EXCELENTE'}else if(recentTotal<=20){competitionScore=18;competitionLevel='BOM'}else if(recentTotal<=35){competitionScore=15;competitionLevel='BOM'}else if(recentTotal<=50){competitionScore=11;competitionLevel='ACEITAVEL'}else if(recentTotal<=80){competitionScore=7;competitionLevel='ATENCAO'}else{competitionScore=4}
-  metricDiagnostics.push({key:'recentCompetition',name:'Concorrência Recente (≤180d)',displayValue:`${recentTotal} anúncios`,level:competitionLevel,statusColor:color(competitionLevel),summary:recentTotal<=20&&recentTotal>0?'Poucos anúncios recentes disputando a palavra-chave.':recentTotal<=50?'Concorrência recente moderada.':'Muitos anúncios recentes disputando a mesma demanda.',scoreAwarded:competitionScore,maxScore:20});
+  let recentScore=0,recentLevel:MetricDiagnostic['level']='FRACA';
+  if(recentTotal>0){if(recentTotal<=10){recentScore=15;recentLevel='EXCELENTE'}else if(recentTotal<=25){recentScore=13;recentLevel='BOM'}else if(recentTotal<=50){recentScore=10;recentLevel='ACEITAVEL'}else if(recentTotal<=80){recentScore=6;recentLevel='ATENCAO'}else recentScore=3}
+  metricDiagnostics.push({key:'recentCompetition',name:'Concorrência Recente (≤180d)',displayValue:`${recentTotal} anúncios`,level:recentLevel,statusColor:color(recentLevel),summary:recentTotal<=25&&recentTotal>0?'Base recente enxuta.':recentTotal<=50?'Concorrência recente moderada.':'Muitos anúncios recentes disputando a demanda.',scoreAwarded:recentScore,maxScore:15});
 
-  let fullScore=0; let fullLevel:MetricDiagnostic['level']='FRACA';
-  if(recentTotal){if(pctFull<=.15){fullScore=15;fullLevel='EXCELENTE'}else if(pctFull<=.30){fullScore=13;fullLevel='BOM'}else if(pctFull<=.45){fullScore=10;fullLevel='ACEITAVEL'}else if(pctFull<=.60){fullScore=7;fullLevel='ATENCAO'}else{fullScore=4}}
-  metricDiagnostics.push({key:'fullPressure',name:'Pressão do Full nos Recentes',displayValue:recentTotal?`${full}/${recentTotal} (${Math.round(pctFull*100)}%)`:'—',level:fullLevel,statusColor:color(fullLevel),summary:recentTotal?`${Math.round(pctFull*100)}% dos anúncios ≤180d estão no Full.`:'Informe a base recente.',scoreAwarded:fullScore,maxScore:15});
+  let fullScore=0,fullLevel:MetricDiagnostic['level']='FRACA';if(recentTotal){if(pFull<=.15){fullScore=12;fullLevel='EXCELENTE'}else if(pFull<=.30){fullScore=10;fullLevel='BOM'}else if(pFull<=.50){fullScore=7;fullLevel='ACEITAVEL'}else if(pFull<=.70){fullScore=4;fullLevel='ATENCAO'}else fullScore=2}
+  metricDiagnostics.push({key:'fullPressure',name:'Pressão do Full nos Recentes',displayValue:recentTotal?`${full}/${recentTotal} (${Math.round(pFull*100)}%)`:'—',level:fullLevel,statusColor:color(fullLevel),summary:recentTotal?`${Math.round(pFull*100)}% dos anúncios recentes estão no Full.`:'Informe a base recente.',scoreAwarded:fullScore,maxScore:12});
 
-  const demand=Math.max(0,metrics.totalPageSales||0); let demandScore=2; let demandLevel:MetricDiagnostic['level']='FRACA';
-  if(demand>=15000){demandScore=15;demandLevel='EXCELENTE'}else if(demand>=8000){demandScore=13;demandLevel='BOM'}else if(demand>=5000){demandScore=11;demandLevel='BOM'}else if(demand>=3000){demandScore=8;demandLevel='ACEITAVEL'}else if(demand>=1500){demandScore=5;demandLevel='ATENCAO'}
-  metricDiagnostics.push({key:'generalDemand',name:'Vendas Totais da Página (Geral)',displayValue:`${demand.toLocaleString('pt-BR')} vendas`,level:demandLevel,statusColor:color(demandLevel),summary:'Indicador histórico com peso menor, pois o total não é filtrável por 180 dias.',scoreAwarded:demandScore,maxScore:15});
+  const results=Math.max(0,metrics.totalSearchResults||0),pages=Math.max(0,metrics.totalResultPages||0);let marketScore=8,marketLevel:MetricDiagnostic['level']='ACEITAVEL';
+  if(results>0){if(results<=150){marketScore=13;marketLevel='EXCELENTE'}else if(results<=500){marketScore=11;marketLevel='BOM'}else if(results<=1500){marketScore=8;marketLevel='ACEITAVEL'}else if(results<=4000){marketScore=5;marketLevel='ATENCAO'}else{marketScore=2;marketLevel='SATURADO'}}
+  if(pages>=20)marketScore=Math.max(0,marketScore-2); else if(pages>=10)marketScore=Math.max(0,marketScore-1);
+  metricDiagnostics.push({key:'marketDepth',name:'Saturação / Profundidade da Busca',displayValue:results?`${results.toLocaleString('pt-BR')} resultados • ${pages||'—'} páginas`:'Não informado',level:marketLevel,statusColor:color(marketLevel),summary:'Resultados têm peso principal; páginas funcionam como confirmação da profundidade, sem duplicar o peso.',scoreAwarded:marketScore,maxScore:13});
 
-  let financialScore=5, margin=0; let financialLevel:MetricDiagnostic['level']='ACEITAVEL'; let financialSummary='Financeiro não preenchido: pontuação neutra (5/10).';
-  if(financials?.enabled){const cf=calculateFinancials(financials,settings);margin=cf.netMarginPercent;if(margin>=30){financialScore=10;financialLevel='EXCELENTE'}else if(margin>=25){financialScore=9;financialLevel='BOM'}else if(margin>=20){financialScore=7;financialLevel='BOM'}else if(margin>=15){financialScore=5}else if(margin>=10){financialScore=3;financialLevel='ATENCAO'}else{financialScore=0;financialLevel='FRACA'}financialSummary=`Margem líquida estimada de ${margin.toFixed(1)}%.`;}
-  metricDiagnostics.push({key:'financialViability',name:'Viabilidade Financeira',displayValue:financials?.enabled?`${margin.toFixed(1)}% margem líquida`:'Não preenchido',level:financialLevel,statusColor:color(financialLevel),summary:financialSummary,scoreAwarded:financialScore,maxScore:10});
+  const demand=Math.max(0,metrics.totalPageSales||0);let demandScore=3,demandLevel:MetricDiagnostic['level']='FRACA';if(demand>=15000){demandScore=10;demandLevel='EXCELENTE'}else if(demand>=8000){demandScore=9;demandLevel='BOM'}else if(demand>=5000){demandScore=7;demandLevel='BOM'}else if(demand>=3000){demandScore=5;demandLevel='ACEITAVEL'}
+  metricDiagnostics.push({key:'generalDemand',name:'Vendas Gerais (Histórico Auxiliar)',displayValue:`${demand.toLocaleString('pt-BR')} vendas`,level:demandLevel,statusColor:color(demandLevel),summary:'Indicador auxiliar, pois não pode ser limitado aos últimos 180 dias.',scoreAwarded:demandScore,maxScore:10});
 
-  let totalScore=Math.round(tractionScore+competitionScore+fullScore+demandScore+financialScore);
-  if(recentTotal>=10&&pct100<.05) totalScore=Math.min(totalScore,54); else if(recentTotal>=10&&pct100<.10) totalScore=Math.min(totalScore,64);
-  totalScore=Math.max(0,Math.min(100,totalScore));
+  let financialScore=3,margin=0,financialLevel:MetricDiagnostic['level']='ACEITAVEL',financialSummary='Financeiro não preenchido: pontuação neutra.';if(financials?.enabled){const cf=calculateFinancials(financials,settings);margin=cf.netMarginPercent;if(margin>=30){financialScore=5;financialLevel='EXCELENTE'}else if(margin>=20){financialScore=4;financialLevel='BOM'}else if(margin>=15){financialScore=3}else if(margin>=10){financialScore=2;financialLevel='ATENCAO'}else{financialScore=0;financialLevel='FRACA'}financialSummary=`Margem líquida estimada de ${margin.toFixed(1)}%.`}
+  metricDiagnostics.push({key:'financialViability',name:'Viabilidade Financeira',displayValue:financials?.enabled?`${margin.toFixed(1)}% margem líquida`:'Não preenchido',level:financialLevel,statusColor:color(financialLevel),summary:financialSummary,scoreAwarded:financialScore,maxScore:5});
+
+  let totalScore=Math.round(tractionScore+recentScore+fullScore+marketScore+demandScore+financialScore);if(recentTotal>=10&&p90<.05)totalScore=Math.min(totalScore,54);else if(recentTotal>=10&&p90<.10)totalScore=Math.min(totalScore,64);totalScore=Math.max(0,Math.min(100,totalScore));
   const recommendation:RecommendationStatus=totalScore>=80?'ENTRAR':totalScore>=60?'ANALISAR':totalScore>=40?'ALTO_RISCO':'DESCARTAR';
-  const chanceGoal5Daily:'ALTA'|'MEDIA'|'BAIXA'=totalScore>=78&&pct100>=.20?'ALTA':totalScore>=58&&pct100>=.10?'MEDIA':'BAIXA';
+  const chanceGoal5Daily:'ALTA'|'MEDIA'|'BAIXA'=totalScore>=78&&p150>=.15?'ALTA':totalScore>=58&&p90>=.12?'MEDIA':'BAIXA';
   const verdictTitle=recommendation==='ENTRAR'?'OPORTUNIDADE FORTE PARA ENTRADA':recommendation==='ANALISAR'?'OPORTUNIDADE PROMISSORA — VALIDAR DETALHES':recommendation==='ALTO_RISCO'?'OPORTUNIDADE COM RISCO ELEVADO':'BAIXA EVIDÊNCIA PARA ENTRADA';
-  const verdictText=recommendation==='ENTRAR'?'Os anúncios criados nos últimos 180 dias mostram tração distribuída e condições favoráveis de entrada.':recommendation==='ANALISAR'?'Existem sinais positivos, mas valide margem, oferta e concentração das vendas recentes.':recommendation==='ALTO_RISCO'?'Tração recente, concorrência e/ou pressão Full não oferecem segurança para entrada agressiva.':'Os anúncios recentes não demonstram tração suficiente para justificar a entrada.';
-  const nextStep=recommendation==='ENTRAR'?'Validar fornecedor e margem final; preparar lote de teste e anúncio competitivo no Full.':recommendation==='ANALISAR'?'Comparar líderes recentes, validar margem e diferenciação de oferta.':'Priorizar outras oportunidades antes de imobilizar capital.';
-  const normalized={...metrics,adsUnder180Days:recentTotal,ads180To365Days:0,adsOver365Days:0,adsMaking150Plus:recent100,adsMaking300Plus:recent300,newEntrants300Plus:recent500};
-  const fullAdvantage=calculateFullAdvantage(normalized); const salesPotential=calculateSalesPotential(normalized);
-  return {scoreBreakdown:{demandScore,rate150Score:tractionScore,rate300Score:competitionScore,newEntrantsScore:financialScore,adAgeScore:0,fullCompScore:fullScore,totalScore,recommendation},diagnosis:{metricDiagnostics,positivePoints:positivePoints.length?positivePoints:['Dados recentes registrados para análise.'],attentionPoints:attentionPoints.length?attentionPoints:['Validar preço e oferta dos líderes antes da compra.'],chanceGoal5Daily,salesPotential,fullAdvantage,verdictTitle,verdictText,nextStep}};
+  const verdictText=recommendation==='ENTRAR'?'Vendedores que entraram recentemente continuam apresentando ritmo atual forte, com concorrência administrável.':recommendation==='ANALISAR'?'Há demanda atual comprovada, mas valide saturação, Full, margem e concentração dos vendedores.':recommendation==='ALTO_RISCO'?'O ritmo atual e/ou a concorrência recente não oferecem segurança para uma entrada agressiva.':'Poucos anúncios recentes demonstram ritmo atual suficiente para justificar a entrada.';
+  const nextStep=recommendation==='ENTRAR'?'Validar fornecedor e margem final; preparar lote de teste e oferta competitiva.':recommendation==='ANALISAR'?'Comparar os anúncios recentes com maior ritmo, preço e proposta de valor.':'Priorizar outras oportunidades antes de imobilizar capital.';
+  const normalized={...metrics,adsUnder180Days:recentTotal,ads180To365Days:0,adsOver365Days:0,adsMaking150Plus:m150,adsMaking300Plus:m300,newEntrants300Plus:m300};
+  const fullAdvantage=calculateFullAdvantage(normalized),salesPotential=calculateSalesPotential(normalized);
+  return {scoreBreakdown:{demandScore,rate150Score:tractionScore,rate300Score:recentScore,newEntrantsScore:financialScore,adAgeScore:marketScore,fullCompScore:fullScore,totalScore,recommendation},diagnosis:{metricDiagnostics,positivePoints:positivePoints.length?positivePoints:['Dados recentes registrados para análise.'],attentionPoints:attentionPoints.length?attentionPoints:['Valide preço e oferta dos líderes recentes antes da compra.'],chanceGoal5Daily,salesPotential,fullAdvantage,verdictTitle,verdictText,nextStep}};
 }
 
 /**

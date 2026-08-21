@@ -1,7 +1,13 @@
 export type RecommendationStatus = 'ENTRAR' | 'ANALISAR' | 'ALTO_RISCO' | 'DESCARTAR';
 
 export interface AvantproMetrics {
+  totalSearchResults: number; // Quantidade geral de resultados da pesquisa
+  totalResultPages: number; // Quantidade de páginas de resultados
   totalRecentAds: number; // Quantidade de resultados após filtrar anúncios criados há <=180 dias
+  recentAds30Monthly: number; // Recentes com ritmo atual >=30 vendas/mês
+  recentAds90Monthly: number; // Recentes com ritmo atual >=90 vendas/mês
+  recentAds150Monthly: number; // Recentes com ritmo atual >=150 vendas/mês
+  recentAds300Monthly: number; // Recentes com ritmo atual >=300 vendas/mês
   recentAds100Plus: number; // Entre os <=180d, quantos possuem 100+ vendas acumuladas
   recentAds300Plus: number; // Entre os <=180d, quantos possuem 300+ vendas acumuladas
   recentAds500Plus: number; // Entre os <=180d, quantos possuem 500+ vendas acumuladas
