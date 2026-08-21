@@ -6,30 +6,27 @@ type Tab='GERAL'|'EMPRESA'|'PESSOAL'|'MOVIMENTACOES';
 
 const CircularControl=({category,base,onChange,onEdit,onDelete}:{category:FinanceCategory;base:number;onChange:(v:number)=>void;onEdit:()=>void;onDelete:()=>void})=>{
  const ref=useRef<SVGSVGElement>(null),drag=useRef(false),pct=category.percentage,r=45,c=2*Math.PI*r,d=c*pct/100;
- const lastPct=useRef(pct);
- useEffect(()=>{lastPct.current=pct},[pct]);
- const calc=(clientX:number,clientY:number)=>{const box=ref.current?.getBoundingClientRect();if(!box)return;const cx=box.left+box.width/2,cy=box.top+box.height/2;let deg=Math.atan2(clientY-cy,clientX-cx)*180/Math.PI+90;if(deg<0)deg+=360;let value=Math.round(deg/3.6);
-  const prev=lastPct.current;
-  // The top is both ends of the arc. Choose the nearest end instead of wrapping through it.
-  if(value<=3||value>=97)value=prev>=50?100:0;
-  // Prevent a drag near one endpoint from teleporting to the opposite endpoint.
-  if(prev>=90&&value<=10)value=100;
-  if(prev<=10&&value>=90)value=0;
-  value=Math.max(0,Math.min(100,value));lastPct.current=value;onChange(value);
+ const dragState=useRef({lastAngle:0,value:pct});
+ useEffect(()=>{if(!drag.current)dragState.current.value=pct},[pct]);
+ const angleAt=(clientX:number,clientY:number)=>{const box=ref.current?.getBoundingClientRect();if(!box)return 0;const cx=box.left+box.width/2,cy=box.top+box.height/2;return Math.atan2(clientY-cy,clientX-cx)*180/Math.PI};
+ const pointer=(e:React.PointerEvent<SVGSVGElement>)=>{drag.current=true;dragState.current={lastAngle:angleAt(e.clientX,e.clientY),value:pct};e.currentTarget.setPointerCapture(e.pointerId)};
+ const movePointer=(e:React.PointerEvent<SVGSVGElement>)=>{if(!drag.current)return;const angle=angleAt(e.clientX,e.clientY);let delta=angle-dragState.current.lastAngle;if(delta>180)delta-=360;if(delta<-180)delta+=360;
+  // SVG percentage grows clockwise; screen atan2 also grows clockwise.
+  const next=Math.max(0,Math.min(100,dragState.current.value+delta/3.6));
+  dragState.current={lastAngle:angle,value:next};onChange(Math.round(next));
  };
- const pointer=(e:React.PointerEvent<SVGSVGElement>)=>{drag.current=true;lastPct.current=pct;e.currentTarget.setPointerCapture(e.pointerId);calc(e.clientX,e.clientY)};
+ const stopPointer=(e:React.PointerEvent<SVGSVGElement>)=>{drag.current=false;try{e.currentTarget.releasePointerCapture(e.pointerId)}catch{}};
  return <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
   <div className="flex items-start justify-between gap-2 min-h-9"><b className="text-sm">{category.name}</b><div className="flex items-center gap-1"><b className="text-xs text-amber-500 mr-1">{pct}%</b><button title="Editar" onClick={onEdit} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><Pencil className="w-3.5 h-3.5"/></button><button title="Excluir" onClick={onDelete} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="w-3.5 h-3.5"/></button></div></div>
   <div className="relative w-36 h-36 mx-auto my-2 select-none touch-none">
-   <svg ref={ref} viewBox="0 0 120 120" className="w-full h-full -rotate-90 cursor-grab active:cursor-grabbing touch-none" onPointerDown={pointer} onPointerMove={e=>{if(drag.current)calc(e.clientX,e.clientY)}} onPointerUp={()=>drag.current=false} onPointerCancel={()=>drag.current=false}>
+   <svg ref={ref} viewBox="0 0 120 120" className="w-full h-full -rotate-90 touch-none" onPointerMove={movePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer}>
     <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-slate-200 dark:text-slate-800"/>
     <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${d} ${c-d}`} className="text-amber-400 pointer-events-none"/>
-    <circle cx="60" cy={60-r} r="4.5" className="fill-slate-900 dark:fill-white pointer-events-none"/>
-    <circle cx={60+r*Math.sin(pct/100*Math.PI*2)} cy={60-r*Math.cos(pct/100*Math.PI*2)} r="7.5" className="fill-amber-400 stroke-white dark:stroke-slate-900 pointer-events-none" strokeWidth="3"/>
+    <circle cx={60+r*Math.sin(pct/100*Math.PI*2)} cy={60-r*Math.cos(pct/100*Math.PI*2)} r="8" className="fill-amber-400 stroke-white dark:stroke-slate-900 cursor-grab active:cursor-grabbing" strokeWidth="3" onPointerDown={pointer}/>
    </svg>
    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><b className="text-base">{money(base*pct/100)}</b><span className="text-[10px] text-slate-500">destinados</span><b className="text-xs text-amber-500 mt-1">{pct}%</b></div>
   </div>
-  <p className="text-[11px] text-center text-slate-500">Arraste a bolinha amarela para definir o final</p>
+  <p className="text-[11px] text-center text-slate-500">Arraste a bolinha amarela • 0% e 100% têm limite</p>
   <div className="flex justify-center mt-2"><div className="flex items-center rounded-xl border dark:border-slate-700 overflow-hidden"><button onClick={()=>onChange(Math.max(0,pct-1))} className="px-3 py-2 font-black">−</button><input aria-label={`Porcentagem ${category.name}`} type="number" min="0" max="100" value={pct} onChange={e=>onChange(Math.max(0,Math.min(100,Number(e.target.value)||0)))} className="w-14 text-center bg-transparent outline-none font-black"/><span className="pr-2 text-xs">%</span><button onClick={()=>onChange(Math.min(100,pct+1))} className="px-3 py-2 font-black">+</button></div></div>
  </div>
 };
