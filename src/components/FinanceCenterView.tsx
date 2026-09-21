@@ -93,7 +93,6 @@ export const FinanceCenterView: React.FC = () => {
   const [usuario, setUsuario] = useState<any>(null);
   const [verificandoAuth, setVerificandoAuth] = useState<boolean>(true);
 
-  // Monitorar se o usuário está logado
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setUsuario(user);
@@ -107,7 +106,7 @@ export const FinanceCenterView: React.FC = () => {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Erro ao fazer login com o Google:", error);
-      alert("Erro ao entrar com o Google. Verifique se ativou o Authentication no painel do Firebase.");
+      alert("Erro ao entrar com o Google. Verifique se ativou o Authentication e o domínio da Vercel no painel do Firebase.");
     }
   };
 
@@ -630,7 +629,7 @@ export const FinanceCenterView: React.FC = () => {
     );
   }
 
-  // TELA DE LOGIN SE NÃO ESTIVER LOGADO
+  // TELA DE LOGIN COM O GOOGLE EXCLUSIVA
   if (!usuario) {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center p-4 font-sans`}>
@@ -1123,6 +1122,7 @@ export const FinanceCenterView: React.FC = () => {
                       <span className={`text-sm md:text-base font-black font-mono ${saldoRealPote < 0 ? 'text-rose-500' : ''}`}>
                         {formatarGrana(saldoRealPote)}
                       </span>
+                      <span className="text-[9px] text-slate-400">Disponível p/ gastar</span>
                     </div>
                   </div>
 
@@ -1596,7 +1596,7 @@ export const FinanceCenterView: React.FC = () => {
                 <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Vault className="w-4 h-4 text-emerald-500" /> Patrimônio da Família
                 </button>
-                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-850' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
                 </button>
               </div>
