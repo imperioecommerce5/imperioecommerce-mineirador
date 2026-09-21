@@ -204,24 +204,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
-  const adicionarContaFixaTemp = () => {
-    if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0) return;
-    setContasFixasTemp([...contasFixasTemp, {
-      id: Date.now().toString(),
-      nome: novaContaNome,
-      valor: Number(novaContaValor),
-      tipo: novaContaTipo,
-      parcelaAtual: novaContaTipo === 'parcelado' ? Number(novaContaParcelaAtual) || 1 : undefined,
-      totalParcelas: novaContaTipo === 'parcelado' ? Number(novaContaTotalParcelas) || 12 : undefined,
-    }]);
-    setNovaContaNome('');
-    setNovaContaValor('');
-  };
-
-  const removerContaFixaTemp = (id: string) => {
-    setContasFixasTemp(contasFixasTemp.filter(c => c.id !== id));
-  };
-
   const solicitarAdicaoPote = (pote: Pote) => {
     if (!potesAtivos.some(p => p.id === pote.id)) {
       if (disponivelGeral <= 0) {
@@ -249,13 +231,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const removerPote = (id: string) => {
     setPotesAtivos(potesAtivos.filter(p => p.id !== id));
-  };
-
-  const atualizarPercentual = (id: string, valorDesejado: number) => {
-    const outrosPotesSoma = potesAtivos.filter(p => p.id !== id).reduce((acc, p) => acc + p.percentual, 0);
-    const maxPermitido = 100 - outrosPotesSoma;
-    const valorFinal = Math.min(valorDesejado, maxPermitido);
-    setPotesAtivos(prev => prev.map(p => p.id === id ? { ...p, percentual: valorFinal } : p));
   };
 
   const processarEntradaComAnimacao = (valor: number, origem: 'CLT' | 'Mercado Livre') => {
@@ -354,7 +329,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         descricao: `Compensação de estouro em ${poteAlvo.nome}`,
         valor: alertaEstouro.valorEstourado,
         tipo: 'saida',
-        poteId: alertaEstouro.poteCompensadorId,
+        poteId:alertaEstouro.poteCompensadorId,
         poteNome: 'Nosso Patrimônio (Compensação)',
         data: new Date().toLocaleDateString('pt-BR')
       };
@@ -384,18 +359,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       tipo: 'manual'
     }]);
     setNomeNovoPatrimonio(''); setValorNovoPatrimonio(''); setModalNovoPatrimonio(false);
-  };
-
-  const adicionarMeta = () => {
-    if (!novaMetaNome || !novaMetaValor || !novaMetaDate) return;
-    setMetas([...metas, {
-      id: Date.now().toString(),
-      nome: novaMetaNome,
-      valorAlvo: Number(novaMetaValor),
-      valorAtual: 0,
-      dataLimite: novaMetaDate
-    }]);
-    setNovaMetaNome(''); setNovaMetaValor(''); setNovaMetaDate('');
   };
 
   const formatarGrana = (valor: number) => {
@@ -532,9 +495,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <p className={`text-xs font-bold text-center ${textMuted}`}>Adicionar Potes ao Plano:</p>
-            <div className="flex items-center space-x-2.5 overflow-x-auto pb-2 scrollbar-none">
+          {/* LISTA DE POTES DISPONÍVEIS PARA ADICIONAR */}
+          <div className="space-y-3 pt-2">
+            <p className={`text-xs font-bold text-center md:text-left ${textMuted}`}>Clique abaixo para adicionar e configurar os potes:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
               {todosPotesDisponiveis.map(pote => {
                 const selecionado = potesAtivos.some(p => p.id === pote.id);
                 return (
@@ -542,10 +506,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     key={pote.id} 
                     disabled={selecionado} 
                     onClick={() => solicitarAdicaoPote(pote)} 
-                    className={`flex-shrink-0 p-2.5 rounded-2xl border text-center flex flex-col items-center space-y-1 w-20 md:w-24 transition-all ${selecionado ? 'opacity-40 border-slate-200 grayscale cursor-not-allowed' : `${cardClasse} hover:border-emerald-500 active:scale-95`}`}
+                    className={`p-3 rounded-2xl border text-center flex flex-col items-center space-y-1.5 transition-all ${selecionado ? 'opacity-40 border-slate-200 grayscale cursor-not-allowed bg-slate-900/40' : `${cardClasse} hover:border-emerald-500 active:scale-95 cursor-pointer`}`}
                   >
-                    <span className="text-xl md:text-2xl">{pote.iconeEmoji}</span>
-                    <span className="text-[10px] md:text-[11px] font-bold truncate w-full">{pote.nome}</span>
+                    <span className="text-2xl">{pote.iconeEmoji}</span>
+                    <span className="text-[11px] font-bold truncate w-full">{pote.nome}</span>
+                    <span className="text-[10px] font-extrabold text-emerald-500">
+                      {selecionado ? 'Adicionado' : '+ Adicionar'}
+                    </span>
                   </button>
                 );
               })}
