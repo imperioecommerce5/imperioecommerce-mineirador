@@ -26,7 +26,8 @@ import {
   Layers,
   BrainCircuit,
   LayoutGrid,
-  Columns2
+  Columns2,
+  LogOut
 } from 'lucide-react';
 
 interface ContaFixa {
@@ -76,10 +77,15 @@ interface ItemPatrimonio {
 
 interface Props {
   emailUsuario?: string;
+  onLogout?: () => void;
 }
 
-export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
-  // Configurações com Persistência (localStorage)
+export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
+  // Persistência da tela ativa (se já passou do onboarding, abre direto no dashboard)
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>(() => {
+    return localStorage.getItem('@meu_imperio_configurado') === 'true' ? 'dashboard' : 'onboarding';
+  });
+
   const [rendaMensal, setRendaMensal] = useState<number>(() => {
     const salvo = localStorage.getItem('@meu_imperio_renda');
     return salvo ? Number(salvo) : 3500;
@@ -87,13 +93,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>('dashboard');
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
-
-  // Modo de Visualização dos Potes (Grid ou Coluna Única)
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
 
-  // Potes Padrão com Academia incluída
   const todosPotesDisponiveis: Pote[] = [
     { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 20, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
     { id: 'patrimonio_manuela', nome: 'Patrimônio Manuela', percentual: 10, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
@@ -136,7 +138,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     return salvo ? JSON.parse(salvo) : [{ id: '1', nome: 'Reserva Renda Fixa / CDB', valor: 3500, tipo: 'manual' }];
   });
 
-  // Salvar no localStorage sempre que houver alterações
+  // Salvar tudo no localStorage automaticamente
   useEffect(() => {
     localStorage.setItem('@meu_imperio_renda', rendaMensal.toString());
     localStorage.setItem('@meu_imperio_potes', JSON.stringify(potesAtivos));
@@ -145,7 +147,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     localStorage.setItem('@meu_imperio_patrimonio', JSON.stringify(itensPatrimonioManuais));
   }, [rendaMensal, potesAtivos, transacoes, metas, itensPatrimonioManuais]);
 
-  // Estados de Modais
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
   const [contasFixasTemp, setContasFixasTemp] = useState<ContaFixa[]>([]);
@@ -193,7 +194,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     setMenuAberto(false);
   };
 
-  // CÁLCULOS FINANCEIROS
   const totalMapeado = potesAtivos.reduce((acc, p) => acc + p.percentual, 0);
   const disponivelGeral = Math.max(0, 100 - totalMapeado);
 
@@ -207,7 +207,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
   const saldoLiquidoDisponivel = Math.max(0, saldoCaixaBruto - totalContasFixasEDividas);
 
-  // Patrimônios Separados
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
   const acumuladoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
@@ -396,12 +395,17 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     setModalLancamento(false);
   };
 
+  const concluirOnboarding = () => {
+    localStorage.setItem('@meu_imperio_configurado', 'true');
+    navegarPara('dashboard');
+  };
+
   const confirmarEntradaInicial = () => {
     if (valorEntradaInicial && Number(valorEntradaInicial) > 0) {
       processarEntradaComAnimacao(Number(valorEntradaInicial), origemEntradaInicial);
     }
     setModalEntradaInicial(false);
-    navegarPara('dashboard');
+    concluirOnboarding();
   };
 
   const adicionarPatrimonioManual = () => {
@@ -566,7 +570,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
-        const totalContasFixas = contasFixasTemp.reduce((a, b) => a + b.valor, 0);
         const valorMapeadoPote = (rendaMensal * percentualPendente) / 100;
         const eDividas = potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida');
 
@@ -626,7 +629,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               Registrar Entrada Inicial
             </button>
             <button 
-              onClick={() => navegarPara('dashboard')}
+              onClick={concluirOnboarding}
               className={`w-full ${inputBg} font-bold py-3 rounded-2xl transition-all text-sm border`}
             >
               Ir para o Painel
@@ -775,14 +778,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             </button>
           </div>
 
-          {/* GRID OU COLUNA DOS POTES (COM CÍRCULO DINÂMICO QUE REDUZ CONFORME OS GASTOS) */}
+          {/* GRID OU COLUNA DOS POTES */}
           <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
               const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
               const saldoRealPote = Math.max(0, valorDiluidoNoPote - gastosPote);
 
-              // Cálculo dinâmico do progresso do círculo (reduz conforme gasta)
               const percentualProgresso = valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100;
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
 
@@ -1090,34 +1092,45 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </div>
       )}
 
-      {/* MENU LATERAL */}
+      {/* MENU LATERAL COM BOTÃO DE SAIR */}
       {menuAberto && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex justify-end" onClick={() => setMenuAberto(false)}>
-          <div className={`${cardClasse} w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l`} onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
-              <X className="w-5 h-5" />
-            </button>
+          <div className={`${cardClasse} w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between`} onClick={(e) => e.stopPropagation()}>
+            <div className="space-y-5">
+              <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
 
-            <h3 className="text-lg font-black text-emerald-500">MEU IMPÉRIO</h3>
+              <h3 className="text-lg font-black text-emerald-500">MEU IMPÉRIO</h3>
 
-            <div className="space-y-1.5 text-xs md:text-sm font-bold">
-              <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <Sliders className="w-4 h-4 text-emerald-500" /> Montar / Refazer Plano
-              </button>
-              <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
-              </button>
-              <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <BrainCircuit className="w-4 h-4 text-emerald-500" /> Diagnóstico de Perfil
-              </button>
-              <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <Vault className="w-4 h-4 text-emerald-500" /> Patrimônio da Família
-              </button>
-              <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
-              </button>
-              <button onClick={() => navegarPara('ajustes')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <Sliders className="w-4 h-4 text-emerald-500" /> Ajustar Limites e Potes
+              <div className="space-y-1.5 text-xs md:text-sm font-bold">
+                <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <Sliders className="w-4 h-4 text-emerald-500" /> Montar / Refazer Plano
+                </button>
+                <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
+                </button>
+                <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <BrainCircuit className="w-4 h-4 text-emerald-500" /> Diagnóstico de Perfil
+                </button>
+                <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <Vault className="w-4 h-4 text-emerald-500" /> Patrimônio da Família
+                </button>
+                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
+                </button>
+                <button onClick={() => navegarPara('ajustes')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <Sliders className="w-4 h-4 text-emerald-500" /> Ajustar Limites e Potes
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800">
+              <button 
+                onClick={onLogout} 
+                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all"
+              >
+                <LogOut className="w-4 h-4" /> Sair da Conta (Logout)
               </button>
             </div>
           </div>
