@@ -237,7 +237,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const disponivelGeral = Math.max(0, 100 - totalMapeado);
 
   const valorAporteNumerico = aportePendenteValor !== '' ? Number(aportePendenteValor) : 0;
-  const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) + valorAporteNumerico;
+  const totalEntradasTransacoes = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
+  
+  // Total de dinheiro bruto que entrou (Transações de entrada + Aporte inicial em caixa)
+  const totalEntradasGeral = totalEntradasTransacoes + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
   // Percentual total de retenções automáticas ativas
@@ -245,12 +248,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     .filter(p => p.retencaoAutomatica)
     .reduce((acc, p) => acc + p.percentual, 0);
 
-  // Valor total retido automaticamente com base em todas as entradas registradas
-  const valorTotalEntradasBrutas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
-  const valorRetidoAutomaticoAcumulado = (valorTotalEntradasBrutas * percentualRetencaoTotal) / 100;
+  // O valor retido automático agora considera tanto as entradas quanto o aporte inicial em caixa
+  const valorRetidoAutomaticoAcumulado = (totalEntradasGeral * percentualRetencaoTotal) / 100;
 
-  // Saldo Real Disponível desconta as saídas manuais e as retenções automáticas de poupança/patrimônio/dízimo
-  const saldoUnicoReal = (totalEntradas - valorRetidoAutomaticoAcumulado) - totalSaidas;
+  // Saldo Real Disponível desconta o que foi retido automaticamente para poupança/patrimônio/dízimo e saídas manuais
+  const saldoUnicoReal = (totalEntradasGeral - valorRetidoAutomaticoAcumulado) - totalSaidas;
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
@@ -924,7 +926,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
             <span className={`text-xs font-semibold ${textMuted}`}>
-              Entradas menos retenções automáticas (poupança, dízimo, patrimônio), saídas e gastos realizados
+              Aporte inicial e entradas menos retenções automáticas (poupança, dízimo, patrimônio), saídas e gastos realizados
             </span>
           </div>
 
