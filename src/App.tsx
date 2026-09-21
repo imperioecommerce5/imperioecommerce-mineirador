@@ -1,44 +1,39 @@
 import React, { useState } from 'react';
 import FinanceCenterView from './components/FinanceCenterView';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
+import { Lock, ArrowRight, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
 
-const EMAIL_AUTORIZADO = "imperioecommerce5@gmail.com"; 
 const SENHA_AUTORIZADA = "0803";
+const EMAIL_FIXO = "imperioecommerce5@gmail.com";
 
 export function App() {
   const [estaLogado, setEstaLogado] = useState<boolean>(false);
   const [animandoLogin, setAnimandoLogin] = useState<boolean>(false);
-  const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
   const [erroLogin, setErroLogin] = useState<string | null>(null);
 
-  const realizarLoginEmail = (e: React.FormEvent) => {
+  const realizarLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput || !senhaInput) {
-      setErroLogin("Por favor, preencha o e-mail e a senha.");
+    if (!senhaInput) {
+      setErroLogin("Por favor, digite a senha de acesso.");
       return;
     }
 
-    const emailLimpo = emailInput.trim().toLowerCase();
-    const senhaLimpa = senhaInput.trim();
-
-    if (emailLimpo === EMAIL_AUTORIZADO.toLowerCase() && senhaLimpa === SENHA_AUTORIZADA) {
+    if (senhaInput.trim() === SENHA_AUTORIZADA) {
       setErroLogin(null);
-      setAnimandoLogin(true); // Dispara a animação de boas-vindas antes de entrar
+      setAnimandoLogin(true); // Dispara a animação de boas-vindas
     } else {
-      setErroLogin("Acesso negado! E-mail ou senha incorretos.");
+      setErroLogin("Senha incorreta! Acesso negado.");
     }
   };
 
   const fazerLogout = () => {
     setEstaLogado(false);
     setAnimandoLogin(false);
-    setEmailInput('');
     setSenhaInput('');
   };
 
   if (estaLogado) {
-    return <FinanceCenterView emailUsuario={EMAIL_AUTORIZADO} onLogout={fazerLogout} />;
+    return <FinanceCenterView emailUsuario={EMAIL_FIXO} onLogout={fazerLogout} />;
   }
 
   // TELA DE ANIMAÇÃO / MENSAGEM DE BOAS-VINDAS COM RESUMO APÓS LOGIN
@@ -84,7 +79,7 @@ export function App() {
             <ShieldCheck className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</h1>
-          <p className="text-xs text-slate-400 font-semibold">Acesso Restrito ao Proprietário</p>
+          <p className="text-xs text-slate-400 font-semibold">Acesso Restrito por Senha</p>
         </div>
 
         {erroLogin && (
@@ -94,23 +89,9 @@ export function App() {
           </div>
         )}
 
-        <form onSubmit={realizarLoginEmail} className="space-y-4">
+        <form onSubmit={realizarLogin} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-400 block">E-mail</label>
-            <div className="relative flex items-center">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3.5" />
-              <input
-                type="email"
-                placeholder="imperioecommerce5@gmail.com"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-400 block">Senha</label>
+            <label className="text-xs font-bold text-slate-400 block">Digite a Senha de Acesso</label>
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3.5" />
               <input
@@ -118,7 +99,8 @@ export function App() {
                 placeholder="••••"
                 value={senhaInput}
                 onChange={(e) => setSenhaInput(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                autoFocus
+                className="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3.5 pl-10 pr-4 text-base tracking-widest font-black text-emerald-400 focus:outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
           </div>
@@ -132,7 +114,7 @@ export function App() {
         </form>
 
         <div className="text-center pt-2 border-t border-slate-800/60">
-          <span className="text-[11px] text-slate-500">Acesso exclusivo para: imperioecommerce5@gmail.com</span>
+          <span className="text-[11px] text-slate-500">Sistema protegido por senha exclusiva</span>
         </div>
 
       </div>
