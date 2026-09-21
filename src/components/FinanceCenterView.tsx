@@ -81,46 +81,29 @@ interface Props {
 }
 
 export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
-  // Persistência da tela ativa (se já passou do onboarding, abre direto no dashboard)
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>(() => {
-    return localStorage.getItem('@meu_imperio_configurado') === 'true' ? 'dashboard' : 'onboarding';
-  });
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>('onboarding');
 
-  const [rendaMensal, setRendaMensal] = useState<number>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_renda');
-    return salvo ? Number(salvo) : 3500;
-  });
-
+  const [rendaMensal, setRendaMensal] = useState<number>(0);
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
 
   const todosPotesDisponiveis: Pote[] = [
-    { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 20, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
-    { id: 'patrimonio_manuela', nome: 'Patrimônio Manuela', percentual: 10, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
-    { id: 'supermercado', nome: 'Supermercado', percentual: 20, cor: '#F97316', iconeEmoji: '🧺' },
-    { id: 'transporte', nome: 'Transporte', percentual: 10, cor: '#3B82F6', iconeEmoji: '🚗' },
-    { id: 'academia', nome: 'Academia', percentual: 5, cor: '#EAB308', iconeEmoji: '🏋️' },
-    { id: 'desfrute_ele', nome: 'Desfrute ele', percentual: 10, cor: '#8B5CF6', iconeEmoji: '🎮' },
-    { id: 'desfrute_ela', nome: 'Desfrute ela', percentual: 10, cor: '#EC4899', iconeEmoji: '🛍️' },
-    { 
-      id: 'dividas', 
-      nome: 'Dívidas & Contas Fixas', 
-      percentual: 10, 
-      cor: '#EF4444', 
-      iconeEmoji: '💳',
-      retencaoAutomatica: true,
-      contasFixas: [
-        { id: '1', nome: 'Luz & Água', valor: 120, tipo: 'a_vista' }
-      ]
-    },
-    { id: 'dizimo', nome: 'Dízimo', percentual: 5, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
+    { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 0, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
+    { id: 'patrimonio_manuela', nome: 'Patrimônio Manuela', percentual: 0, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
+    { id: 'supermercado', nome: 'Supermercado', percentual: 0, cor: '#F97316', iconeEmoji: '🧺' },
+    { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', iconeEmoji: '🚗' },
+    { id: 'academia', nome: 'Academia', percentual: 0, cor: '#EAB308', iconeEmoji: '🏋️' },
+    { id: 'desfrute_ele', nome: 'Desfrute ele', percentual: 0, cor: '#8B5CF6', iconeEmoji: '🎮' },
+    { id: 'desfrute_ela', nome: 'Desfrute ela', percentual: 0, cor: '#EC4899', iconeEmoji: '🛍️' },
+    { id: 'dividas', nome: 'Dívidas & Contas Fixas', percentual: 0, cor: '#EF4444', iconeEmoji: '💳', retencaoAutomatica: true, contasFixas: [] },
+    { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
   const [potesAtivos, setPotesAtivos] = useState<Pote[]>(() => {
     const salvo = localStorage.getItem('@meu_imperio_potes');
-    return salvo ? JSON.parse(salvo) : todosPotesDisponiveis;
+    return salvo ? JSON.parse(salvo) : [];
   });
 
   const [transacoes, setTransacoes] = useState<Transacao[]>(() => {
@@ -130,15 +113,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const [metas, setMetas] = useState<Meta[]>(() => {
     const salvo = localStorage.getItem('@meu_imperio_metas');
-    return salvo ? JSON.parse(salvo) : [{ id: '1', nome: 'Fundo da Manuela', valorAlvo: 10000, valorAtual: 1200, dataLimite: '2027-12-31' }];
+    return salvo ? JSON.parse(salvo) : [];
   });
 
   const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>(() => {
     const salvo = localStorage.getItem('@meu_imperio_patrimonio');
-    return salvo ? JSON.parse(salvo) : [{ id: '1', nome: 'Reserva Renda Fixa / CDB', valor: 3500, tipo: 'manual' }];
+    return salvo ? JSON.parse(salvo) : [];
   });
 
-  // Salvar tudo no localStorage automaticamente
   useEffect(() => {
     localStorage.setItem('@meu_imperio_renda', rendaMensal.toString());
     localStorage.setItem('@meu_imperio_potes', JSON.stringify(potesAtivos));
@@ -221,16 +203,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
-
-  useEffect(() => {
-    if (rendaMensal > 0) {
-      const somaDividas = contasFixasTemp.reduce((acc, c) => acc + c.valor, 0);
-      const percentualCalculado = Math.min(100, Math.ceil((somaDividas / rendaMensal) * 100));
-      if (potePendente && (potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida'))) {
-        setPercentualPendente(Math.max(1, percentualCalculado));
-      }
-    }
-  }, [contasFixasTemp, rendaMensal]);
 
   const adicionarContaFixaTemp = () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0) return;
@@ -395,17 +367,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     setModalLancamento(false);
   };
 
-  const concluirOnboarding = () => {
-    localStorage.setItem('@meu_imperio_configurado', 'true');
-    navegarPara('dashboard');
-  };
-
   const confirmarEntradaInicial = () => {
     if (valorEntradaInicial && Number(valorEntradaInicial) > 0) {
       processarEntradaComAnimacao(Number(valorEntradaInicial), origemEntradaInicial);
     }
     setModalEntradaInicial(false);
-    concluirOnboarding();
+    navegarPara('dashboard');
   };
 
   const adicionarPatrimonioManual = () => {
@@ -499,8 +466,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
                 <input
                   type="number"
-                  value={rendaMensal}
-                  onChange={(e) => setRendaMensal(Number(e.target.value))}
+                  value={rendaMensal === 0 ? '' : rendaMensal}
+                  placeholder="0"
+                  onChange={(e) => setRendaMensal(e.target.value === '' ? 0 : Number(e.target.value))}
                   className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black"
                 />
               </div>
@@ -561,6 +529,26 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <button onClick={() => navegarPara('confirmacao')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
                 Concluir Plano Financeiro
               </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <p className={`text-xs font-bold text-center ${textMuted}`}>Adicionar Potes ao Plano:</p>
+            <div className="flex items-center space-x-2.5 overflow-x-auto pb-2 scrollbar-none">
+              {todosPotesDisponiveis.map(pote => {
+                const selecionado = potesAtivos.some(p => p.id === pote.id);
+                return (
+                  <button 
+                    key={pote.id} 
+                    disabled={selecionado} 
+                    onClick={() => solicitarAdicaoPote(pote)} 
+                    className={`flex-shrink-0 p-2.5 rounded-2xl border text-center flex flex-col items-center space-y-1 w-20 md:w-24 transition-all ${selecionado ? 'opacity-40 border-slate-200 grayscale cursor-not-allowed' : `${cardClasse} hover:border-emerald-500 active:scale-95`}`}
+                  >
+                    <span className="text-xl md:text-2xl">{pote.iconeEmoji}</span>
+                    <span className="text-[10px] md:text-[11px] font-bold truncate w-full">{pote.nome}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </main>
@@ -629,7 +617,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               Registrar Entrada Inicial
             </button>
             <button 
-              onClick={concluirOnboarding}
+              onClick={() => navegarPara('dashboard')}
               className={`w-full ${inputBg} font-bold py-3 rounded-2xl transition-all text-sm border`}
             >
               Ir para o Painel
