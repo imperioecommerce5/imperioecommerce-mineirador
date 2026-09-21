@@ -22,8 +22,7 @@ import {
   Columns2,
   LogOut,
   Target,
-  ArrowUpRight,
-  Lock
+  ArrowUpRight
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -83,29 +82,12 @@ interface ItemPatrimonio {
   tipo: 'automatico' | 'manual';
 }
 
-export const FinanceCenterView: React.FC = () => {
-  // ESTADO ÚNICO DE AUTENTICAÇÃO
-  const [autenticado, setAutenticado] = useState<boolean>(false);
-  const [senhaInput, setSenhaInput] = useState<string>('');
-  const [erroSenha, setErroSenha] = useState<boolean>(false);
+interface FinanceCenterViewProps {
+  emailUsuario?: string;
+  onLogout?: () => void;
+}
 
-  const fazerLoginSenha = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (senhaInput === '0803') {
-      setAutenticado(true);
-      setErroSenha(false);
-    } else {
-      setErroSenha(true);
-      setSenhaInput('');
-    }
-  };
-
-  const fazerLogout = () => {
-    setAutenticado(false);
-    setSenhaInput('');
-    setMenuAberto(false);
-  };
-
+export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }) => {
   const docId = 'familia_imperio';
 
   const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil'>('dashboard');
@@ -589,48 +571,6 @@ export const FinanceCenterView: React.FC = () => {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold text-sm`}>
         Carregando...
-      </div>
-    );
-  }
-
-  // TELA ÚNICA DE AUTENTICAÇÃO POR SENHA NUMÉRICA
-  if (!autenticado) {
-    return (
-      <div className={`min-h-screen ${bgClasse} flex items-center justify-center p-4 font-sans`}>
-        <div className={`${cardClasse} rounded-3xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl border border-emerald-500/20`}>
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-3xl font-black">
-            <Lock className="w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-emerald-500">MEU IMPÉRIO</h1>
-            <p className={`text-xs mt-2 ${textMuted}`}>Insira a senha de acesso para entrar no sistema financeiro.</p>
-          </div>
-          
-          <form onSubmit={fazerLoginSenha} className="space-y-4">
-            <input
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoFocus
-              maxLength={4}
-              placeholder="••••"
-              value={senhaInput}
-              onChange={(e) => setSenhaInput(e.target.value)}
-              className={`w-full text-center tracking-[1em] text-2xl font-black ${inputBg} p-3.5 rounded-2xl border focus:outline-none`}
-            />
-
-            {erroSenha && (
-              <span className="text-xs font-bold text-rose-500 block">Senha incorreta. Tente novamente.</span>
-            )}
-
-            <button
-              type="submit"
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3.5 px-4 rounded-2xl shadow-md transition-all cursor-pointer text-sm"
-            >
-              Entrar
-            </button>
-          </form>
-        </div>
       </div>
     );
   }
@@ -1619,12 +1559,14 @@ export const FinanceCenterView: React.FC = () => {
               >
                 <Trash2 className="w-4 h-4" /> Reiniciar Sistema (Zerar Tudo)
               </button>
-              <button 
-                onClick={fazerLogout} 
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" /> Sair da Conta (Bloquear)
-              </button>
+              {onLogout && (
+                <button 
+                  onClick={onLogout} 
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" /> Sair da Conta (Bloquear)
+                </button>
+              )}
             </div>
           </div>
         </div>
