@@ -119,10 +119,10 @@ export const FinanceCenterView: React.FC = () => {
 
   const docId = usuario ? usuario.email.replace(/[^a-zA-Z0-9]/g, '_') : 'familia';
 
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil'>('dashboard');
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil'>('dashboard');
   const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
 
-  const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil') => {
+  const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil') => {
     setTelaAtiva(tela);
     setMenuAberto(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -225,7 +225,7 @@ export const FinanceCenterView: React.FC = () => {
   const [valorLancamento, setValorLancamento] = useState<number | ''>('');
   const [origemEntradaModal, setOrigemEntradaModal] = useState<'CLT' | 'Mercado Livre'>('Mercado Livre');
   const [categoriaSaidaSelecionada, setCategoriaSaidaSelecionada] = useState<string>('Supermercado / Compras');
-  const [poteSelecionadoId, setPoteSelecionadoId] = useState<string>('supermercado');
+  const [poteSelecionadoId, setPoteSelecionadoId] = useState<string>('divida_fixa');
 
   const [filtroExtrato, setFiltroExtrato] = useState<'todos' | 'entradas' | 'saidas'>('todos');
   const [modalNovoPatrimonio, setModalNovoPatrimonio] = useState<boolean>(false);
@@ -247,12 +247,6 @@ export const FinanceCenterView: React.FC = () => {
     ativo: boolean;
     valorTotal: number;
     detalhes: { nome: string; icone: string; valor: number; percentual: number; cor: string }[];
-  } | null>(null);
-
-  const [alertaEstouro, setAlertaEstouro] = useState<{
-    poteNome: string;
-    valorEstourado: number;
-    poteCompensadorId: string;
   } | null>(null);
 
   const reiniciarSistemaGeral = async () => {
@@ -283,7 +277,6 @@ export const FinanceCenterView: React.FC = () => {
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  // Saldo Bruto é exatamente o dinheiro em conta (entradas - saídas totais)
   const saldoBrutoTotal = totalEntradas - totalSaidas;
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
@@ -325,6 +318,40 @@ export const FinanceCenterView: React.FC = () => {
     const novasContas = contasFixasObrigatorias.filter(c => c.id !== id);
     setContasFixasObrigatorias(novasContas);
     await salvarDadosNaNuvem({ contasFixasObrigatorias: novasContas });
+  };
+
+  const pagarParcelaDivida = async (idConta: string) => {
+    const conta = contasFixasObrigatorias.find(c => c.id === idConta);
+    if (!conta || conta.mesesRestantes <= 0) return;
+
+    if (window.confirm(`Registrar pagamento de ${formatarGrana(conta.valor)} para "${conta.nome}"? O valor sairá do Saldo Bruto e abaterá 1 mês.`)) {
+      const novasContas = contasFixasObrigatorias.map(c => {
+        if (c.id === idConta) {
+          return { ...c, mesesRestantes: Math.max(0, c.mesesRestantes - 1) };
+        }
+        return c;
+      });
+
+      const novaSaida: Transacao = {
+        id: Date.now().toString(),
+        descricao: `Pagamento Dívida: ${conta.nome}`,
+        valor: conta.valor,
+        tipo: 'saida',
+        poteId: 'divida_fixa',
+        poteNome: 'Direto do Saldo (Dívida / Conta)',
+        data: new Date().toLocaleDateString('pt-BR')
+      };
+
+      const novasTransacoes = [novaSaida, ...transacoes];
+
+      setContasFixasObrigatorias(novasContas);
+      setTransacoes(novasTransacoes);
+
+      await salvarDadosNaNuvem({ 
+        contasFixasObrigatorias: novasContas, 
+        transacoes: novasTransacoes 
+      });
+    }
   };
 
   const solicitarAdicaoPote = (pote: Pote) => {
@@ -402,15 +429,14 @@ export const FinanceCenterView: React.FC = () => {
     } else {
       const valorGasto = Number(valorLancamento);
 
-      // Se for pagamento de Dívida / Conta Fixa, sai direto do Saldo Bruto (sem mexer em potes)
       if (poteSelecionadoId === 'divida_fixa') {
         const novaSaida: Transacao = {
           id: Date.now().toString(),
-          descricao: `Pagamento de Dívida: ${categoriaSaidaSelecionada}`,
+          descricao: `Pagamento: ${categoriaSaidaSelecionada}`,
           valor: valorGasto,
           tipo: 'saida',
           poteId: 'divida_fixa',
-          poteNome: 'Dívida / Conta Fixa',
+          poteNome: 'Direto do Saldo (Gasto / Dívida)',
           data: new Date().toLocaleDateString('pt-BR')
         };
         const novasTransacoes = [novaSaida, ...transacoes];
@@ -421,31 +447,15 @@ export const FinanceCenterView: React.FC = () => {
       }
 
       const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
-      if (!poteAlvo) return;
-
-      const valorDiluidoNoPote = (rendaRestanteAposDividas * poteAlvo.percentual) / 100;
-      const gastosAtuaisPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
-      const saldoDisponivelPote = valorDiluidoNoPote - gastosAtuaisPote;
-
-      if (valorGasto > saldoDisponivelPote && !poteAlvo.retencaoAutomatica) {
-        const excesso = valorGasto - saldoDisponivelPote;
-        const outroPoteCompensador = potesAtivos.find(p => p.id !== poteAlvo.id && !p.retencaoAutomatica);
-
-        setAlertaEstouro({
-          poteNome: poteAlvo.nome,
-          valorEstourado: excesso,
-          poteCompensadorId: outroPoteCompensador ? outroPoteCompensador.id : 'nosso_patrimonio'
-        });
-        return;
-      }
+      const nomePoteFinal = poteAlvo ? poteAlvo.nome : 'Gasto Geral';
 
       const novaSaida: Transacao = {
         id: Date.now().toString(),
         descricao: categoriaSaidaSelecionada,
         valor: valorGasto,
         tipo: 'saida',
-        poteId: poteAlvo.id,
-        poteNome: poteAlvo.nome,
+        poteId: poteSelecionadoId,
+        poteNome: nomePoteFinal,
         data: new Date().toLocaleDateString('pt-BR')
       };
       const novasTransacoes = [novaSaida, ...transacoes];
@@ -453,43 +463,6 @@ export const FinanceCenterView: React.FC = () => {
       setValorLancamento(''); setModalLancamento(false);
       await salvarDadosNaNuvem({ transacoes: novasTransacoes });
     }
-  };
-
-  const confirmarCompensacaoEstouro = async () => {
-    if (!alertaEstouro || !valorLancamento) return;
-
-    const valorGasto = Number(valorLancamento);
-    const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
-
-    if (poteAlvo) {
-      const novaSaida: Transacao = {
-        id: Date.now().toString(),
-        descricao: `${categoriaSaidaSelecionada} (Excedeu ${formatarGrana(alertaEstouro.valorEstourado)})`,
-        valor: valorGasto,
-        tipo: 'saida',
-        poteId: poteAlvo.id,
-        poteNome: poteAlvo.nome,
-        data: new Date().toLocaleDateString('pt-BR')
-      };
-
-      const compensacaoSaida: Transacao = {
-        id: (Date.now() + 1).toString(),
-        descricao: `Compensação de estouro em ${poteAlvo.nome}`,
-        valor: alertaEstouro.valorEstourado,
-        tipo: 'saida',
-        poteId: alertaEstouro.poteCompensadorId,
-        poteNome: 'Nosso Patrimônio (Compensação)',
-        data: new Date().toLocaleDateString('pt-BR')
-      };
-
-      const novasTransacoes = [novaSaida, compensacaoSaida, ...transacoes];
-      setTransacoes(novasTransacoes);
-      await salvarDadosNaNuvem({ transacoes: novasTransacoes });
-    }
-
-    setAlertaEstouro(null);
-    setValorLancamento('');
-    setModalLancamento(false);
   };
 
   const adicionarPatrimonioManual = async () => {
@@ -602,16 +575,6 @@ export const FinanceCenterView: React.FC = () => {
     setValorDepositoMeta('');
     setMetaSelecionadaId('');
     await salvarDadosNaNuvem({ metas: novasMetas, transacoes: novasTransacoes });
-  };
-
-  const efetivarAportePendente = async () => {
-    if (valorModalAporte !== '' && Number(valorModalAporte) > 0) {
-      await processarEntradaComAnimacao(Number(valorModalAporte), 'Mercado Livre');
-      setAportePendenteValor('');
-      setModalAportePendente(false);
-      setValorModalAporte('');
-      await salvarDadosNaNuvem({ aportePendenteValor: '' });
-    }
   };
 
   const removerTransacao = async (id: string) => {
@@ -1209,6 +1172,74 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
+      {telaAtiva === 'dividas' && (
+        <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
+              <CreditCard className="w-6 h-6 text-rose-500" /> Acompanhamento de Dívidas
+            </h2>
+            <button onClick={() => navegarPara('onboarding')} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer">
+              + Adicionar / Editar Dívidas
+            </button>
+          </div>
+
+          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 text-center space-y-2 border-2 border-rose-500/30`}>
+            <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Total Comprometido Mensal com Dívidas</span>
+            <div className="text-3xl md:text-4xl font-black text-rose-500 font-mono">
+              {formatarGrana(totalContasFixasValor)}
+            </div>
+            <span className={`text-[10px] ${textMuted}`}>({percentualComprometidoDividas.toFixed(1)}% da renda mensal)</span>
+          </div>
+
+          <div className="space-y-3">
+            {contasFixasObrigatorias.length === 0 ? (
+              <p className={`text-center text-xs py-10 ${textMuted}`}>Nenhuma dívida ou conta fixa cadastrada. Vá em "Editar / Ajustar Plano" para cadastrar.</p>
+            ) : (
+              contasFixasObrigatorias.map(c => {
+                const progressoMeses = c.mesesTotales > 0 ? ((c.mesesTotales - c.mesesRestantes) / c.mesesTotales) * 100 : 0;
+                const valorTotalDividaRestante = c.valor * c.mesesRestantes;
+
+                return (
+                  <div key={c.id} className={`${cardClasse} rounded-3xl p-5 space-y-3 border border-rose-500/20`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-2xl">💳</span>
+                        <div>
+                          <span className="font-black text-base block">{c.nome}</span>
+                          <span className="text-[10px] text-slate-400">Parcela: {formatarGrana(c.valor)} / mês</span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => pagarParcelaDivida(c.id)}
+                        disabled={c.mesesRestantes <= 0}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md ${c.mesesRestantes <= 0 ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-rose-500 hover:bg-rose-600 text-white'}`}
+                      >
+                        <Check className="w-4 h-4" /> Pagar Parcela
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className={textMuted}>Progresso ({progressoMeses.toFixed(0)}% quitado)</span>
+                        <span className="font-mono text-rose-400">{c.mesesRestantes} de {c.mesesTotales} meses restantes</span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-rose-500 transition-all duration-500" style={{ width: `${progressoMeses}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+                      <span className={textMuted}>Valor Total Restante da Dívida:</span>
+                      <span className="font-mono font-black text-rose-400 text-sm">{formatarGrana(valorTotalDividaRestante)}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </main>
+      )}
+
       {telaAtiva === 'metas' && (
         <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
@@ -1470,30 +1501,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {alertaEstouro && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative border-2 border-amber-500/50`}>
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-base md:text-lg font-black text-amber-500">Aviso de Limite Excedido</h3>
-              <p className={`text-xs mt-1 ${textMuted}`}>
-                Este gasto estourou o limite do pote <strong>{alertaEstouro.poteNome}</strong> em <strong>{formatarGrana(alertaEstouro.valorEstourado)}</strong>.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs border cursor-pointer`}>
-                Cancelar
-              </button>
-              <button onClick={confirmarCompensacaoEstouro} className="flex-1 bg-amber-500 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1 cursor-pointer">
-                Compensar <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <nav className={`fixed bottom-0 inset-x-0 border-t p-1.5 flex justify-around items-center z-40 transition-colors duration-300 ${isDark ? 'bg-slate-950/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
         <button onClick={() => navegarPara('dashboard')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer">
           <Home className="w-5 h-5 text-emerald-500" /> Início
@@ -1560,7 +1567,7 @@ export const FinanceCenterView: React.FC = () => {
 
                 <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
                 <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
-                  <option value="divida_fixa">💳 Direto do Saldo Bruto (Pagamento de Dívida / Conta)</option>
+                  <option value="divida_fixa">💳 Direto do Saldo Bruto (Geral / Dívidas / Contas)</option>
                   {potesAtivos.map(p => (
                     <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
                   ))}
@@ -1593,6 +1600,9 @@ export const FinanceCenterView: React.FC = () => {
                 </button>
                 <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Sliders className="w-4 h-4 text-emerald-500" /> Editar / Ajustar Plano
+                </button>
+                <button onClick={() => navegarPara('dividas')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <CreditCard className="w-4 h-4 text-rose-500" /> Acompanhamento de Dívidas
                 </button>
                 <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras
