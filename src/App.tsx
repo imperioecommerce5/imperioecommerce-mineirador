@@ -59,7 +59,10 @@ export function App() {
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3.5" />
               <input
-                type="password"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
                 placeholder="••••"
                 value={senhaInput}
                 onChange={(e) => setSenhaInput(e.target.value)}
