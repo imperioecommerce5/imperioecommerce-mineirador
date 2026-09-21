@@ -1628,5 +1628,3 @@ export const FinanceCenterView: React.FC = () => {
 };
 
 export default FinanceCenterView;
-
-Atualizado
