@@ -84,7 +84,7 @@ interface ItemPatrimonio {
 }
 
 export const FinanceCenterView: React.FC = () => {
-  // AUTENTICAÇÃO
+  // ESTADO ÚNICO DE AUTENTICAÇÃO
   const [autenticado, setAutenticado] = useState<boolean>(false);
   const [senhaInput, setSenhaInput] = useState<string>('');
   const [erroSenha, setErroSenha] = useState<boolean>(false);
@@ -108,7 +108,6 @@ export const FinanceCenterView: React.FC = () => {
 
   const docId = 'familia_imperio';
 
-  // ESTADOS GERAIS
   const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil'>('dashboard');
   const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
 
@@ -142,7 +141,6 @@ export const FinanceCenterView: React.FC = () => {
     { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
-  // FIREBASE SYNC
   useEffect(() => {
     const docRef = doc(db, 'imperio_finance', docId);
     const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
@@ -587,7 +585,6 @@ export const FinanceCenterView: React.FC = () => {
     return true;
   });
 
-  // TELA DE CARREGAMENTO
   if (carregandoNuvem) {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold text-sm`}>
@@ -596,7 +593,7 @@ export const FinanceCenterView: React.FC = () => {
     );
   }
 
-  // TELA ÚNICA DE LOGIN (SENHA NUMÉRICA)
+  // TELA ÚNICA DE AUTENTICAÇÃO POR SENHA NUMÉRICA
   if (!autenticado) {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center p-4 font-sans`}>
@@ -638,7 +635,6 @@ export const FinanceCenterView: React.FC = () => {
     );
   }
 
-  // APLICATIVO PRINCIPAL PÓS-LOGIN
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
       
