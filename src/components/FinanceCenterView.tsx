@@ -19,7 +19,10 @@ import {
   Receipt,
   CreditCard,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  Vault,
+  Wallet
 } from 'lucide-react';
 
 interface ContaFixa {
@@ -54,12 +57,19 @@ interface Meta {
   dataLimite: string;
 }
 
+interface ItemPatrimonio {
+  id: string;
+  nome: string;
+  valor: number;
+  tipo: 'automatico' | 'manual';
+}
+
 export const FinanceCenterView: React.FC = () => {
   // Configurações Globais
   const [rendaMensal, setRendaMensal] = useState<number>(2000);
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas'>('onboarding');
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio'>('onboarding');
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
   // Seleção e Gerenciamento de Potes
@@ -78,6 +88,11 @@ export const FinanceCenterView: React.FC = () => {
   const [valorLancamento, setValorLancamento] = useState<number | ''>('');
   const [descLancamento, setDescLancamento] = useState<string>('');
   const [poteSelecionadoId, setPoteSelecionadoId] = useState<string>('supermercado');
+
+  // Modal Patrimônio Manual
+  const [modalNovoPatrimonio, setModalNovoPatrimonio] = useState<boolean>(false);
+  const [nomeNovoPatrimonio, setNomeNovoPatrimonio] = useState('');
+  const [valorNovoPatrimonio, setValorNovoPatrimonio] = useState<number | ''>('');
 
   // Sistema de Alerta e Reposição
   const [alertaEstouro, setAlertaEstouro] = useState<{
@@ -111,7 +126,7 @@ export const FinanceCenterView: React.FC = () => {
     todosPotesDisponiveis[5]
   ]);
 
-  // Metas
+  // Metas & Patrimônio Manual
   const [metas, setMetas] = useState<Meta[]>([
     { id: '1', nome: 'Reserva de Emergência', valorAlvo: 5000, valorAtual: 500, dataLimite: '2026-12-31' }
   ]);
@@ -120,6 +135,10 @@ export const FinanceCenterView: React.FC = () => {
   const [novaMetaDate, setNovaMetaDate] = useState('');
   const [metaAporteId, setMetaAporteId] = useState<string | null>(null);
   const [valorAporteMeta, setValorAporteMeta] = useState<number | ''>('');
+
+  const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>([
+    { id: '1', nome: 'Reserva em CDB / Renda Fixa', valor: 2000, tipo: 'manual' }
+  ]);
 
   // Lógica de Navegação
   const navegarPara = (tela: typeof telaAtiva) => {
@@ -135,12 +154,20 @@ export const FinanceCenterView: React.FC = () => {
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   const saldoCaixaBruto = totalEntradas - totalSaidas;
 
-  // Total das Dívidas / Contas Fixas Cadastradas
+  // Cálculo das Dívidas / Contas Fixas
   const poteDividasObj = potesAtivos.find(p => p.id === 'dividas' || p.nome.toLowerCase().includes('dívida'));
   const totalContasFixasEDividas = poteDividasObj?.contasFixas?.reduce((acc, c) => acc + c.valor, 0) || 0;
-
-  // Saldo Líquido Disponível em Conta (Subtraindo Contas Fixas e Dívidas)
   const saldoLiquidoDisponivel = Math.max(0, saldoCaixaBruto - totalContasFixasEDividas);
+
+  // Cálculo do Patrimônio Total (Entradas automáticas para Pote de Reserva/Investimento + Aportes Manuais)
+  const poteReserva = potesAtivos.find(p => p.id === 'reserva' || p.nome.toLowerCase().includes('reserva'));
+  const pctReserva = poteReserva ? poteReserva.percentual : 0;
+  const acumuladoReservaEntradas = (totalEntradas * pctReserva) / 100;
+  const saídasReserva = transacoes.filter(t => t.tipo === 'saida' && t.poteId === 'reserva').reduce((acc, t) => acc + t.valor, 0);
+  const saldoReservaAtual = Math.max(0, acumuladoReservaEntradas - saídasReserva);
+
+  const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
+  const patrimonioTotalCalculado = saldoReservaAtual + totalPatrimonioManual;
 
   // Manipulação de Potes
   const solicitarAdicaoPote = (pote: Pote) => {
@@ -195,7 +222,7 @@ export const FinanceCenterView: React.FC = () => {
     setPotesAtivos(prev => prev.map(p => p.id === id ? { ...p, percentual: valorFinal } : p));
   };
 
-  // Registros de Entrada / Saída com Sistema de Trava e Compensação
+  // Lançamentos e Entrada Geral
   const processarEntrada = (valor: number, desc: string) => {
     const novaEntrada: Transacao = {
       id: Date.now().toString(),
@@ -224,7 +251,6 @@ export const FinanceCenterView: React.FC = () => {
       const gastosAtuaisPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
       const saldoDisponivelPote = valorDiluidoNoPote - gastosAtuaisPote;
 
-      // Trava de Segurança: Se estourar o pote
       if (valorGasto > saldoDisponivelPote) {
         const excesso = valorGasto - saldoDisponivelPote;
         const outroPoteCompensador = potesAtivos.find(p => p.id !== poteAlvo.id && p.id !== 'dividas');
@@ -250,7 +276,6 @@ export const FinanceCenterView: React.FC = () => {
     }
   };
 
-  // Confirmar Compensação do Estouro em Outro Pote
   const confirmarCompensacaoEstouro = () => {
     if (!alertaEstouro || !valorLancamento) return;
 
@@ -258,7 +283,6 @@ export const FinanceCenterView: React.FC = () => {
     const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
 
     if (poteAlvo) {
-      // Registra o gasto original
       const novaSaida: Transacao = {
         id: Date.now().toString(),
         descricao: `${descLancamento || 'Gasto Excedente'} (Excedeu ${formatarGrana(alertaEstouro.valorEstourado)})`,
@@ -268,7 +292,6 @@ export const FinanceCenterView: React.FC = () => {
         data: new Date().toLocaleDateString('pt-BR')
       };
 
-      // Registra a compensação do outro pote
       const compensacaoSaida: Transacao = {
         id: (Date.now() + 1).toString(),
         descricao: `Compensação automática para estouro em ${poteAlvo.nome}`,
@@ -293,6 +316,17 @@ export const FinanceCenterView: React.FC = () => {
     }
     setModalEntradaInicial(false);
     navegarPara('dashboard');
+  };
+
+  const adicionarPatrimonioManual = () => {
+    if (!nomeNovoPatrimonio || !valorNovoPatrimonio || Number(valorNovoPatrimonio) <= 0) return;
+    setItensPatrimonioManuais([...itensPatrimonioManuais, {
+      id: Date.now().toString(),
+      nome: nomeNovoPatrimonio,
+      valor: Number(valorNovoPatrimonio),
+      tipo: 'manual'
+    }]);
+    setNomeNovoPatrimonio(''); setValorNovoPatrimonio(''); setModalNovoPatrimonio(false);
   };
 
   const salvarAporteMeta = () => {
@@ -326,7 +360,6 @@ export const FinanceCenterView: React.FC = () => {
     return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // Círculo SVG
   let acumulado = 0;
   const fatiasSVG = potesAtivos.map(pote => {
     const inicio = acumulado;
@@ -363,7 +396,7 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       </header>
 
-      {/* TELA 1: ONBOARDING / MONTANDO PLANO */}
+      {/* TELA 1: ONBOARDING */}
       {telaAtiva === 'onboarding' && (
         <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-center md:text-left">Montando seu plano financeiro</h1>
@@ -463,7 +496,7 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* MODAL DE % DO POTE E CADASTRO DE CONTAS FIXAS/DÍVIDAS */}
+      {/* MODAL DE % DO POTE */}
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
@@ -505,7 +538,6 @@ export const FinanceCenterView: React.FC = () => {
                 className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
 
-              {/* SEÇÃO DE CONTAS FIXAS & DÍVIDAS */}
               {(potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida')) && (
                 <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-3 text-left">
                   <div className="flex justify-between items-center text-xs font-bold">
@@ -560,7 +592,7 @@ export const FinanceCenterView: React.FC = () => {
         );
       })()}
 
-      {/* TELA 2: CONFIRMAÇÃO & ENTRADA INICIAL */}
+      {/* TELA 2: CONFIRMAÇÃO */}
       {telaAtiva === 'confirmacao' && (
         <main className="max-w-sm mx-auto p-4 text-center space-y-5 my-auto">
           <h2 className="text-xl md:text-2xl font-black">Seu plano está pronto!</h2>
@@ -609,7 +641,7 @@ export const FinanceCenterView: React.FC = () => {
               placeholder="Valor R$"
               value={valorEntradaInicial}
               onChange={(e) => setValorEntradaInicial(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-center font-black text-lg focus:outline-none"
+              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-center font-black text-lg focus:outline-none font-mono"
             />
 
             <button
@@ -622,11 +654,9 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* TELA 3: DASHBOARD PRINCIPAL */}
+      {/* TELA 3: DASHBOARD */}
       {telaAtiva === 'dashboard' && (
         <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
-          
-          {/* PAINEL DE SALDO EM CAIXA & SALDO LÍQUIDO DISPONÍVEL */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`${cardClasse} rounded-3xl p-4 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
@@ -648,7 +678,7 @@ export const FinanceCenterView: React.FC = () => {
                 </div>
               </div>
               <span className="text-[11px] text-rose-400 font-bold">
-                Descontado {formatarGrana(totalContasFixasEDividas)} em dívidas & contas fixas cadastradas
+                Descontado {formatarGrana(totalContasFixasEDividas)} em dívidas & contas fixas
               </span>
             </div>
           </div>
@@ -660,7 +690,6 @@ export const FinanceCenterView: React.FC = () => {
             </button>
           </div>
 
-          {/* GRID DE POTES */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
@@ -692,7 +721,101 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* MODAL DE ALERTA DE ESTOURO E COMPENSAÇÃO */}
+      {/* TELA DE PATRIMÔNIO (NOVA) */}
+      {telaAtiva === 'patrimonio' && (
+        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
+              <Vault className="w-6 h-6 text-emerald-500" /> Meu Patrimônio Acumulado
+            </h2>
+            <button onClick={() => setModalNovoPatrimonio(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold">
+              + Adicionar
+            </button>
+          </div>
+
+          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 text-center space-y-2 border-2 border-emerald-500/30`}>
+            <span className="text-xs uppercase font-bold text-slate-400 font-mono tracking-wider">Patrimônio Total Guardado</span>
+            <div className="text-3xl md:text-4xl font-black text-emerald-500 font-mono">
+              {formatarGrana(patrimonioTotalCalculado)}
+            </div>
+            <p className="text-[11px] text-slate-400">Soma automática das entradas no Pote de Reserva + Investimentos e Aportes Manuais</p>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-extrabold uppercase text-slate-400">Composição do Patrimônio</h3>
+
+            {/* Pote de Reserva Automático */}
+            <div className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-emerald-500`}>
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">🐷</span>
+                <div>
+                  <span className="font-bold block text-sm">Reserva Automática dos Potes</span>
+                  <span className="text-[10px] text-slate-400">{pctReserva}% de todas as entradas gerais</span>
+                </div>
+              </div>
+              <span className="font-mono font-black text-emerald-500 text-sm md:text-base">
+                {formatarGrana(saldoReservaAtual)}
+              </span>
+            </div>
+
+            {/* Aportes Manuais */}
+            {itensPatrimonioManuais.map(item => (
+              <div key={item.id} className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center`}>
+                <div className="flex items-center space-x-3">
+                  <Wallet className="w-5 h-5 text-amber-500" />
+                  <div>
+                    <span className="font-bold block text-sm">{item.nome}</span>
+                    <span className="text-[10px] text-slate-400">Aporte manual individual</span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-mono font-black text-sm md:text-base">{formatarGrana(item.valor)}</span>
+                  <button onClick={() => setItensPatrimonioManuais(itensPatrimonioManuais.filter(x => x.id !== item.id))} className="text-slate-400 hover:text-rose-500">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {/* MODAL ADICIONAR PATRIMÔNIO MANUAL */}
+      {modalNovoPatrimonio && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
+            <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400">
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base md:text-lg font-black">Adicionar ao Patrimônio</h3>
+
+            <input
+              type="text"
+              placeholder="Nome (Ex: CDB, Imóvel, Poupança)"
+              value={nomeNovoPatrimonio}
+              onChange={(e) => setNomeNovoPatrimonio(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none"
+            />
+            <input
+              type="number"
+              placeholder="Valor Guardado R$"
+              value={valorNovoPatrimonio}
+              onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl font-black text-lg focus:outline-none font-mono"
+            />
+
+            <button
+              onClick={adicionarPatrimonioManual}
+              className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm"
+            >
+              Salvar Patrimônio
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ALERTA DE ESTOURO */}
       {alertaEstouro && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative border-2 border-amber-500/50`}>
@@ -703,14 +826,14 @@ export const FinanceCenterView: React.FC = () => {
             <div>
               <h3 className="text-base md:text-lg font-black text-amber-500">Aviso de Limite Excedido</h3>
               <p className="text-xs text-slate-400 mt-1">
-                Este gasto estourou o limite disponível do pote <strong>{alertaEstouro.poteNome}</strong> em <strong>{formatarGrana(alertaEstouro.valorEstourado)}</strong>.
+                Este gasto estourou o limite do pote <strong>{alertaEstouro.poteNome}</strong> em <strong>{formatarGrana(alertaEstouro.valorEstourado)}</strong>.
               </p>
             </div>
 
             <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs font-bold text-left space-y-1">
               <span className="text-slate-400 block font-mono">Plano de Compensação:</span>
               <p className="text-emerald-500">
-                O valor excedente de {formatarGrana(alertaEstouro.valorEstourado)} será compensado automaticamente no seu pote de Reserva para manter o caixa equilibrado.
+                O valor excedente de {formatarGrana(alertaEstouro.valorEstourado)} será compensado no pote de Reserva para manter o equilíbrio.
               </p>
             </div>
 
@@ -755,7 +878,7 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* TELA 5: MINHAS METAS */}
+      {/* TELA 5: METAS */}
       {telaAtiva === 'metas' && (
         <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500" /> Minhas Metas</h2>
@@ -829,33 +952,6 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* MODAL APORTE META */}
-      {metaAporteId && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative`}>
-            <button onClick={() => setMetaAporteId(null)} className="absolute top-4 right-4 text-slate-400">
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-base font-black">Aportar na Meta</h3>
-            <input
-              type="number"
-              placeholder="Valor R$"
-              value={valorAporteMeta}
-              onChange={(e) => setValorAporteMeta(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-center font-black text-lg focus:outline-none"
-            />
-
-            <button
-              onClick={salvarAporteMeta}
-              className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl text-sm"
-            >
-              Confirmar Aporte
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* TELA 6: EXTRATO */}
       {telaAtiva === 'extrato' && (
         <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-3">
@@ -896,8 +992,8 @@ export const FinanceCenterView: React.FC = () => {
         <button onClick={() => setModalLancamento(true)} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 -mt-5 active:scale-95 transition-transform">
           <Plus className="w-5 h-5" />
         </button>
-        <button onClick={() => navegarPara('metas')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
-          <Target className="w-5 h-5 text-emerald-500" /> Metas
+        <button onClick={() => navegarPara('patrimonio')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
+          <Vault className="w-5 h-5 text-emerald-500" /> Patrimônio
         </button>
         <button onClick={() => setMenuAberto(!menuAberto)} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
           <MoreHorizontal className="w-5 h-5 text-emerald-500" /> Mais
@@ -954,6 +1050,9 @@ export const FinanceCenterView: React.FC = () => {
             <div className="space-y-1.5 text-xs md:text-sm font-bold">
               <button onClick={() => navegarPara('dashboard')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
                 <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
+              </button>
+              <button onClick={() => navegarPara('patrimonio')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+                <Vault className="w-4 h-4 text-emerald-500" /> Meu Patrimônio
               </button>
               <button onClick={() => navegarPara('extrato')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
                 <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
