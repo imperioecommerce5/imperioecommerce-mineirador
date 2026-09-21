@@ -279,7 +279,8 @@ export const FinanceCenterView: React.FC = () => {
   const totalMapeado = potesAtivos.reduce((acc, p) => acc + p.percentual, 0);
   const disponivelGeral = Math.max(0, 100 - totalMapeado);
 
-  const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
+  const valorAporteNumerico = aportePendenteValor !== '' ? Number(aportePendenteValor) : 0;
+  const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
   const saldoBrutoTotal = totalEntradas - totalSaidas;
@@ -859,11 +860,6 @@ export const FinanceCenterView: React.FC = () => {
               {totalMapeado === 100 ? (
                 <button 
                   onClick={async () => {
-                    if (aportePendenteValor !== '' && Number(aportePendenteValor) > 0) {
-                      await processarEntradaComAnimacao(Number(aportePendenteValor), 'Mercado Livre');
-                      setAportePendenteValor('');
-                      await salvarDadosNaNuvem({ aportePendenteValor: '' });
-                    }
                     navegarPara('dashboard');
                   }} 
                   className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base cursor-pointer"
@@ -985,19 +981,19 @@ export const FinanceCenterView: React.FC = () => {
         <main className="max-w-5xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           
           {aportePendenteValor !== '' && Number(aportePendenteValor) > 0 && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-400">
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-400">
               <div className="flex items-center space-x-3">
-                <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+                <Sparkles className="w-6 h-6 text-emerald-500 shrink-0" />
                 <div>
-                  <span className="font-black text-sm block">Você possui um Valor Inicial / Aporte Pendente</span>
-                  <span className="text-xs text-amber-300/80">Valor aguardando aporte: {formatarGrana(Number(aportePendenteValor))}</span>
+                  <span className="font-black text-sm block">Aporte / Valor Inicial em Caixa Ativo</span>
+                  <span className="text-xs text-emerald-300/80">Valor considerado no saldo bruto: {formatarGrana(Number(aportePendenteValor))}</span>
                 </div>
               </div>
               <button 
                 onClick={() => setModalAportePendente(true)}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-2xl text-xs transition-all shrink-0 shadow-md cursor-pointer"
+                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2 rounded-2xl text-xs transition-all shrink-0 shadow-md cursor-pointer"
               >
-                Aportar Agora
+                Ajustar Valor
               </button>
             </div>
           )}
@@ -1010,7 +1006,7 @@ export const FinanceCenterView: React.FC = () => {
                   {formatarGrana(saldoBrutoTotal)}
                 </div>
               </div>
-              <span className={`text-[11px] font-semibold ${textMuted}`}>Entradas menos saídas acumuladas</span>
+              <span className={`text-[11px] font-semibold ${textMuted}`}>Entradas + aporte inicial menos saídas</span>
             </div>
 
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
@@ -1320,17 +1316,23 @@ export const FinanceCenterView: React.FC = () => {
             <button onClick={() => setModalAportePendente(false)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-base md:text-lg font-black">Efetivar Aporte Inicial</h3>
-            <p className={`text-xs ${textMuted}`}>Valor pendente de: <strong>{formatarGrana(Number(aportePendenteValor))}</strong></p>
+            <h3 className="text-base md:text-lg font-black">Ajustar Valor Inicial em Caixa</h3>
+            <p className={`text-xs ${textMuted}`}>Atualize o valor inicial caso necessário:</p>
             <input
               type="number"
-              placeholder="Confirmar Valor R$"
-              value={valorModalAporte === '' ? aportePendenteValor : valorModalAporte}
-              onChange={(e) => setValorModalAporte(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Valor R$"
+              value={aportePendenteValor}
+              onChange={(e) => setAportePendenteValor(e.target.value === '' ? '' : Number(e.target.value))}
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`}
             />
-            <button onClick={efetivarAportePendente} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer">
-              Confirmar e Distribuir
+            <button 
+              onClick={async () => {
+                await salvarDadosNaNuvem({ aportePendenteValor });
+                setModalAportePendente(false);
+              }} 
+              className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer"
+            >
+              Salvar Alteração
             </button>
           </div>
         </div>
