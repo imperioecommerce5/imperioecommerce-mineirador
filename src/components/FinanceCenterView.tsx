@@ -1,23 +1,61 @@
 import React, { useState } from 'react';
-import { 
-  PiggyBank, 
-  ShoppingBag, 
-  Car, 
-  CreditCard, 
-  Heart, 
-  Gamepad2, 
-  TrendingUp, 
-  Church, 
-  X,
-  Check
-} from 'lucide-react';
+import { X, Check } from 'lucide-react';
+
+// Componentes para Renderizar os Ícones Visuais 3D Estilo App Original
+const IconePorquinho3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    🐷
+  </div>
+);
+
+const IconeCarro3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    🚗
+  </div>
+);
+
+const IconeSupermercado3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    🧺
+  </div>
+);
+
+const IconeControle3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    🎮
+  </div>
+);
+
+const IconeSacola3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    🛍️
+  </div>
+);
+
+const IconeDividas3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    💳
+  </div>
+);
+
+const IconeDizimo3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    ✉️
+  </div>
+);
+
+const IconeInvestimento3D = () => (
+  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
+    📈
+  </div>
+);
 
 interface Pote {
   id: string;
   nome: string;
   percentual: number;
   cor: string;
-  icone: any;
+  IconeComponente: React.FC;
   subtexto?: string;
 }
 
@@ -26,16 +64,16 @@ export const FinanceCenterView: React.FC = () => {
   const [rendaMensal, setRendaMensal] = useState<number>(2000);
   const [frequencia, setFrequencia] = useState<'dia' | 'semana' | 'quinzena' | 'mes'>('mes');
 
-  // Potes Disponíveis no Banco/Carrossel Inferior com Cores Harmoniosas sobre Base Amarela
+  // Potes Disponíveis no Banco/Carrossel Inferior
   const todosPotesDisponiveis: Pote[] = [
-    { id: 'reserva', nome: 'Reserva', percentual: 0, cor: '#EAB308', icone: PiggyBank }, // Amarelo
-    { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', icone: Car }, // Azul
-    { id: 'supermercado', nome: 'Supermercado', percentual: 0, cor: '#F97316', icone: ShoppingBag }, // Laranja
-    { id: 'desfrute_marido', nome: 'Desfrute marido', percentual: 0, cor: '#8B5CF6', icone: Gamepad2 }, // Roxo
-    { id: 'desfrute_esposa', nome: 'Desfrute esposa', percentual: 0, cor: '#EC4899', icone: Heart }, // Rosa
-    { id: 'dividas', nome: 'Dívidas', percentual: 0, cor: '#EF4444', icone: CreditCard }, // Vermelho
-    { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#10B981', icone: Church, subtexto: 'verba pra sua igreja' }, // Verde
-    { id: 'investimento_ml', nome: 'Investimento ML', percentual: 0, cor: '#F59E0B', icone: TrendingUp }, // Âmbar/Amarelo Ouro
+    { id: 'reserva', nome: 'Reserva', percentual: 0, cor: '#EAB308', IconeComponente: IconePorquinho3D },
+    { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', IconeComponente: IconeCarro3D },
+    { id: 'supermercado', nome: 'Supermercado', percentual: 0, cor: '#F97316', IconeComponente: IconeSupermercado3D },
+    { id: 'desfrute_marido', nome: 'Desfrute marido', percentual: 0, cor: '#8B5CF6', IconeComponente: IconeControle3D },
+    { id: 'desfrute_esposa', nome: 'Desfrute esposa', percentual: 0, cor: '#EC4899', IconeComponente: IconeSacola3D },
+    { id: 'dividas', nome: 'Dívidas', percentual: 0, cor: '#EF4444', IconeComponente: IconeDividas3D },
+    { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#10B981', IconeComponente: IconeDizimo3D, subtexto: 'verba pra sua igreja' },
+    { id: 'investimento_ml', nome: 'Investimento ML', percentual: 0, cor: '#F59E0B', IconeComponente: IconeInvestimento3D },
   ];
 
   // Potes selecionados para o plano
@@ -48,7 +86,7 @@ export const FinanceCenterView: React.FC = () => {
   // Adicionar pote do carrossel para a área central
   const adicionarPote = (pote: Pote) => {
     if (!potesSelecionados.some(p => p.id === pote.id)) {
-      const novoPote = { ...pote, percentual: 10 }; // Valor padrão inicial ao adicionar
+      const novoPote = { ...pote, percentual: 10 };
       setPotesSelecionados([...potesSelecionados, novoPote]);
       setPoteEmEdicao(novoPote);
     }
@@ -179,7 +217,7 @@ export const FinanceCenterView: React.FC = () => {
         {/* Potes Ativos em volta do Círculo */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-6">
           {potesSelecionados.map(pote => {
-            const Icone = pote.icone;
+            const Icone = pote.IconeComponente;
             const valorCalculado = (rendaMensal * pote.percentual) / 100;
 
             return (
@@ -196,7 +234,7 @@ export const FinanceCenterView: React.FC = () => {
                 </button>
 
                 <div className="w-12 h-12 rounded-xl bg-amber-50/60 flex items-center justify-center my-1 group-hover:scale-105 transition-transform">
-                  <Icone className="w-7 h-7 text-amber-600" />
+                  <Icone />
                 </div>
 
                 <span className="text-xs font-bold text-slate-800">{pote.nome}</span>
@@ -217,7 +255,7 @@ export const FinanceCenterView: React.FC = () => {
 
         <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
           {todosPotesDisponiveis.map(pote => {
-            const Icone = pote.icone;
+            const Icone = pote.IconeComponente;
             const jaSelecionado = potesSelecionados.some(p => p.id === pote.id);
 
             return (
@@ -233,7 +271,7 @@ export const FinanceCenterView: React.FC = () => {
                 }`}
               >
                 <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                  <Icone className="w-5 h-5 text-amber-600" />
+                  <Icone />
                 </div>
                 <span className="text-[11px] font-bold text-slate-800 truncate w-full">{pote.nome}</span>
                 {pote.subtexto && (
@@ -257,7 +295,7 @@ export const FinanceCenterView: React.FC = () => {
             </button>
 
             <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center">
-              {React.createElement(poteEmEdicao.icone, { className: "w-9 h-9 text-amber-600" })}
+              {React.createElement(poteEmEdicao.IconeComponente)}
             </div>
 
             <div>
