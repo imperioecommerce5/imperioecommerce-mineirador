@@ -27,6 +27,21 @@ import {
   AlertTriangle,
   ArrowUpRight
 } from 'lucide-react';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+
+// CONFIGURAÇÃO DO FIREBASE (Suas chaves reais)
+const firebaseConfig = {
+  apiKey: "AIzaSyDQTXuzRMDP4vtpvpzvkTBd5Cl_0_aCM5g",
+  authDomain: "imperioecommerce-mineirador.firebaseapp.com",
+  projectId: "imperioecommerce-mineirador",
+  storageBucket: "imperioecommerce-mineirador.firebasestorage.app",
+  messagingSenderId: "805172672001",
+  appId: "1:805172672001:web:77e71eddea97aa9550f200"
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
 
 interface ContaFixa {
   id: string;
@@ -76,9 +91,11 @@ interface Props {
   onLogout?: () => void;
 }
 
-export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
-  const [potesAtivosSalvos] = useState(() => localStorage.getItem('@meu_imperio_potes'));
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil'>(potesAtivosSalvos ? 'dashboard' : 'onboarding');
+export const FinanceCenterView: React.FC<Props> = ({ emailUsuario = 'familia', onLogout }) => {
+  const docId = emailUsuario.replace(/[^a-zA-Z0-9]/g, '_');
+
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil'>('dashboard');
+  const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
 
   const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil') => {
     setTelaAtiva(tela);
@@ -86,20 +103,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const [rendaMensal, setRendaMensal] = useState<number>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_renda');
-    return salvo ? Number(salvo) : 0;
-  });
-
-  const [aportePendenteValor, setAportePendenteValor] = useState<number | ''>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_aporte_pendente');
-    return salvo !== null ? Number(salvo) : '';
-  });
-
-  const [contasFixasObrigatorias, setContasFixasObrigatorias] = useState<ContaFixa[]>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_contas_fixas');
-    return salvo ? JSON.parse(salvo) : [];
-  });
+  const [rendaMensal, setRendaMensal] = useState<number>(0);
+  const [aportePendenteValor, setAportePendenteValor] = useState<number | ''>('');
+  const [contasFixasObrigatorias, setContasFixasObrigatorias] = useState<ContaFixa[]>([]);
+  const [potesAtivos, setPotesAtivos] = useState<Pote[]>([]);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>([]);
+  const [metas, setMetas] = useState<Meta[]>([]);
 
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
@@ -118,39 +128,59 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
-  const [potesAtivos, setPotesAtivos] = useState<Pote[]>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_potes');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
-  const [transacoes, setTransacoes] = useState<Transacao[]>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_transacoes');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
-  const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_patrimonio');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
-  const [metas, setMetas] = useState<Meta[]>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_metas');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
   useEffect(() => {
-    localStorage.setItem('@meu_imperio_renda', rendaMensal.toString());
-    localStorage.setItem('@meu_imperio_contas_fixas', JSON.stringify(contasFixasObrigatorias));
-    localStorage.setItem('@meu_imperio_potes', JSON.stringify(potesAtivos));
-    localStorage.setItem('@meu_imperio_transacoes', JSON.stringify(transacoes));
-    localStorage.setItem('@meu_imperio_patrimonio', JSON.stringify(itensPatrimonioManuais));
-    localStorage.setItem('@meu_imperio_metas', JSON.stringify(metas));
-    if (aportePendenteValor !== '') {
-      localStorage.setItem('@meu_imperio_aporte_pendente', aportePendenteValor.toString());
-    } else {
-      localStorage.removeItem('@meu_imperio_aporte_pendente');
+    const docRef = doc(db, 'imperio_finance', docId);
+    const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const dados = docSnapshot.data();
+        setRendaMensal(dados.rendaMensal ?? 0);
+        setAportePendenteValor(dados.aportePendenteValor ?? '');
+        setContasFixasObrigatorias(dados.contasFixasObrigatorias ?? []);
+        setPotesAtivos(dados.potesAtivos ?? []);
+        setTransacoes(dados.transacoes ?? []);
+        setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
+        setMetas(dados.metas ?? []);
+
+        if (!dados.potesAtivos || dados.potesAtivos.length === 0) {
+          setTelaAtiva('onboarding');
+        }
+      } else {
+        setTelaAtiva('onboarding');
+      }
+      setCarregandoNuvem(false);
+    }, (error) => {
+      console.error("Erro ao sincronizar com o Firebase:", error);
+      setCarregandoNuvem(false);
+    });
+
+    return () => unsubscribe();
+  }, [docId]);
+
+  const salvarDadosNaNuvem = async (novosDados: {
+    rendaMensal?: number;
+    aportePendenteValor?: number | '';
+    contasFixasObrigatorias?: ContaFixa[];
+    potesAtivos?: Pote[];
+    transacoes?: Transacao[];
+    itensPatrimonioManuais?: ItemPatrimonio[];
+    metas?: Meta[];
+  }) => {
+    try {
+      const docRef = doc(db, 'imperio_finance', docId);
+      await setDoc(docRef, {
+        rendaMensal,
+        aportePendenteValor,
+        contasFixasObrigatorias,
+        potesAtivos,
+        transacoes,
+        itensPatrimonioManuais,
+        metas,
+        ...novosDados
+      }, { merge: true });
+    } catch (error) {
+      console.error("Erro ao salvar dados no Firebase:", error);
     }
-  }, [rendaMensal, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, aportePendenteValor]);
+  };
 
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
@@ -177,7 +207,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [guardadoNovaMeta, setGuardadoNovaMeta] = useState<number | ''>('');
   const [mesesNovaMeta, setMesesNovaMeta] = useState<number | ''>('');
 
-  // Estados para o modal de transferência/depósito em metas
   const [modalDepositoMeta, setModalDepositoMeta] = useState<boolean>(false);
   const [metaSelecionadaId, setMetaSelecionadaId] = useState<string>('');
   const [valorDepositoMeta, setValorDepositoMeta] = useState<number | ''>('');
@@ -195,16 +224,18 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     poteCompensadorId: string;
   } | null>(null);
 
-  const reiniciarSistemaGeral = () => {
+  const reiniciarSistemaGeral = async () => {
     if (window.confirm("Deseja realmente reiniciar o plano? Todos os dados e transações serão limpos.")) {
-      localStorage.clear();
-      setPotesAtivos([]);
-      setContasFixasObrigatorias([]);
-      setTransacoes([]);
-      setItensPatrimonioManuais([]);
-      setMetas([]);
-      setRendaMensal(0);
-      setAportePendenteValor('');
+      const dadosVazios = {
+        rendaMensal: 0,
+        aportePendenteValor: '',
+        contasFixasObrigatorias: [],
+        potesAtivos: [],
+        transacoes: [],
+        itensPatrimonioManuais: [],
+        metas: []
+      };
+      await salvarDadosNaNuvem(dadosVazios);
       setTelaAtiva('onboarding');
       setMenuAberto(false);
     }
@@ -240,23 +271,27 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const valorRetidoAutomaticoTotal = (rendaRestanteAposDividas * percentualTotalRetencao) / 100;
   const saldoLiquidoDisponivel = Math.max(0, saldoBrutoTotal - valorRetidoAutomaticoTotal - totalContasFixasValor);
 
-  const adicionarContaFixaObrigatoria = () => {
+  const adicionarContaFixaObrigatoria = async () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
     const meses = Number(novaContaMeses);
-    setContasFixasObrigatorias([...contasFixasObrigatorias, {
+    const novasContas = [...contasFixasObrigatorias, {
       id: Date.now().toString(),
       nome: novaContaNome,
       valor: Number(novaContaValor),
       mesesTotales: meses,
       mesesRestantes: meses
-    }]);
+    }];
+    setContasFixasObrigatorias(novasContas);
     setNovaContaNome('');
     setNovaContaValor('');
     setNovaContaMeses('');
+    await salvarDadosNaNuvem({ contasFixasObrigatorias: novasContas });
   };
 
-  const removerContaFixaObrigatoria = (id: string) => {
-    setContasFixasObrigatorias(contasFixasObrigatorias.filter(c => c.id !== id));
+  const removerContaFixaObrigatoria = async (id: string) => {
+    const novasContas = contasFixasObrigatorias.filter(c => c.id !== id);
+    setContasFixasObrigatorias(novasContas);
+    await salvarDadosNaNuvem({ contasFixasObrigatorias: novasContas });
   };
 
   const solicitarAdicaoPote = (pote: Pote) => {
@@ -270,7 +305,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     }
   };
 
-  const confirmarAdicionarPote = () => {
+  const confirmarAdicionarPote = async () => {
     if (potePendente) {
       const poteAtualizado = {
         ...potePendente,
@@ -284,14 +319,17 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       }
       setPotesAtivos(novoConjunto);
       setPotePendente(null);
+      await salvarDadosNaNuvem({ potesAtivos: novoConjunto });
     }
   };
 
-  const removerPote = (id: string) => {
-    setPotesAtivos(potesAtivos.filter(p => p.id !== id));
+  const removerPote = async (id: string) => {
+    const novoConjunto = potesAtivos.filter(p => p.id !== id);
+    setPotesAtivos(novoConjunto);
+    await salvarDadosNaNuvem({ potesAtivos: novoConjunto });
   };
 
-  const processarEntradaComAnimacao = (valor: number, origem: 'CLT' | 'Mercado Livre') => {
+  const processarEntradaComAnimacao = async (valor: number, origem: 'CLT' | 'Mercado Livre') => {
     const novaEntrada: Transacao = {
       id: Date.now().toString(),
       descricao: `Entrada (${origem})`,
@@ -302,7 +340,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       poteNome: `Origem: ${origem}`,
       data: new Date().toLocaleDateString('pt-BR')
     };
-    setTransacoes(prev => [novaEntrada, ...prev]);
+    const novasTransacoes = [novaEntrada, ...transacoes];
+    setTransacoes(novasTransacoes);
 
     const detalhes = potesAtivos.map(pote => ({
       nome: pote.nome,
@@ -317,13 +356,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       valorTotal: valor,
       detalhes
     });
+
+    await salvarDadosNaNuvem({ transacoes: novasTransacoes });
   };
 
-  const salvarLancamento = () => {
+  const salvarLancamento = async () => {
     if (!valorLancamento || Number(valorLancamento) <= 0) return;
 
     if (tipoLancamento === 'entrada') {
-      processarEntradaComAnimacao(Number(valorLancamento), origemEntradaModal);
+      await processarEntradaComAnimacao(Number(valorLancamento), origemEntradaModal);
       setValorLancamento(''); setModalLancamento(false);
     } else {
       const valorGasto = Number(valorLancamento);
@@ -356,12 +397,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         poteNome: poteAlvo.nome,
         data: new Date().toLocaleDateString('pt-BR')
       };
-      setTransacoes(prev => [novaSaida, ...prev]);
+      const novasTransacoes = [novaSaida, ...transacoes];
+      setTransacoes(novasTransacoes);
       setValorLancamento(''); setModalLancamento(false);
+      await salvarDadosNaNuvem({ transacoes: novasTransacoes });
     }
   };
 
-  const confirmarCompensacaoEstouro = () => {
+  const confirmarCompensacaoEstouro = async () => {
     if (!alertaEstouro || !valorLancamento) return;
 
     const valorGasto = Number(valorLancamento);
@@ -388,7 +431,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         data: new Date().toLocaleDateString('pt-BR')
       };
 
-      setTransacoes(prev => [novaSaida, compensacaoSaida, ...prev]);
+      const novasTransacoes = [novaSaida, compensacaoSaida, ...transacoes];
+      setTransacoes(novasTransacoes);
+      await salvarDadosNaNuvem({ transacoes: novasTransacoes });
     }
 
     setAlertaEstouro(null);
@@ -396,22 +441,30 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     setModalLancamento(false);
   };
 
-  const adicionarPatrimonioManual = () => {
+  const adicionarPatrimonioManual = async () => {
     if (!nomeNovoPatrimonio || !valorNovoPatrimonio || Number(valorNovoPatrimonio) <= 0) return;
-    setItensPatrimonioManuais([...itensPatrimonioManuais, {
+    const novosItens = [...itensPatrimonioManuais, {
       id: Date.now().toString(),
       nome: nomeNovoPatrimonio,
       valor: Number(valorNovoPatrimonio),
-      tipo: 'manual'
-    }]);
+      tipo: 'manual' as const
+    }];
+    setItensPatrimonioManuais(novosItens);
     setNomeNovoPatrimonio(''); setValorNovoPatrimonio(''); setModalNovoPatrimonio(false);
+    await salvarDadosNaNuvem({ itensPatrimonioManuais: novosItens });
   };
 
-  const adicionarMeta = () => {
+  const removerPatrimonioManual = async (id: string) => {
+    const novosItens = itensPatrimonioManuais.filter(x => x.id !== id);
+    setItensPatrimonioManuais(novosItens);
+    await salvarDadosNaNuvem({ itensPatrimonioManuais: novosItens });
+  };
+
+  const adicionarMeta = async () => {
     if (!nomeNovaMeta || !valorNovaMeta || Number(valorNovaMeta) <= 0 || !mesesNovaMeta || Number(mesesNovaMeta) <= 0) return;
     const valorGuardadoInicial = guardadoNovaMeta !== '' ? Number(guardadoNovaMeta) : 0;
 
-    // Se informou valor inicial, cria uma transação de saída para descontar do saldo disponível
+    let novasTransacoes = [...transacoes];
     if (valorGuardadoInicial > 0) {
       if (valorGuardadoInicial > saldoLiquidoDisponivel) {
         alert("O valor inicial guardado não pode ser maior que o Saldo Líquido Disponível!");
@@ -426,30 +479,39 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         poteNome: `Meta: ${nomeNovaMeta}`,
         data: new Date().toLocaleDateString('pt-BR')
       };
-      setTransacoes(prev => [novaSaida, ...prev]);
+      novasTransacoes = [novaSaida, ...novasTransacoes];
+      setTransacoes(novasTransacoes);
     }
 
-    setMetas([...metas, {
+    const novasMetas = [...metas, {
       id: Date.now().toString(),
       nome: nomeNovaMeta,
       valorAlvo: Number(valorNovaMeta),
       valorGuardado: valorGuardadoInicial,
       meses: Number(mesesNovaMeta)
-    }]);
+    }];
+    setMetas(novasMetas);
 
     setNomeNovaMeta(''); setValorNovaMeta(''); setGuardadoNovaMeta(''); setMesesNovaMeta(''); setModalNovaMeta(false);
+    await salvarDadosNaNuvem({ metas: novasMetas, transacoes: novasTransacoes });
   };
 
-  const efetivarTransferenciaMeta = () => {
+  const removerMeta = async (id: string) => {
+    const novasMetas = metas.filter(m => m.id !== id);
+    setMetas(novasMetas);
+    await salvarDadosNaNuvem({ metas: novasMetas });
+  };
+
+  const efetivarTransferenciaMeta = async () => {
     if (!metaSelecionadaId || valorDepositoMeta === '' || Number(valorDepositoMeta) <= 0) return;
     const valorTransf = Number(valorDepositoMeta);
 
+    let novasTransacoes = [...transacoes];
     if (origemDepositoMeta === 'disponivel') {
       if (valorTransf > saldoLiquidoDisponivel) {
         alert("Valor superior ao Saldo Líquido Disponível!");
         return;
       }
-      // Registra saída do caixa geral
       const novaSaida: Transacao = {
         id: Date.now().toString(),
         descricao: `Transferência para Meta`,
@@ -459,9 +521,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         poteNome: 'Depósito em Meta',
         data: new Date().toLocaleDateString('pt-BR')
       };
-      setTransacoes(prev => [novaSaida, ...prev]);
+      novasTransacoes = [novaSaida, ...novasTransacoes];
     } else {
-      // Origem é Patrimônio ("Nosso Patrimônio" ou "Manuela") -> abate criando uma saída simulada em compensação de patrimônio
       const nomeOrigemPatri = origemDepositoMeta === 'nosso_patrimonio' ? 'Nosso Patrimônio' : 'Patrimônio Manuela';
       const saldoMaxPatri = origemDepositoMeta === 'nosso_patrimonio' ? saldoNossoPatrimonio : saldoPatrimonioManuela;
 
@@ -479,23 +540,33 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         poteNome: nomeOrigemPatri,
         data: new Date().toLocaleDateString('pt-BR')
       };
-      setTransacoes(prev => [saidaPatri, ...prev]);
+      novasTransacoes = [saidaPatri, ...novasTransacoes];
     }
 
-    // Atualiza a meta selecionada
-    setMetas(metas.map(m => m.id === metaSelecionadaId ? { ...m, valorGuardado: m.valorGuardado + valorTransf } : m));
+    setTransacoes(novasTransacoes);
+    const novasMetas = metas.map(m => m.id === metaSelecionadaId ? { ...m, valorGuardado: m.valorGuardado + valorTransf } : m);
+    setMetas(novasMetas);
+
     setModalDepositoMeta(false);
     setValorDepositoMeta('');
     setMetaSelecionadaId('');
+    await salvarDadosNaNuvem({ metas: novasMetas, transacoes: novasTransacoes });
   };
 
-  const efetivarAportePendente = () => {
+  const efetivarAportePendente = async () => {
     if (valorModalAporte !== '' && Number(valorModalAporte) > 0) {
-      processarEntradaComAnimacao(Number(valorModalAporte), 'Mercado Livre');
+      await processarEntradaComAnimacao(Number(valorModalAporte), 'Mercado Livre');
       setAportePendenteValor('');
       setModalAportePendente(false);
       setValorModalAporte('');
+      await salvarDadosNaNuvem({ aportePendenteValor: '' });
     }
+  };
+
+  const removerTransacao = async (id: string) => {
+    const novasTransacoes = transacoes.filter(x => x.id !== id);
+    setTransacoes(novasTransacoes);
+    await salvarDadosNaNuvem({ transacoes: novasTransacoes });
   };
 
   const formatarGrana = (valor: number) => {
@@ -518,6 +589,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     return true;
   });
 
+  if (carregandoNuvem) {
+    return (
+      <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold text-sm`}>
+        Sincronizando com a nuvem em tempo real...
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
       
@@ -525,7 +604,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-300 ${isDark ? 'border-slate-800 bg-[#0B0F17]/90 backdrop-blur-md' : 'border-slate-200 bg-white/90 backdrop-blur-md'}`}>
         <div className="flex items-center space-x-2">
           <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</span>
-          <span className="text-[9px] md:text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-extrabold uppercase">Finance</span>
+          <span className="text-[9px] md:text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-extrabold uppercase">Real-Time</span>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -565,7 +644,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                   type="number"
                   value={rendaMensal === 0 ? '' : rendaMensal}
                   placeholder="0"
-                  onChange={(e) => setRendaMensal(e.target.value === '' ? 0 : Number(e.target.value))}
+                  onChange={async (e) => {
+                    const val = e.target.value === '' ? 0 : Number(e.target.value);
+                    setRendaMensal(val);
+                    await salvarDadosNaNuvem({ rendaMensal: val });
+                  }}
                   className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black"
                 />
               </div>
@@ -582,7 +665,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                   type="number"
                   value={aportePendenteValor === 0 ? '' : aportePendenteValor}
                   placeholder="0"
-                  onChange={(e) => setAportePendenteValor(e.target.value === '' ? '' : Number(e.target.value))}
+                  onChange={async (e) => {
+                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                    setAportePendenteValor(val);
+                    await salvarDadosNaNuvem({ aportePendenteValor: val });
+                  }}
                   className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black"
                 />
               </div>
@@ -714,10 +801,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
               {totalMapeado === 100 ? (
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     if (aportePendenteValor !== '' && Number(aportePendenteValor) > 0) {
-                      processarEntradaComAnimacao(Number(aportePendenteValor), 'Mercado Livre');
+                      await processarEntradaComAnimacao(Number(aportePendenteValor), 'Mercado Livre');
                       setAportePendenteValor('');
+                      await salvarDadosNaNuvem({ aportePendenteValor: '' });
                     }
                     navegarPara('dashboard');
                   }} 
@@ -1042,7 +1130,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </div>
                 <div className="flex items-center space-x-3">
                   <span className="font-mono font-black text-amber-500 text-sm md:text-base">{formatarGrana(item.valor)}</span>
-                  <button onClick={() => setItensPatrimonioManuais(itensPatrimonioManuais.filter(x => x.id !== item.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
+                  <button onClick={() => removerPatrimonioManual(item.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -1091,7 +1179,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                         >
                           <ArrowUpRight className="w-3.5 h-3.5" /> + Depositar
                         </button>
-                        <button onClick={() => setMetas(metas.filter(m => m.id !== meta.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
+                        <button onClick={() => removerMeta(meta.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -1163,7 +1251,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     <span className={`font-black font-mono ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}`}>
                       {t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}
                     </span>
-                    <button onClick={() => setTransacoes(transacoes.filter(x => x.id !== t.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
+                    <button onClick={() => removerTransacao(t.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
