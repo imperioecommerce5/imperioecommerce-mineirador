@@ -22,29 +22,25 @@ Eye,
 HelpCircle,
 LogOut,
 Plus,
-DollarSign,
 Moon,
 Sun,
 Monitor,
-CheckCircle2
+CheckCircle2,
+TrendingDown,
+TrendingUp,
+Calendar,
+Tag
 } from 'lucide-react';
 
-// Custom 3D Illustration Components
-const IconePorquinho3D = () => (
-
-const IconeCarro3D = () => (
-
-const IconeSupermercado3D = () => (
-
-const IconeControle3D = () => (
-
-const IconeSacola3D = () => (
-
-const IconeDividas3D = () => (
-
-const IconeDizimo3D = () => (
-
-const IconeInvestimento3D = () => (
+// Custom 3D-styled Illustration Components
+const IconePorquinho3D = () => 🐷;
+const IconeCarro3D = () => 🚗;
+const IconeSupermercado3D = () => 🧺;
+const IconeControle3D = () => 🎮;
+const IconeSacola3D = () => 🛍️;
+const IconeDividas3D = () => 💳;
+const IconeDizimo3D = () => ✉️;
+const IconeInvestimento3D = () => 📈;
 
 interface Pote {
 id: string;
@@ -56,22 +52,56 @@ subtexto?: string;
 posicaoSlot?: number;
 }
 
-type ModeTheme = 'light' | 'dark' | 'system';
-type ScreenState = 'setup' | 'confirmation' | 'dashboard' | 'adjust_limits';
+interface Transacao {
+id: string;
+descricao: string;
+valor: number;
+tipo: 'entrada' | 'saida';
+poteId?: string;
+poteNome?: string;
+data: string;
+}
 
 export const FinanceCenterView: React.FC = () => {
 // Theme & Privacy States
-const [themeMode, setThemeMode] = useState('system');
+const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
 const [isDarkMode, setIsDarkMode] = useState(false);
 const [tamparValores, setTamparValores] = useState(false);
 
-// App Navigation States
-const [telaAtual, setTelaAtual] = useState('setup');
+// Navigation & Modal States
+const [telaAtual, setTelaAtual] = useState<'setup' | 'confirmation' | 'dashboard' | 'adjust_limits' | 'extrato'>('setup');
 const [menuMaisAberto, setMenuMaisAberto] = useState(false);
+const [modalLancamentoAberto, setModalLancamentoAberto] = useState(false);
 
-// Financial Data States
+// Financial Base Data
 const [rendaMensal, setRendaMensal] = useState(2000);
 const [frequencia, setFrequencia] = useState<'dia' | 'semana' | 'quinzena' | 'mes'>('mes');
+
+// Transaction States (Entradas e Saídas)
+const [transacoes, setTransacoes] = useState<Transacao[]>([
+{
+id: '1',
+descricao: 'Salário CLT',
+valor: 2000,
+tipo: 'entrada',
+data: new Date().toISOString().split('T')[0]
+},
+{
+id: '2',
+descricao: 'Feira da semana',
+valor: 150,
+tipo: 'saida',
+poteId: 'supermercado',
+poteNome: 'Supermercado',
+data: new Date().toISOString().split('T')[0]
+}
+]);
+
+// Form State for Quick Add Transaction
+const [novoTipo, setNovoTipo] = useState<'saida' | 'entrada'>('saida');
+const [novaDescricao, setNovaDescricao] = useState('');
+const [novoValor, setNovoValor] = useState<number | ''>('');
+const [novoPoteId, setNovoPoteId] = useState('supermercado');
 
 const scrollRef = useRef(null);
 
@@ -87,7 +117,7 @@ const todosPotesDisponiveis: Pote[] = [
 { id: 'investimento_ml', nome: 'Investimento ML', percentual: 0, cor: '#F59E0B', IconeComponente: IconeInvestimento3D },
 ];
 
-// Selected Jars / Placement
+// Selected Jars
 const [potesSelecionados, setPotesSelecionados] = useState<Pote[]>([
 { ...todosPotesDisponiveis[0], posicaoSlot: 0 },
 { ...todosPotesDisponiveis[1], posicaoSlot: 1 },
@@ -99,7 +129,7 @@ const [potesSelecionados, setPotesSelecionados] = useState<Pote[]>([
 
 const [poteEmEdicao, setPoteEmEdicao] = useState<Pote | null>(null);
 
-// System Dark Mode Handler
+// Theme Sync
 useEffect(() => {
 const handleSystemTheme = () => {
 if (themeMode === 'system') {
@@ -118,24 +148,27 @@ return () => mediaQuery.removeEventListener('change', handleSystemTheme);
 
 }, [themeMode]);
 
-// Total Percentage
+// Calculations
+const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
+const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
+const saldoAtualDisponivel = totalEntradas - totalSaidas;
+
 const totalMapeado = potesSelecionados.reduce((acc, p) => acc + p.percentual, 0);
 
-// Slots positioning around the ring (6 radial slots)
+// Radial Slot positions (6 slots around central ring)
 const slotPositions = [
-{ top: '0%', left: '50%', transform: 'translate(-50%, -100%)' }, // Slot 0: Top
-{ top: '25%', left: '100%', transform: 'translate(10%, -50%)' }, // Slot 1: Top-Right
-{ top: '75%', left: '100%', transform: 'translate(10%, -50%)' }, // Slot 2: Bottom-Right
-{ top: '100%', left: '50%', transform: 'translate(-50%, 10%)' }, // Slot 3: Bottom
-{ top: '75%', left: '0%', transform: 'translate(-110%, -50%)' }, // Slot 4: Bottom-Left
-{ top: '25%', left: '0%', transform: 'translate(-110%, -50%)' }, // Slot 5: Top-Left
+{ top: '0%', left: '50%', transform: 'translate(-50%, -100%)' },
+{ top: '25%', left: '100%', transform: 'translate(10%, -50%)' },
+{ top: '75%', left: '100%', transform: 'translate(10%, -50%)' },
+{ top: '100%', left: '50%', transform: 'translate(-50%, 10%)' },
+{ top: '75%', left: '0%', transform: 'translate(-110%, -50%)' },
+{ top: '25%', left: '0%', transform: 'translate(-110%, -50%)' },
 ];
 
-// Actions
+// Add Jar to slot
 const adicionarPoteNoSlot = (pote: Pote, targetSlot?: number) => {
 if (potesSelecionados.some(p => p.id === pote.id)) return;
 
-// Find next available slot if not specified
 let slotToUse = targetSlot;
 if (slotToUse === undefined) {
   const occupiedSlots = potesSelecionados.map(p => p.posicaoSlot);
@@ -143,7 +176,6 @@ if (slotToUse === undefined) {
 }
 
 if (slotToUse !== undefined && slotToUse >= 0 && slotToUse < 6) {
-  // Remove any existing jar in that slot or add new
   const filtered = potesSelecionados.filter(p => p.posicaoSlot !== slotToUse);
   const novoPote = { ...pote, percentual: pote.percentual || 10, posicaoSlot: slotToUse };
   setPotesSelecionados([...filtered, novoPote]);
@@ -164,32 +196,41 @@ setPoteEmEdicao({ ...poteEmEdicao, percentual: novoPercentual });
 }
 };
 
-// Drag and Drop Handlers
-const handleDragStart = (e: React.DragEvent, pote: Pote) => {
-e.dataTransfer.setData('application/json', JSON.stringify(pote));
-};
-
-const handleDragOver = (e: React.DragEvent) => {
+// Add Transaction Handler
+const handleAdicionarTransacao = (e: React.FormEvent) => {
 e.preventDefault();
+if (!novaDescricao || !novoValor || Number(novoValor) <= 0) return;
+
+const poteSelecionadoObj = potesSelecionados.find(p => p.id === novoPoteId);
+
+const novaTransacao: Transacao = {
+  id: Date.now().toString(),
+  descricao: novaDescricao,
+  valor: Number(novoValor),
+  tipo: novoTipo,
+  poteId: novoTipo === 'saida' ? novoPoteId : undefined,
+  poteNome: novoTipo === 'saida' ? poteSelecionadoObj?.nome : undefined,
+  data: new Date().toISOString().split('T')[0]
 };
 
-const handleDropOnSlot = (e: React.DragEvent, slotIndex: number) => {
-e.preventDefault();
-const data = e.dataTransfer.getData('application/json');
-if (data) {
-const pote: Pote = JSON.parse(data);
-adicionarPoteNoSlot(pote, slotIndex);
-}
+setTransacoes([novaTransacao, ...transacoes]);
+
+// Reset Form
+setNovaDescricao('');
+setNovoValor('');
+setModalLancamentoAberto(false);
+
+
 };
 
-// Scroll controls for carousel
+// Scroll controls
 const scrollEsquerda = () => scrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' });
 const scrollDireita = () => scrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' });
 
-// Format monetary value helper
+// Privacy format
 const formatValor = (val: number) => tamparValores ? 'R$ •••••' : R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })};
 
-// Calculate SVG Donut Slices
+// SVG Slices
 let acumulado = 0;
 const fatiasSVG = potesSelecionados.map(pote => {
 const inicio = acumulado;
@@ -197,13 +238,20 @@ acumulado += pote.percentual;
 return { ...pote, inicio, fim: acumulado };
 });
 
+// Calculate spent amount per jar
+const getGastoPorPote = (poteId: string) => {
+return transacoes
+.filter(t => t.tipo === 'saida' && t.poteId === poteId)
+.reduce((acc, t) => acc + t.valor, 0);
+};
+
 return (
 <div className={min-h-screen transition-colors duration-200 font-sans ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#F6F7F9] text-slate-900'}}>
 
-  {/* APP CONTAINER */}
+  {/* CONTAINER PRINCIPAL (ESTILO IPAD/CELULAR) */}
   <div className="max-w-md md:max-w-xl mx-auto min-h-screen flex flex-col justify-between pb-24 relative shadow-xl bg-white dark:bg-slate-900 border-x border-slate-200/60 dark:border-slate-800">
 
-    {/* TOP BAR / THEME SELECTOR */}
+    {/* CAMEÇALHO & SELEÇÃO DE TEMA */}
     <header className="p-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-800/80">
       <div className="flex items-center space-x-2">
         <span className="text-xl font-black bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent">
@@ -214,7 +262,6 @@ return (
         </span>
       </div>
 
-      {/* Theme Mode Switcher */}
       <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-full space-x-1 border border-slate-200/50 dark:border-slate-700">
         <button
           onClick={() => setThemeMode('light')}
@@ -240,7 +287,7 @@ return (
       </div>
     </header>
 
-    {/* SCREEN 1: SETUP / ONBOARDING */}
+    {/* TELA 1: MONTAGEM DO PLANO (SETUP) */}
     {telaAtual === 'setup' && (
       <main className="p-5 flex-1 flex flex-col justify-between space-y-6">
         <div>
@@ -252,7 +299,6 @@ return (
           </p>
         </div>
 
-        {/* Income Card */}
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-4 border border-slate-200/80 dark:border-slate-700/60 space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -296,10 +342,8 @@ return (
           </div>
         </div>
 
-        {/* RING AREA WITH DEDICATED CIRCULAR DROP ZONES */}
+        {/* ÁREA DO ANEL COM ZONAS DE ARRASTE FIXAS */}
         <div className="relative my-10 py-12 flex justify-center items-center min-h-[300px]">
-          
-          {/* Central Donut Chart */}
           <div className="relative w-48 h-48 flex items-center justify-center">
             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
               <circle cx="50" cy="50" r="40" fill="transparent" stroke={isDarkMode ? '#1E293B' : '#E2E8F0'} strokeWidth="10" />
@@ -332,7 +376,7 @@ return (
             </div>
           </div>
 
-          {/* 6 Radial Drop Zones around the ring */}
+          {/* Slots Círculares ao Redor */}
           {slotPositions.map((pos, idx) => {
             const poteNoSlot = potesSelecionados.find(p => p.posicaoSlot === idx);
             const Icone = poteNoSlot?.IconeComponente;
@@ -340,8 +384,6 @@ return (
             return (
               <div
                 key={idx}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDropOnSlot(e, idx)}
                 style={{ top: pos.top, left: pos.left, transform: pos.transform }}
                 className={`absolute w-20 h-20 rounded-2xl flex flex-col items-center justify-center transition-all ${
                   poteNoSlot
@@ -370,7 +412,7 @@ return (
                   <div className="text-center p-1">
                     <Plus className="w-5 h-5 mx-auto text-emerald-500/80 mb-0.5" />
                     <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block leading-tight">
-                      Arraste aqui
+                      Adicionar
                     </span>
                   </div>
                 )}
@@ -379,7 +421,7 @@ return (
           })}
         </div>
 
-        {/* Bottom Carousel Selector */}
+        {/* Carrossel Inferior */}
         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
           <p className="text-xs font-bold text-center text-slate-500 dark:text-slate-400">
             Escolha seus potes — {potesSelecionados.length} escolhidos de {todosPotesDisponiveis.length}
@@ -401,13 +443,11 @@ return (
                 return (
                   <div
                     key={pote.id}
-                    draggable={!jaSelecionado}
-                    onDragStart={(e) => handleDragStart(e, pote)}
                     onClick={() => !jaSelecionado && adicionarPoteNoSlot(pote)}
                     className={`flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-2xl p-2.5 border text-center flex flex-col items-center space-y-1 w-24 select-none transition-all ${
                       jaSelecionado 
                         ? 'opacity-30 border-slate-200 dark:border-slate-800 grayscale cursor-not-allowed' 
-                        : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500 cursor-grab active:cursor-grabbing hover:shadow-sm'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500 cursor-pointer hover:shadow-sm'
                     }`}
                   >
                     <Icone />
@@ -426,7 +466,6 @@ return (
           </div>
         </div>
 
-        {/* Confirm Setup Action */}
         <button
           onClick={() => setTelaAtual('confirmation')}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-emerald-600/20 mt-2"
@@ -436,7 +475,7 @@ return (
       </main>
     )}
 
-    {/* SCREEN 2: CONFIRMATION PAGE */}
+    {/* TELA 2: CONFIRMAÇÃO DO PLANO */}
     {telaAtual === 'confirmation' && (
       <main className="p-6 flex-1 flex flex-col items-center justify-between text-center space-y-6 my-auto">
         <div className="space-y-2 mt-4">
@@ -448,7 +487,6 @@ return (
           </p>
         </div>
 
-        {/* Central Donut Summary */}
         <div className="relative w-64 h-64 flex items-center justify-center my-6">
           <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
             <circle cx="50" cy="50" r="40" fill="transparent" stroke={isDarkMode ? '#1E293B' : '#E2E8F0'} strokeWidth="12" />
@@ -488,23 +526,24 @@ return (
       </main>
     )}
 
-    {/* SCREEN 3: DASHBOARD */}
+    {/* TELA 3: DASHBOARD PRINCIPAL (SALDO REAL E POTES) */}
     {telaAtual === 'dashboard' && (
       <main className="p-5 flex-1 space-y-6">
-        {/* Available Balance Banner */}
+        
+        {/* Banner de Saldo Mapeado e Real */}
         <div className="text-center space-y-1 py-2">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            SALDO DISPONÍVEL
+            SALDO DISPONÍVEL REAL
           </span>
           <div className="text-3xl font-black text-slate-900 dark:text-white">
-            {formatValor(rendaMensal * (totalMapeado / 100))}
+            {formatValor(saldoAtualDisponivel)}
           </div>
           <p className="text-xs text-slate-400">
-            de {formatValor(rendaMensal)} que entraram no mês
+            de {formatValor(totalEntradas)} que entraram no mês
           </p>
         </div>
 
-        {/* Section Title */}
+        {/* Título da Seção */}
         <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             COMO VOCÊ PODE GASTAR
@@ -517,10 +556,17 @@ return (
           </button>
         </div>
 
-        {/* Jars Grid */}
+        {/* Grid dos Potes com Progresso de Gastos Reais */}
         <div className="grid grid-cols-2 gap-4">
           {potesSelecionados.map(pote => {
-            const valorCalculado = (rendaMensal * pote.percentual) / 100;
+            const orcamentoPote = (rendaMensal * pote.percentual) / 100;
+            const gastoAtualPote = getGastoPorPote(pote.id);
+            const restantePote = orcamentoPote - gastoAtualPote;
+            
+            // Percentual de progresso do pote
+            const percentualGasto = orcamentoPote > 0 ? Math.min(100, (gastoAtualPote / orcamentoPote) * 100) : 0;
+            const dashOffset = 251.327 - (251.327 * (100 - percentualGasto)) / 100;
+
             return (
               <div
                 key={pote.id}
@@ -530,7 +576,7 @@ return (
                   {pote.nome}
                 </span>
 
-                {/* Circular Ring per Jar */}
+                {/* Circulo de Progresso do Pote */}
                 <div className="relative w-24 h-24 flex items-center justify-center">
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                     <circle cx="50" cy="50" r="40" fill="transparent" stroke={isDarkMode ? '#334155' : '#E2E8F0'} strokeWidth="8" />
@@ -539,21 +585,22 @@ return (
                       cy="50"
                       r="40"
                       fill="transparent"
-                      stroke={pote.cor}
+                      stroke={restantePote >= 0 ? pote.cor : '#EF4444'}
                       strokeWidth="8"
                       strokeDasharray="251.327"
-                      strokeDashoffset="0"
+                      strokeDashoffset={dashOffset}
+                      className="transition-all duration-300"
                     />
                   </svg>
-                  <div className="absolute inset-0 flex items-center justify-center p-1">
-                    <span className="text-xs font-black text-slate-900 dark:text-white">
-                      {formatValor(valorCalculado)}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-1">
+                    <span className={`text-xs font-black ${restantePote < 0 ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
+                      {formatValor(restantePote)}
                     </span>
                   </div>
                 </div>
 
                 <span className="text-[10px] font-semibold text-slate-400">
-                  de {formatValor(valorCalculado)}
+                  de {formatValor(orcamentoPote)}/mês
                 </span>
               </div>
             );
@@ -562,11 +609,66 @@ return (
       </main>
     )}
 
-    {/* SCREEN 4: ADJUST LIMITS */}
+    {/* TELA 4: EXTRATO COMPLETO DE ENTRADAS E SAÍDAS */}
+    {telaAtual === 'extrato' && (
+      <main className="p-5 flex-1 space-y-4">
+        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">Extrato Financeiro</h2>
+            <p className="text-xs text-slate-400">Histórico de movimentações do mês</p>
+          </div>
+          <button
+            onClick={() => setModalLancamentoAberto(true)}
+            className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" /> Novo Lançamento
+          </button>
+        </div>
+
+        {/* Cards Resumo */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 p-3 rounded-2xl">
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase block">Total Entradas</span>
+            <span className="text-base font-black text-emerald-600 dark:text-emerald-400">{formatValor(totalEntradas)}</span>
+          </div>
+          <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-800/40 p-3 rounded-2xl">
+            <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase block">Total Saídas</span>
+            <span className="text-base font-black text-rose-600 dark:text-rose-400">{formatValor(totalSaidas)}</span>
+          </div>
+        </div>
+
+        {/* Lista de Transações */}
+        <div className="space-y-2 pt-2">
+          {transacoes.length === 0 ? (
+            <p className="text-center text-xs text-slate-400 py-8">Nenhuma movimentação registrada.</p>
+          ) : (
+            transacoes.map(t => (
+              <div key={t.id} className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 flex justify-between items-center text-xs">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-xl ${t.tipo === 'entrada' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-400'}`}>
+                    {t.tipo === 'entrada' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block">{t.descricao}</span>
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> {t.data} {t.poteNome && `• Pote: ${t.poteNome}`}
+                    </span>
+                  </div>
+                </div>
+                <span className={`font-black text-sm ${t.tipo === 'entrada' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                  {t.tipo === 'entrada' ? '+' : '-'} {formatValor(t.valor)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
+    )}
+
+    {/* TELA 5: AJUSTAR LIMITES */}
     {telaAtual === 'adjust_limits' && (
       <main className="p-5 flex-1 space-y-6">
         <div className="flex items-center space-x-3">
-          {/* Ring Thumbnail */}
           <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
               <circle cx="50" cy="50" r="40" fill="transparent" stroke={isDarkMode ? '#1E293B' : '#E2E8F0'} strokeWidth="12" />
@@ -601,11 +703,10 @@ return (
           </div>
         </div>
 
-        {/* Sliders list */}
         <div className="space-y-4">
           {potesSelecionados.map(pote => {
             const valorMes = (rendaMensal * pote.percentual) / 100;
-            const valorDiaUtil = valorMes / 22; // ~22 business days
+            const valorDiaUtil = valorMes / 22;
 
             return (
               <div key={pote.id} className="space-y-1.5 bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/50">
@@ -633,22 +734,6 @@ return (
           })}
         </div>
 
-        {/* Add Custom / Income Action */}
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <button 
-            onClick={() => setTelaAtual('setup')}
-            className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200/60 dark:border-slate-700"
-          >
-            + Nova categoria
-          </button>
-          <button 
-            onClick={() => setTelaAtual('setup')}
-            className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200/60 dark:border-slate-700"
-          >
-            Alterar minha renda
-          </button>
-        </div>
-
         <button
           onClick={() => setTelaAtual('dashboard')}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-md shadow-emerald-600/20"
@@ -658,7 +743,7 @@ return (
       </main>
     )}
 
-    {/* BOTTOM NAVIGATION BAR (5 BUTTONS) */}
+    {/* BARRA DE NAVEGAÇÃO INFERIOR DE 5 BOTÕES */}
     <nav className="fixed bottom-0 left-0 right-0 max-w-md md:max-w-xl mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur border-t border-slate-200/80 dark:border-slate-800 px-4 py-2 flex justify-between items-center z-40">
       <button
         onClick={() => setTelaAtual('dashboard')}
@@ -671,16 +756,18 @@ return (
       </button>
 
       <button
-        onClick={() => setTelaAtual('dashboard')}
-        className="flex flex-col items-center space-y-0.5 text-[10px] font-bold text-slate-400 hover:text-slate-600"
+        onClick={() => setTelaAtual('extrato')}
+        className={`flex flex-col items-center space-y-0.5 text-[10px] font-bold ${
+          telaAtual === 'extrato' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
+        }`}
       >
         <List className="w-5 h-5" />
         <span>Extrato</span>
       </button>
 
-      {/* Quick Add Central Floating Button */}
+      {/* Botão Flutuante Central (Abrir Modal de Lançamento) */}
       <button
-        onClick={() => setTelaAtual('setup')}
+        onClick={() => setModalLancamentoAberto(true)}
         className="bg-emerald-500 hover:bg-emerald-600 text-white p-3 rounded-full shadow-lg -mt-5 transition-transform active:scale-95"
       >
         <ArrowUp className="w-5 h-5" />
@@ -705,6 +792,92 @@ return (
       </button>
     </nav>
 
+    {/* MODAL DE LANÇAMENTO RÁPIDO (ENTRADAS E SAÍDAS) */}
+    {modalLancamentoAberto && (
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 dark:border-slate-800 relative">
+          <button
+            onClick={() => setModalLancamentoAberto(false)}
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <h3 className="text-base font-black text-slate-900 dark:text-white">
+            Novo Lançamento
+          </h3>
+
+          {/* Seletor Tipo: Entrada ou Saída */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setNovoTipo('saida')}
+              className={`py-2 rounded-xl transition-all ${novoTipo === 'saida' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500'}`}
+            >
+              Saída (Gasto)
+            </button>
+            <button
+              type="button"
+              onClick={() => setNovoTipo('entrada')}
+              className={`py-2 rounded-xl transition-all ${novoTipo === 'entrada' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500'}`}
+            >
+              Entrada (Renda)
+            </button>
+          </div>
+
+          <form onSubmit={handleAdicionarTransacao} className="space-y-3 text-xs">
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Descrição</label>
+              <input
+                type="text"
+                required
+                placeholder="Ex: Supermercado, Venda ML, Conta de Luz"
+                value={novaDescricao}
+                onChange={(e) => setNovaDescricao(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Valor R$</label>
+              <input
+                type="number"
+                required
+                step="0.01"
+                placeholder="0,00"
+                value={novoValor}
+                onChange={(e) => setNovoValor(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white font-mono text-base focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Selecionar Pote se for Saída */}
+            {novoTipo === 'saida' && (
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Descontar do Pote</label>
+                <select
+                  value={novoPoteId}
+                  onChange={(e) => setNovoPoteId(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                >
+                  {potesSelecionados.map(p => (
+                    <option key={p.id} value={p.id}>{p.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className={`w-full font-bold py-3 rounded-xl text-white transition-all shadow-md ${novoTipo === 'saida' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
+            >
+              Registrar {novoTipo === 'saida' ? 'Saída' : 'Entrada'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
+
     {/* MENU DRAWER "MAIS" */}
     {menuMaisAberto && (
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end">
@@ -716,7 +889,6 @@ return (
             </button>
           </div>
 
-          {/* Install App Banner */}
           <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-2xl flex items-center space-x-3 border border-emerald-200/50 dark:border-emerald-800/40">
             <Download className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
@@ -724,7 +896,6 @@ return (
             </span>
           </div>
 
-          {/* Section: Ir Para */}
           <div className="space-y-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
               IR PARA
@@ -743,7 +914,7 @@ return (
               ].map((item, i) => (
                 <button
                   key={i}
-                  onClick={() => setMenuMaisAberto(false)}
+                  onClick={() => { setTelaAtual('extrato'); setMenuMaisAberto(false); }}
                   className="w-full flex items-center space-x-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
                 >
                   <item.icon className={`w-4 h-4 ${item.color}`} />
@@ -753,7 +924,6 @@ return (
             </div>
           </div>
 
-          {/* Section: Ajustes */}
           <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
               AJUSTES
@@ -767,18 +937,6 @@ return (
                 <span>Tampar valores</span>
               </div>
               <span className="text-[10px] font-bold text-slate-400">{tamparValores ? 'Ativado' : 'Desativado'}</span>
-            </button>
-          </div>
-
-          {/* Section: Ajuda e Conta */}
-          <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
-            <button className="w-full flex items-center space-x-3 p-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">
-              <HelpCircle className="w-4 h-4 text-teal-500" />
-              <span>Suporte</span>
-            </button>
-            <button className="w-full flex items-center space-x-3 p-2.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30">
-              <LogOut className="w-4 h-4 text-rose-500" />
-              <span>Sair desta conta</span>
             </button>
           </div>
         </div>
