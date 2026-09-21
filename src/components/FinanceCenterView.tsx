@@ -240,7 +240,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  const saldoBrutoTotal = totalEntradas - totalSaidas;
+  // Saldo Único Real da Conta
+  const saldoUnicoReal = totalEntradas - totalSaidas;
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
@@ -252,13 +253,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalConsolidado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
-
-  const percentualTotalRetencao = potesAtivos
-    .filter(p => p.retencaoAutomatica)
-    .reduce((acc, p) => acc + p.percentual, 0);
-
-  const valorRetidoAutomaticoTotal = (rendaRestanteAposDividas * percentualTotalRetencao) / 100;
-  const saldoLiquidoDisponivel = Math.max(0, saldoBrutoTotal - valorRetidoAutomaticoTotal);
 
   const adicionarContaFixaObrigatoria = async () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
@@ -287,7 +281,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     const conta = contasFixasObrigatorias.find(c => c.id === idConta);
     if (!conta || conta.mesesRestantes <= 0) return;
 
-    if (window.confirm(`Registrar pagamento de ${formatarGrana(conta.valor)} para "${conta.nome}"? O valor sairá do Saldo Bruto e abaterá 1 mês.`)) {
+    if (window.confirm(`Registrar pagamento de ${formatarGrana(conta.valor)} para "${conta.nome}"? O valor sairá do saldo e abaterá 1 mês.`)) {
       const novasContas = contasFixasObrigatorias.map(c => {
         if (c.id === idConta) {
           return { ...c, mesesRestantes: Math.max(0, c.mesesRestantes - 1) };
@@ -391,7 +385,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       await processarEntradaComAnimacao(valorGasto, origemEntradaModal);
       setValorLancamento(''); setModalLancamento(false);
     } else {
-      // TRAVA DE SEGURANÇA DE GASTOS (NÃO PODE FUGIR DO LIMITE)
+      // TRAVA DE SEGURANÇA DE GASTOS
       if (poteSelecionadoId !== 'divida_fixa') {
         const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
         if (poteAlvo) {
@@ -450,8 +444,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
     let novasTransacoes = [...transacoes];
     if (valorGuardadoInicial > 0) {
-      if (valorGuardadoInicial > saldoLiquidoDisponivel) {
-        alert("O valor inicial guardado não pode ser maior que o Saldo Líquido Disponível!");
+      if (valorGuardadoInicial > saldoUnicoReal) {
+        alert("O valor inicial guardado não pode ser maior que o Saldo Real disponível!");
         return;
       }
       const novaSaida: Transacao = {
@@ -492,8 +486,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
     let novasTransacoes = [...transacoes];
     if (origemDepositoMeta === 'disponivel') {
-      if (valorTransf > saldoLiquidoDisponivel) {
-        alert("Valor superior ao Saldo Líquido Disponível!");
+      if (valorTransf > saldoUnicoReal) {
+        alert("Valor superior ao Saldo Real disponível!");
         return;
       }
       const novaSaida: Transacao = {
@@ -868,7 +862,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <Sparkles className="w-8 h-8" />
             </div>
             <div>
-              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Distribuída Automaticamente!</span>
+              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada no Sistema!</span>
               <h3 className="text-2xl font-black font-mono mt-1">{formatarGrana(animacaoEntrada.valorTotal)}</h3>
             </div>
             <div className="space-y-2 text-left">
@@ -900,7 +894,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 <Sparkles className="w-6 h-6 text-emerald-500 shrink-0" />
                 <div>
                   <span className="font-black text-sm block">Aporte / Valor Inicial em Caixa Ativo</span>
-                  <span className="text-xs text-emerald-300/80">Valor considerado no saldo bruto: {formatarGrana(Number(aportePendenteValor))}</span>
+                  <span className="text-xs text-emerald-300/80">Valor considerado no saldo real: {formatarGrana(Number(aportePendenteValor))}</span>
                 </div>
               </div>
               <button 
@@ -912,30 +906,17 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col justify-between space-y-2`}>
-              <div>
-                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO (DINHEIRO EM CONTA)</span>
-                <div className="text-3xl md:text-4xl font-black text-emerald-500 mt-1 font-mono">
-                  {formatarGrana(saldoBrutoTotal)}
-                </div>
+          {/* ÚNICO SALDO REAL DA CONTA */}
+          <div className={`${cardClasse} rounded-3xl p-6 md:p-8 flex flex-col justify-between space-y-3 border-2 border-emerald-500/40`}>
+            <div>
+              <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted}`}>SALDO REAL DISPONÍVEL NA CONTA</span>
+              <div className="text-4xl md:text-5xl font-black text-emerald-500 mt-2 font-mono">
+                {formatarGrana(saldoUnicoReal)}
               </div>
-              <span className={`text-[11px] font-semibold ${textMuted}`}>Entradas menos todas as saídas e pagamentos</span>
             </div>
-
-            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
-              <div>
-                <span className={`text-[11px] uppercase font-bold tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-                  <CreditCard className="w-4 h-4 text-rose-500" /> SALDO LÍQUIDO DISPONÍVEL PARA GASTOS
-                </span>
-                <div className={`text-3xl md:text-4xl font-black mt-1 font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {formatarGrana(saldoLiquidoDisponivel)}
-                </div>
-              </div>
-              <span className="text-[11px] font-bold text-slate-400">
-                Livre descontando retenções automáticas de patrimônio
-              </span>
-            </div>
+            <span className={`text-xs font-semibold ${textMuted}`}>
+              Entradas menos despesas, contas fixas pagas, poupança e saídas realizadas
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -964,7 +945,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-black">Como você pode gastar:</h3>
+              <h3 className="text-lg font-black">Limites de Gastos por Pote:</h3>
               <div className={`flex ${inputBg} p-1 rounded-xl border`}>
                 <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-1.5 rounded-lg cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? 'bg-emerald-500 text-white' : textMuted}`} title="Modo Coluna Única">
                   <Columns2 className="w-4 h-4" />
@@ -1025,7 +1006,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                       <span className={`text-sm md:text-base font-black font-mono ${saldoRealPote < 0 ? 'text-rose-500' : ''}`}>
                         {formatarGrana(saldoRealPote)}
                       </span>
-                      <span className="text-[9px] text-slate-400">Disponível p/ gastar</span>
+                      <span className="text-[9px] text-slate-400">Limite disponível</span>
                     </div>
                   </div>
 
@@ -1372,7 +1353,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             
             <div className="space-y-1">
               <label className={`text-[11px] font-bold block ${textMuted}`}>
-                Aportar Valor Inicial (Disponível: {formatarGrana(saldoLiquidoDisponivel)})
+                Aportar Valor Inicial (Disponível: {formatarGrana(saldoUnicoReal)})
               </label>
               <input
                 type="number"
@@ -1412,7 +1393,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} 
                 className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border`}
               >
-                <option value="disponivel">💳 Saldo Líquido Disponível ({formatarGrana(saldoLiquidoDisponivel)})</option>
+                <option value="disponivel">💳 Saldo Real Disponível ({formatarGrana(saldoUnicoReal)})</option>
                 <option value="nosso_patrimonio">🐷 Nosso Patrimônio ({formatarGrana(saldoNossoPatrimonio)})</option>
                 <option value="patrimonio_manuela">👶 Poupança Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
               </select>
@@ -1498,7 +1479,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
                 <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
                 <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
-                  <option value="divida_fixa">💳 Direto do Saldo Bruto (Geral / Dívidas / Contas)</option>
+                  <option value="divida_fixa">💳 Direto do Saldo Real (Geral / Dívidas / Contas)</option>
                   {potesAtivos.map(p => (
                     <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
                   ))}
