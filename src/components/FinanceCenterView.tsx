@@ -68,7 +68,7 @@ interface Props {
 }
 
 export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'patrimonio' | 'perfil'>('onboarding');
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'ajustes' | 'extrato' | 'patrimonio' | 'perfil'>('onboarding');
 
   const [rendaMensal, setRendaMensal] = useState<number>(() => {
     const salvo = localStorage.getItem('@meu_imperio_renda');
@@ -119,10 +119,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [novaContaValor, setNovaContaValor] = useState<number | ''>('');
   const [novaContaMeses, setNovaContaMeses] = useState<number | ''>('');
 
-  const [modalEntradaInicial, setModalEntradaInicial] = useState<boolean>(false);
-  const [valorEntradaInicial, setValorEntradaInicial] = useState<number | ''>('');
-  const [origemEntradaInicial, setOrigemEntradaInicial] = useState<'CLT' | 'Mercado Livre'>('Mercado Livre');
-
   const [modalLancamento, setModalLancamento] = useState<boolean>(false);
   const [tipoLancamento, setTipoLancamento] = useState<'saida' | 'entrada'>('saida');
   const [valorLancamento, setValorLancamento] = useState<number | ''>('');
@@ -160,7 +156,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   
   const caixaBrutoAtual = totalEntradas - totalSaidas;
 
-  // Cálculo de Patrimônios Integrados (Automáticos)
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
   const saldoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
@@ -172,18 +167,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
-  // SALDO BRUTO = Caixa em Conta + Patrimônios Integrados e Manuais
   const saldoBrutoTotal = caixaBrutoAtual + patrimonioTotalCalculado;
 
-  // Soma de todos os percentuais de retenção automática cadastrados no plano
   const percentualTotalRetencao = potesAtivos
     .filter(p => p.retencaoAutomatica)
     .reduce((acc, p) => acc + p.percentual, 0);
 
-  // Valor total reservado/subtraído automaticamente para retenções com base nas entradas
   const valorRetidoAutomaticoTotal = (totalEntradas * percentualTotalRetencao) / 100;
-
-  // SALDO LÍQUIDO DISPONÍVEL = Caixa Bruto menos as retenções automáticas e saídas de consumo
   const saldoLiquidoDisponivel = Math.max(0, caixaBrutoAtual - valorRetidoAutomaticoTotal);
 
   const adicionarContaFixaTemp = () => {
@@ -339,14 +329,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     setModalLancamento(false);
   };
 
-  const confirmarEntradaInicial = () => {
-    if (valorEntradaInicial && Number(valorEntradaInicial) > 0) {
-      processarEntradaComAnimacao(Number(valorEntradaInicial), origemEntradaInicial);
-    }
-    setModalEntradaInicial(false);
-    navegarPara('dashboard');
-  };
-
   const adicionarPatrimonioManual = () => {
     if (!nomeNovoPatrimonio || !valorNovoPatrimonio || Number(valorNovoPatrimonio) <= 0) return;
     setItensPatrimonioManuais([...itensPatrimonioManuais, {
@@ -484,8 +466,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               </div>
 
               {totalMapeado === 100 ? (
-                <button onClick={() => navegarPara('confirmacao')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
-                  Concluir Plano Financeiro
+                <button onClick={() => navegarPara('dashboard')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
+                  Concluir Plano e Ir para o Painel
                 </button>
               ) : (
                 <div className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold py-3 px-4 rounded-2xl text-center">
@@ -627,63 +609,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         );
       })()}
 
-      {/* TELA 2: CONFIRMAÇÃO */}
-      {telaAtiva === 'confirmacao' && (
-        <main className="max-w-md mx-auto p-4 text-center space-y-5 my-auto">
-          <h2 className="text-xl md:text-2xl font-black">Seu plano está pronto!</h2>
-          <div className="space-y-2.5 pt-2">
-            <button 
-              onClick={() => setModalEntradaInicial(true)}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm"
-            >
-              Registrar Entrada Inicial
-            </button>
-            <button 
-              onClick={() => navegarPara('dashboard')}
-              className={`w-full ${inputBg} font-bold py-3 rounded-2xl transition-all text-sm border`}
-            >
-              Ir para o Painel
-            </button>
-          </div>
-        </main>
-      )}
-
-      {/* MODAL ENTRADA INICIAL */}
-      {modalEntradaInicial && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative`}>
-            <button onClick={() => setModalEntradaInicial(false)} className="absolute top-4 right-4 text-slate-400">
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-base md:text-lg font-black">Qual valor entrou hoje?</h3>
-            <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-              <button onClick={() => setOrigemEntradaInicial('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaInicial === 'Mercado Livre' ? 'bg-emerald-500 text-white' : textMuted}`}>
-                Mercado Livre
-              </button>
-              <button onClick={() => setOrigemEntradaInicial('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaInicial === 'CLT' ? 'bg-emerald-500 text-white' : textMuted}`}>
-                CLT
-              </button>
-            </div>
-
-            <input
-              type="number"
-              placeholder="Valor R$"
-              value={valorEntradaInicial}
-              onChange={(e) => setValorEntradaInicial(e.target.value === '' ? '' : Number(e.target.value))}
-              className={`w-full ${inputBg} p-3 rounded-2xl text-center font-black text-lg focus:outline-none font-mono border`}
-            />
-
-            <button
-              onClick={confirmarEntradaInicial}
-              className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm"
-            >
-              Confirmar e Diluir
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ANIMAÇÃO VISUAL DE ENTRADA */}
       {animacaoEntrada && animacaoEntrada.ativo && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -784,7 +709,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
 
             <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 text-xs md:text-sm">
-              <Plus className="w-4 h-4" /> + Entrada / Gasto
+              <Plus className="w-4 h-4" /> + Registrar Entrada / Gasto
             </button>
           </div>
 
@@ -794,10 +719,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
               const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
               
-              // Para potes de retenção automática, o saldo exibido no gráfico é exatamente o valor diluído acumulado
               const saldoRealPote = pote.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
 
-              // Círculo SVG preenchendo proporcionalmente
               const percentualProgresso = pote.retencaoAutomatica 
                 ? pote.percentual 
                 : (valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100);
