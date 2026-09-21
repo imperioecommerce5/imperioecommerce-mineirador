@@ -80,6 +80,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [potesAtivosSalvos] = useState(() => localStorage.getItem('@meu_imperio_potes'));
   const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil'>(potesAtivosSalvos ? 'dashboard' : 'onboarding');
 
+  const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil') => {
+    setTelaAtiva(tela);
+    setMenuAberto(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const [rendaMensal, setRendaMensal] = useState<number>(() => {
     const salvo = localStorage.getItem('@meu_imperio_renda');
     return salvo ? Number(salvo) : 0;
@@ -440,10 +446,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </div>
 
         <div className="flex items-center space-x-2">
-          <button onClick={() => setTamparValores(!tamparValores)} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all`}>
+          <button onClick={() => setTamparValores(!tamparValores)} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all cursor-pointer`}>
             {tamparValores ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
-          <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all`}>
+          <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all cursor-pointer`}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           <button onClick={() => setMenuAberto(!menuAberto)} className="p-2 md:p-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black shadow-md shadow-emerald-500/20 transition-all cursor-pointer">
