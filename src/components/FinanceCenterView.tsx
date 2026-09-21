@@ -134,9 +134,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [contasFixasTemp, setContasFixasTemp] = useState<ContaFixa[]>([]);
   const [novaContaNome, setNovaContaNome] = useState('');
   const [novaContaValor, setNovaContaValor] = useState<number | ''>('');
-  const [novaContaTipo, setNovaContaTipo] = useState<'a_vista' | 'parcelado'>('a_vista');
-  const [novaContaParcelaAtual, setNovaContaParcelaAtual] = useState<number | ''>(1);
-  const [novaContaTotalParcelas, setNovaContaTotalParcelas] = useState<number | ''>(12);
 
   const [modalEntradaInicial, setModalEntradaInicial] = useState<boolean>(false);
   const [valorEntradaInicial, setValorEntradaInicial] = useState<number | ''>('');
@@ -166,10 +163,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     valorEstourado: number;
     poteCompensadorId: string;
   } | null>(null);
-
-  const [novaMetaNome, setNovaMetaNome] = useState('');
-  const [novaMetaValor, setNovaMetaValor] = useState<number | ''>('');
-  const [novaMetaDate, setNovaMetaDate] = useState('');
 
   const navegarPara = (tela: typeof telaAtiva) => {
     setTelaAtiva(tela);
@@ -281,9 +274,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       const gastosAtuaisPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
       const saldoDisponivelPote = valorDiluidoNoPote - gastosAtuaisPote;
 
-      if (valorGasto > saldoDisponivelPote) {
+      if (valorGasto > saldoDisponivelPote && !poteAlvo.retencaoAutomatica) {
         const excesso = valorGasto - saldoDisponivelPote;
-        const outroPoteCompensador = potesAtivos.find(p => p.id !== poteAlvo.id && p.id !== 'dividas');
+        const outroPoteCompensador = potesAtivos.find(p => p.id !== poteAlvo.id && !p.retencaoAutomatica);
 
         setAlertaEstouro({
           poteNome: poteAlvo.nome,
@@ -329,7 +322,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         descricao: `Compensação de estouro em ${poteAlvo.nome}`,
         valor: alertaEstouro.valorEstourado,
         tipo: 'saida',
-        poteId:alertaEstouro.poteCompensadorId,
+        poteId: alertaEstouro.poteCompensadorId,
         poteNome: 'Nosso Patrimônio (Compensação)',
         data: new Date().toLocaleDateString('pt-BR')
       };
@@ -637,7 +630,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <Sparkles className="w-8 h-8" />
             </div>
             <div>
-              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Distribuída!</span>
+              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Distribuída Automaticamente!</span>
               <h3 className="text-2xl font-black font-mono mt-1">{formatarGrana(animacaoEntrada.valorTotal)}</h3>
             </div>
             <div className="space-y-2 text-left">
@@ -695,7 +688,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">🐷</span>
                 <div>
-                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança</span>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança (Diluição Automática)</span>
                   <span className="font-black text-sm block">Nosso Patrimônio</span>
                 </div>
               </div>
@@ -706,7 +699,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">👶</span>
                 <div>
-                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança</span>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança (Diluição Automática)</span>
                   <span className="font-black text-sm block">Manuela</span>
                 </div>
               </div>
@@ -738,7 +731,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
               const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
-              const saldoRealPote = Math.max(0, valorDiluidoNoPote - gastosPote);
+              const saldoRealPote = pote.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
 
               const percentualProgresso = valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100;
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
@@ -747,7 +740,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 <div key={pote.id} className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col items-center text-center space-y-4 relative overflow-hidden`}>
                   {pote.retencaoAutomatica && (
                     <span className="absolute top-3 right-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                      Retenção
+                      Retenção Automática
                     </span>
                   )}
 
