@@ -20,7 +20,6 @@ import {
   ArrowRight,
   Vault,
   Sparkles,
-  BrainCircuit,
   LayoutGrid,
   Columns2,
   LogOut,
@@ -199,7 +198,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  // Saldo Bruto real em caixa (Entradas - Saídas)
   const saldoBrutoTotal = totalEntradas - totalSaidas;
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
@@ -448,7 +446,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
           <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all`}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button onClick={() => setMenuAberto(!menuAberto)} className="p-2 md:p-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black shadow-md shadow-emerald-500/20 transition-all">
+          <button onClick={() => setMenuAberto(!menuAberto)} className="p-2 md:p-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black shadow-md shadow-emerald-500/20 transition-all cursor-pointer">
             <Menu className="w-4 h-4 text-white" />
           </button>
         </div>
@@ -461,7 +459,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <h1 className="text-xl md:text-2xl font-extrabold tracking-tight">
               {potesAtivos.length > 0 ? 'Editar Plano Financeiro (100% Obrigatório)' : 'Montar seu Plano Financeiro'}
             </h1>
-            <button onClick={reiniciarSistemaGeral} className="text-xs text-rose-400 hover:text-rose-500 font-bold underline">
+            <button onClick={reiniciarSistemaGeral} className="text-xs text-rose-400 hover:text-rose-500 font-bold underline cursor-pointer">
               Reiniciar Sistema Zera Tudo
             </button>
           </div>
@@ -550,7 +548,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     }}
                     className={`${cardClasse} p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative group transition-all active:scale-95 hover:border-emerald-500/50`}
                   >
-                    <button onClick={(e) => { e.stopPropagation(); removerPote(pote.id); }} className="absolute top-1.5 right-1.5 text-slate-400 hover:text-rose-500">
+                    <button onClick={(e) => { e.stopPropagation(); removerPote(pote.id); }} className="absolute top-1.5 right-1.5 text-slate-400 hover:text-rose-500 cursor-pointer">
                       <X className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-2xl md:text-3xl mb-1">{pote.iconeEmoji}</span>
@@ -569,7 +567,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     }
                     navegarPara('dashboard');
                   }} 
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base cursor-pointer"
                 >
                   Salvar Plano e Ir para o Painel
                 </button>
@@ -616,7 +614,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         return (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-lg w-full text-center space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto`}>
-              <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400">
+              <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
 
@@ -676,7 +674,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     <button
                       type="button"
                       onClick={adicionarContaFixaTemp}
-                      className="w-full bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                      className="w-full bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" /> Adicionar na Lista
                     </button>
@@ -690,7 +688,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                             <span className="font-bold block">{c.nome}</span>
                             <span className="text-[10px] text-slate-400">{formatarGrana(c.valor)}/mês • {c.mesesTotales} meses</span>
                           </div>
-                          <button onClick={() => removerContaFixaTemp(c.id)} className="text-rose-500">
+                          <button onClick={() => removerContaFixaTemp(c.id)} className="text-rose-500 cursor-pointer">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -702,7 +700,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
               <button
                 onClick={confirmarAdicionarPote}
-                className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm cursor-pointer"
               >
                 <Check className="w-4 h-4" /> Confirmar Porcentagem
               </button>
@@ -734,7 +732,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
             <button 
               onClick={() => setAnimacaoEntrada(null)}
-              className="w-full bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm"
+              className="w-full bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm cursor-pointer"
             >
               Ver Meu Painel
             </button>
@@ -757,7 +755,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               </div>
               <button 
                 onClick={() => setModalAportePendente(true)}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-2xl text-xs transition-all shrink-0 shadow-md"
+                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-2xl text-xs transition-all shrink-0 shadow-md cursor-pointer"
               >
                 Aportar Agora
               </button>
@@ -818,16 +816,16 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-black">Como você pode gastar:</h3>
               <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-1.5 rounded-lg ${modoVisualizacaoPotes === 'coluna' ? 'bg-emerald-500 text-white' : textMuted}`} title="Modo Coluna Única">
+                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-1.5 rounded-lg cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? 'bg-emerald-500 text-white' : textMuted}`} title="Modo Coluna Única">
                   <Columns2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-1.5 rounded-lg ${modoVisualizacaoPotes === 'grid' ? 'bg-emerald-500 text-white' : textMuted}`} title="Modo Grid / Colunas">
+                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-1.5 rounded-lg cursor-pointer ${modoVisualizacaoPotes === 'grid' ? 'bg-emerald-500 text-white' : textMuted}`} title="Modo Grid / Colunas">
                   <LayoutGrid className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 text-xs md:text-sm">
+            <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 text-xs md:text-sm cursor-pointer">
               <Plus className="w-4 h-4" /> + Registrar Entrada / Gasto
             </button>
           </div>
@@ -910,7 +908,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
               <Vault className="w-6 h-6 text-emerald-500" /> Patrimônio da Família
             </h2>
-            <button onClick={() => setModalNovoPatrimonio(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold">
+            <button onClick={() => setModalNovoPatrimonio(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer">
               + Item Manual
             </button>
           </div>
@@ -957,7 +955,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </div>
                 <div className="flex items-center space-x-3">
                   <span className="font-mono font-black text-amber-500 text-sm md:text-base">{formatarGrana(item.valor)}</span>
-                  <button onClick={() => setItensPatrimonioManuais(itensPatrimonioManuais.filter(x => x.id !== item.id))} className="text-slate-400 hover:text-rose-500">
+                  <button onClick={() => setItensPatrimonioManuais(itensPatrimonioManuais.filter(x => x.id !== item.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -974,7 +972,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
               <Target className="w-6 h-6 text-emerald-500" /> Metas Financeiras
             </h2>
-            <button onClick={() => setModalNovaMeta(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold">
+            <button onClick={() => setModalNovaMeta(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer">
               + Nova Meta
             </button>
           </div>
@@ -996,7 +994,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                         <span className="text-2xl">🎯</span>
                         <span className="font-black text-base">{meta.nome}</span>
                       </div>
-                      <button onClick={() => setMetas(metas.filter(m => m.id !== meta.id))} className="text-slate-400 hover:text-rose-500">
+                      <button onClick={() => setMetas(metas.filter(m => m.id !== meta.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -1040,9 +1038,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-black">Extrato</h2>
             <div className={`flex ${inputBg} p-1 rounded-xl border text-xs`}>
-              <button onClick={() => setFiltroExtrato('todos')} className={`px-3 py-1.5 font-bold rounded-lg ${filtroExtrato === 'todos' ? 'bg-emerald-500 text-white' : textMuted}`}>Todos</button>
-              <button onClick={() => setFiltroExtrato('entradas')} className={`px-3 py-1.5 font-bold rounded-lg ${filtroExtrato === 'entradas' ? 'bg-emerald-500 text-white' : textMuted}`}>Entradas</button>
-              <button onClick={() => setFiltroExtrato('saidas')} className={`px-3 py-1.5 font-bold rounded-lg ${filtroExtrato === 'saidas' ? 'bg-emerald-500 text-white' : textMuted}`}>Saídas</button>
+              <button onClick={() => setFiltroExtrato('todos')} className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer ${filtroExtrato === 'todos' ? 'bg-emerald-500 text-white' : textMuted}`}>Todos</button>
+              <button onClick={() => setFiltroExtrato('entradas')} className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer ${filtroExtrato === 'entradas' ? 'bg-emerald-500 text-white' : textMuted}`}>Entradas</button>
+              <button onClick={() => setFiltroExtrato('saidas')} className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer ${filtroExtrato === 'saidas' ? 'bg-emerald-500 text-white' : textMuted}`}>Saídas</button>
             </div>
           </div>
 
@@ -1067,7 +1065,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     <span className={`font-black font-mono ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}`}>
                       {t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}
                     </span>
-                    <button onClick={() => setTransacoes(transacoes.filter(x => x.id !== t.id))} className="text-slate-400 hover:text-rose-500">
+                    <button onClick={() => setTransacoes(transacoes.filter(x => x.id !== t.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1082,7 +1080,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       {modalAportePendente && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
-            <button onClick={() => setModalAportePendente(false)} className="absolute top-4 right-4 text-slate-400">
+            <button onClick={() => setModalAportePendente(false)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
             <h3 className="text-base md:text-lg font-black">Efetivar Aporte Inicial</h3>
@@ -1094,7 +1092,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               onChange={(e) => setValorModalAporte(e.target.value === '' ? '' : Number(e.target.value))}
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`}
             />
-            <button onClick={efetivarAportePendente} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm">
+            <button onClick={efetivarAportePendente} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer">
               Confirmar e Distribuir
             </button>
           </div>
@@ -1105,7 +1103,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       {modalNovoPatrimonio && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
-            <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400">
+            <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
             <h3 className="text-base md:text-lg font-black">Adicionar Item ao Patrimônio</h3>
@@ -1123,7 +1121,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))}
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`}
             />
-            <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm">
+            <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer">
               Salvar
             </button>
           </div>
@@ -1134,7 +1132,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       {modalNovaMeta && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto`}>
-            <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400">
+            <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
             <h3 className="text-base md:text-lg font-black">Nova Meta Financeira</h3>
@@ -1166,7 +1164,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               onChange={(e) => setMesesNovaMeta(e.target.value === '' ? '' : Number(e.target.value))}
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
             />
-            <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm">
+            <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer">
               Salvar Meta
             </button>
           </div>
@@ -1187,10 +1185,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs border`}>
+              <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs border cursor-pointer`}>
                 Cancelar
               </button>
-              <button onClick={confirmarCompensacaoEstouro} className="flex-1 bg-amber-500 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1">
+              <button onClick={confirmarCompensacaoEstouro} className="flex-1 bg-amber-500 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1 cursor-pointer">
                 Compensar <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -1200,19 +1198,19 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
       {/* BARRA INFERIOR GLOBAL */}
       <nav className={`fixed bottom-0 inset-x-0 border-t p-1.5 flex justify-around items-center z-40 transition-colors duration-300 ${isDark ? 'bg-slate-950/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
-        <button onClick={() => navegarPara('dashboard')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
+        <button onClick={() => navegarPara('dashboard')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer">
           <Home className="w-5 h-5 text-emerald-500" /> Início
         </button>
-        <button onClick={() => navegarPara('extrato')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
+        <button onClick={() => navegarPara('extrato')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer">
           <List className="w-5 h-5 text-emerald-500" /> Extrato
         </button>
-        <button onClick={() => setModalLancamento(true)} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 -mt-5 active:scale-95 transition-transform">
+        <button onClick={() => setModalLancamento(true)} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 -mt-5 active:scale-95 transition-transform cursor-pointer">
           <Plus className="w-5 h-5" />
         </button>
-        <button onClick={() => navegarPara('metas')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
+        <button onClick={() => navegarPara('metas')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer">
           <Target className="w-5 h-5 text-emerald-500" /> Metas
         </button>
-        <button onClick={() => setMenuAberto(!menuAberto)} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
+        <button onClick={() => setMenuAberto(!menuAberto)} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer">
           <MoreHorizontal className="w-5 h-5 text-emerald-500" /> Mais
         </button>
       </nav>
@@ -1221,17 +1219,17 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       {modalLancamento && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl`}>
-            <button onClick={() => setModalLancamento(false)} className="absolute top-4 right-4 text-slate-400">
+            <button onClick={() => setModalLancamento(false)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
 
             <h3 className="text-base md:text-lg font-black">Novo Lançamento</h3>
 
             <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-              <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white' : textMuted}`}>
+              <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white' : textMuted}`}>
                 Gasto (Saída)
               </button>
-              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white' : textMuted}`}>
+              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white' : textMuted}`}>
                 Renda (Entrada)
               </button>
             </div>
@@ -1240,10 +1238,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="space-y-3">
                 <label className={`text-xs font-bold block ${textMuted}`}>Origem da Entrada:</label>
                 <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-                  <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'Mercado Livre' ? 'bg-emerald-500 text-white' : textMuted}`}>
+                  <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${origemEntradaModal === 'Mercado Livre' ? 'bg-emerald-500 text-white' : textMuted}`}>
                     Mercado Livre
                   </button>
-                  <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'CLT' ? 'bg-emerald-500 text-white' : textMuted}`}>
+                  <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${origemEntradaModal === 'CLT' ? 'bg-emerald-500 text-white' : textMuted}`}>
                     CLT
                   </button>
                 </div>
@@ -1275,7 +1273,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
             <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`} />
 
-            <button onClick={salvarLancamento} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm">
+            <button onClick={salvarLancamento} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm cursor-pointer">
               Registrar Lançamento
             </button>
           </div>
@@ -1287,26 +1285,26 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex justify-end" onClick={() => setMenuAberto(false)}>
           <div className={`${cardClasse} w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between`} onClick={(e) => e.stopPropagation()}>
             <div className="space-y-5">
-              <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+              <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
 
               <h3 className="text-lg font-black text-emerald-500">MEU IMPÉRIO</h3>
 
               <div className="space-y-1.5 text-xs md:text-sm font-bold">
-                <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
                 </button>
-                <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Sliders className="w-4 h-4 text-emerald-500" /> Editar / Ajustar Porcentagens
                 </button>
-                <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras
                 </button>
-                <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Vault className="w-4 h-4 text-emerald-500" /> Patrimônio da Família
                 </button>
-                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
                 </button>
               </div>
@@ -1315,13 +1313,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <div className="pt-4 border-t border-slate-800 space-y-2">
               <button 
                 onClick={reiniciarSistemaGeral}
-                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all"
+                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" /> Reiniciar Sistema (Zerar Tudo)
               </button>
               <button 
                 onClick={onLogout} 
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all"
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-all cursor-pointer"
               >
                 <LogOut className="w-4 h-4" /> Sair da Conta (Logout)
               </button>
