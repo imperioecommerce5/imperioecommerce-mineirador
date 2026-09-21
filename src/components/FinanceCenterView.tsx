@@ -24,7 +24,8 @@ import {
   Wallet,
   Sparkles,
   Layers,
-  BrainCircuit
+  BrainCircuit,
+  Filter
 } from 'lucide-react';
 
 interface ContaFixa {
@@ -51,7 +52,9 @@ interface Transacao {
   descricao: string;
   valor: number;
   tipo: 'entrada' | 'saida';
+  origemEntrada?: 'CLT' | 'Mercado Livre';
   poteId: string;
+  poteNome?: string;
   data: string;
 }
 
@@ -92,22 +95,27 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
   const [novaContaParcelaAtual, setNovaContaParcelaAtual] = useState<number | ''>(1);
   const [novaContaTotalParcelas, setNovaContaTotalParcelas] = useState<number | ''>(12);
 
-  // Modais
+  // Modais de Lançamento
   const [modalEntradaInicial, setModalEntradaInicial] = useState<boolean>(false);
   const [valorEntradaInicial, setValorEntradaInicial] = useState<number | ''>('');
+  const [origemEntradaInicial, setOrigemEntradaInicial] = useState<'CLT' | 'Mercado Livre'>('Mercado Livre');
 
   const [modalLancamento, setModalLancamento] = useState<boolean>(false);
   const [tipoLancamento, setTipoLancamento] = useState<'saida' | 'entrada'>('saida');
   const [valorLancamento, setValorLancamento] = useState<number | ''>('');
-  const [descLancamento, setDescLancamento] = useState<string>('');
+  const [origemEntradaModal, setOrigemEntradaModal] = useState<'CLT' | 'Mercado Livre'>('Mercado Livre');
+  const [categoriaSaidaSelecionada, setCategoriaSaidaSelecionada] = useState<string>('Supermercado / Compras');
   const [poteSelecionadoId, setPoteSelecionadoId] = useState<string>('supermercado');
+
+  // Filtros do Extrato
+  const [filtroExtrato, setFiltroExtrato] = useState<'todos' | 'entradas' | 'saidas'>('todos');
 
   // Modal Patrimônio
   const [modalNovoPatrimonio, setModalNovoPatrimonio] = useState<boolean>(false);
   const [nomeNovoPatrimonio, setNomeNovoPatrimonio] = useState('');
   const [valorNovoPatrimonio, setValorNovoPatrimonio] = useState<number | ''>('');
 
-  // Animação de Entrada
+  // Animação e Estouro
   const [animacaoEntrada, setAnimacaoEntrada] = useState<{
     ativo: boolean;
     valorTotal: number;
@@ -115,7 +123,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     sobraLivre: number;
   } | null>(null);
 
-  // Alerta de Estouro
   const [alertaEstouro, setAlertaEstouro] = useState<{
     poteNome: string;
     valorEstourado: number;
@@ -159,7 +166,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     todosPotesDisponiveis[7]
   ]);
 
-  // Metas e Patrimônio
+  // Metas e Patrimônio Manual
   const [metas, setMetas] = useState<Meta[]>([
     { id: '1', nome: 'Fundo da Manuela', valorAlvo: 10000, valorAtual: 1200, dataLimite: '2027-12-31' }
   ]);
@@ -183,14 +190,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  // Saldo Bruto em Caixa
   const saldoCaixaBruto = totalEntradas - totalSaidas;
 
-  // Dívidas & Compromissos Fixos
   const poteDividasObj = potesAtivos.find(p => p.id === 'dividas' || p.nome.toLowerCase().includes('dívida'));
   const totalContasFixasEDividas = poteDividasObj?.contasFixas?.reduce((acc, c) => acc + c.valor, 0) || 0;
 
-  // Saldo Líquido Livre em Conta
   const saldoLiquidoDisponivel = Math.max(0, saldoCaixaBruto - totalContasFixasEDividas);
 
   // Patrimônios Separados
@@ -209,7 +213,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
-  // Atualização Automática de % das Dívidas
+  // Atualização Automática de % de Dívidas
   useEffect(() => {
     if (rendaMensal > 0) {
       const somaDividas = contasFixasTemp.reduce((acc, c) => acc + c.valor, 0);
@@ -220,7 +224,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     }
   }, [contasFixasTemp, rendaMensal]);
 
-  // Adicionar Dívidas (À Vista ou Parceladas)
   const adicionarContaFixaTemp = () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0) return;
     setContasFixasTemp([...contasFixasTemp, {
@@ -276,14 +279,16 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     setPotesAtivos(prev => prev.map(p => p.id === id ? { ...p, percentual: valorFinal } : p));
   };
 
-  // Entrada com Animação
-  const processarEntradaComAnimacao = (valor: number, desc: string) => {
+  // Processar Entrada com Origem
+  const processarEntradaComAnimacao = (valor: number, origem: 'CLT' | 'Mercado Livre') => {
     const novaEntrada: Transacao = {
       id: Date.now().toString(),
-      descricao: desc,
+      descricao: `Entrada (${origem})`,
       valor: valor,
       tipo: 'entrada',
+      origemEntrada: origem,
       poteId: 'geral',
+      poteNome: `Origem: ${origem}`,
       data: new Date().toLocaleDateString('pt-BR')
     };
     setTransacoes(prev => [novaEntrada, ...prev]);
@@ -307,12 +312,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     });
   };
 
+  // Salvar Lançamento com verificação correta de estouro e pop-up
   const salvarLancamento = () => {
-    if (!valorLancamento || valorLancamento <= 0) return;
+    if (!valorLancamento || Number(valorLancamento) <= 0) return;
 
     if (tipoLancamento === 'entrada') {
-      processarEntradaComAnimacao(Number(valorLancamento), descLancamento || 'Entrada Registrada');
-      setValorLancamento(''); setDescLancamento(''); setModalLancamento(false);
+      processarEntradaComAnimacao(Number(valorLancamento), origemEntradaModal);
+      setValorLancamento(''); setModalLancamento(false);
     } else {
       const valorGasto = Number(valorLancamento);
       const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
@@ -337,14 +343,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
       const novaSaida: Transacao = {
         id: Date.now().toString(),
-        descricao: descLancamento || `Gasto em ${poteAlvo.nome}`,
+        descricao: categoriaSaidaSelecionada,
         valor: valorGasto,
         tipo: 'saida',
         poteId: poteAlvo.id,
+        poteNome: poteAlvo.nome,
         data: new Date().toLocaleDateString('pt-BR')
       };
       setTransacoes(prev => [novaSaida, ...prev]);
-      setValorLancamento(''); setDescLancamento(''); setModalLancamento(false);
+      setValorLancamento(''); setModalLancamento(false);
     }
   };
 
@@ -357,10 +364,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     if (poteAlvo) {
       const novaSaida: Transacao = {
         id: Date.now().toString(),
-        descricao: `${descLancamento || 'Gasto Excedente'} (Excedeu ${formatarGrana(alertaEstouro.valorEstourado)})`,
+        descricao: `${categoriaSaidaSelecionada} (Excedeu ${formatarGrana(alertaEstouro.valorEstourado)})`,
         valor: valorGasto,
         tipo: 'saida',
         poteId: poteAlvo.id,
+        poteNome: poteAlvo.nome,
         data: new Date().toLocaleDateString('pt-BR')
       };
 
@@ -370,6 +378,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         valor: alertaEstouro.valorEstourado,
         tipo: 'saida',
         poteId: alertaEstouro.poteCompensadorId,
+        poteNome: 'Nosso Patrimônio (Compensação)',
         data: new Date().toLocaleDateString('pt-BR')
       };
 
@@ -378,13 +387,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
     setAlertaEstouro(null);
     setValorLancamento('');
-    setDescLancamento('');
     setModalLancamento(false);
   };
 
   const confirmarEntradaInicial = () => {
     if (valorEntradaInicial && Number(valorEntradaInicial) > 0) {
-      processarEntradaComAnimacao(Number(valorEntradaInicial), 'Renda Inicial Registrada');
+      processarEntradaComAnimacao(Number(valorEntradaInicial), origemEntradaInicial);
     }
     setModalEntradaInicial(false);
     navegarPara('dashboard');
@@ -438,6 +446,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
   const pctPatrimonioTotal = pctNossoPatrimonio + pctPatrimonioManuela;
   const pctDividasTotal = poteDividasObj ? poteDividasObj.percentual : 0;
 
+  // Filtragem do extrato
+  const transacoesFiltradas = transacoes.filter(t => {
+    if (filtroExtrato === 'entradas') return t.tipo === 'entrada';
+    if (filtroExtrato === 'saidas') return t.tipo === 'saida';
+    return true;
+  });
+
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
       
@@ -461,7 +476,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </div>
       </header>
 
-      {/* TELA 1: MONTAR PLANO */}
+      {/* TELA 1: ONBOARDING / PLANO */}
       {telaAtiva === 'onboarding' && (
         <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-center md:text-left">Montando seu plano financeiro</h1>
@@ -540,26 +555,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               </button>
             </div>
           </div>
-
-          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <p className={`text-xs font-bold text-center ${textMuted}`}>Escolha mais potes para o seu plano:</p>
-            <div className="flex items-center space-x-2.5 overflow-x-auto pb-2 scrollbar-none">
-              {todosPotesDisponiveis.map(pote => {
-                const selecionado = potesAtivos.some(p => p.id === pote.id);
-                return (
-                  <button 
-                    key={pote.id} 
-                    disabled={selecionado} 
-                    onClick={() => solicitarAdicaoPote(pote)} 
-                    className={`flex-shrink-0 p-2.5 rounded-2xl border text-center flex flex-col items-center space-y-1 w-20 md:w-24 transition-all ${selecionado ? 'opacity-40 border-slate-200 grayscale cursor-not-allowed' : `${cardClasse} hover:border-emerald-500 active:scale-95`}`}
-                  >
-                    <span className="text-xl md:text-2xl">{pote.iconeEmoji}</span>
-                    <span className="text-[10px] md:text-[11px] font-bold truncate w-full">{pote.nome}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </main>
       )}
 
@@ -585,7 +580,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               <div>
                 <h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3>
                 <p className={`text-xs mt-0.5 ${textMuted}`}>
-                  {eDividas ? 'A porcentagem é calculada automaticamente pelas dívidas cadastradas' : 'Defina a porcentagem de alocação'}
+                  {eDividas ? 'Calculado automaticamente pelas dívidas' : 'Defina a porcentagem de alocação'}
                 </p>
               </div>
 
@@ -645,7 +640,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
-                        placeholder="Nome da Dívida/Conta"
+                        placeholder="Nome da Dívida"
                         value={novaContaNome}
                         onChange={(e) => setNovaContaNome(e.target.value)}
                         className={`${inputBg} p-2.5 rounded-xl text-xs font-bold focus:outline-none border`}
@@ -665,7 +660,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                         onChange={(e) => setNovaContaTipo(e.target.value as any)}
                         className={`${inputBg} p-2 rounded-xl text-xs font-bold focus:outline-none border flex-1`}
                       >
-                        <option value="a_vista">À Vista (Mês atual)</option>
+                        <option value="a_vista">À Vista</option>
                         <option value="parcelado">Parcelado</option>
                       </select>
 
@@ -741,7 +736,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </main>
       )}
 
-      {/* MODAL ENTRADA INICIAL */}
+      {/* MODAL ENTRADA INICIAL COM ORIGEM */}
       {modalEntradaInicial && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative`}>
@@ -750,7 +745,16 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             </button>
 
             <h3 className="text-base md:text-lg font-black">Qual valor entrou hoje?</h3>
-            <p className={`text-xs ${textMuted}`}>Esse valor será diluído automaticamente nos potes.</p>
+            <p className={`text-xs ${textMuted}`}>Selecione a origem da sua entrada financeira:</p>
+
+            <div className={`flex ${inputBg} p-1 rounded-xl border`}>
+              <button onClick={() => setOrigemEntradaInicial('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaInicial === 'Mercado Livre' ? 'bg-emerald-500 text-white' : textMuted}`}>
+                Mercado Livre
+              </button>
+              <button onClick={() => setOrigemEntradaInicial('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaInicial === 'CLT' ? 'bg-emerald-500 text-white' : textMuted}`}>
+                CLT
+              </button>
+            </div>
 
             <input
               type="number"
@@ -770,7 +774,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </div>
       )}
 
-      {/* ANIMAÇÃO VISUAL AO REGISTRAR ENTRADA */}
+      {/* ANIMAÇÃO VISUAL DE ENTRADA */}
       {animacaoEntrada && animacaoEntrada.ativo && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/40 animate-fade-in max-h-[90vh] overflow-y-auto`}>
@@ -816,11 +820,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </div>
       )}
 
-      {/* TELA 3: DASHBOARD PRINCIPAL (IGUAL À FOTO) */}
+      {/* TELA 3: DASHBOARD PRINCIPAL (ESTILO IPAD DA FOTO) */}
       {telaAtiva === 'dashboard' && (
         <main className="max-w-5xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           
-          {/* CARDS TOPO */}
+          {/* CARDS TOPO: Bruto, Líquido, Poupanças */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
@@ -847,6 +851,31 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             </div>
           </div>
 
+          {/* POUPANÇAS FAMILIARES */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`${cardClasse} rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-emerald-500`}>
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">🐷</span>
+                <div>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança</span>
+                  <span className="font-black text-sm block">Nosso Patrimônio</span>
+                </div>
+              </div>
+              <span className="font-mono font-black text-emerald-500 text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
+            </div>
+
+            <div className={`${cardClasse} rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500`}>
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">👶</span>
+                <div>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança</span>
+                  <span className="font-black text-sm block">Manuela</span>
+                </div>
+              </div>
+              <span className="font-mono font-black text-cyan-500 text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
+            </div>
+          </div>
+
           {/* BARRA DE AÇÃO */}
           <div className="flex justify-between items-center pt-2">
             <h3 className="text-lg font-black">Como você pode gastar:</h3>
@@ -855,7 +884,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             </button>
           </div>
 
-          {/* GRID DOS POTES */}
+          {/* GRID DE POTES IDÊNTICO AO LAYOUT IPAD SOLICITADO */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
@@ -917,25 +946,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
             <p className="text-xs md:text-sm font-semibold leading-relaxed">
               {pctPatrimonioTotal >= 30 
-                ? 'Excelente! Vocês estão destinando mais de 30% de tudo o que entra para o patrimônio da família (Nosso Patrimônio + Manuela). Isso garante proteção acelerada.'
+                ? 'Excelente! Vocês estão destinando mais de 30% de tudo o que entra para o patrimônio da família. Isso garante proteção acelerada.'
                 : pctDividasTotal > 30
                 ? 'Atenção ao custo fixo! As dívidas e compromissos estão consumindo mais de 30% da renda. O ideal é quitar dívidas parceladas para liberar caixa.'
                 : 'Seu plano está bem distribuído entre os potes de vida pessoal e investimentos. Continuem mantendo o teto de gastos rigoroso.'}
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`${cardClasse} rounded-3xl p-4 md:p-5 space-y-2`}>
-              <span className={`text-xs font-bold uppercase ${textMuted}`}>Total em Patrimônio</span>
-              <div className="text-xl font-black text-emerald-500 font-mono">{pctPatrimonioTotal}% do Plano</div>
-              <p className={`text-[11px] ${textMuted}`}>Acumulando em Nosso Patrimônio e Manuela</p>
-            </div>
-
-            <div className={`${cardClasse} rounded-3xl p-4 md:p-5 space-y-2`}>
-              <span className={`text-xs font-bold uppercase ${textMuted}`}>Comprometido com Dívidas</span>
-              <div className="text-xl font-black text-rose-500 font-mono">{pctDividasTotal}% do Plano</div>
-              <p className={`text-[11px] ${textMuted}`}>Contas fixas e parcelamentos ativos</p>
-            </div>
           </div>
         </main>
       )}
@@ -957,12 +972,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             <div className="text-3xl md:text-4xl font-black text-emerald-500 font-mono">
               {formatarGrana(patrimonioTotalCalculado)}
             </div>
-            <p className={`text-[11px] ${textMuted}`}>Soma automática dos potes de Patrimônio + Investimentos Manuais</p>
           </div>
 
           <div className="space-y-3">
-            <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Divisão do Patrimônio</h3>
-
             <div className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-emerald-500`}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">🐷</span>
@@ -971,9 +983,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                   <span className={`text-[10px] ${textMuted}`}>{pctNossoPatrimonio}% de todas as entradas</span>
                 </div>
               </div>
-              <span className="font-mono font-black text-emerald-500 text-sm md:text-base">
-                {formatarGrana(saldoNossoPatrimonio)}
-              </span>
+              <span className="font-mono font-black text-emerald-500 text-sm md:text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
 
             <div className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-cyan-500`}>
@@ -984,28 +994,52 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                   <span className={`text-[10px] ${textMuted}`}>{pctPatrimonioManuela}% de todas as entradas</span>
                 </div>
               </div>
-              <span className="font-mono font-black text-cyan-500 text-sm md:text-base">
-                {formatarGrana(saldoPatrimonioManuela)}
-              </span>
+              <span className="font-mono font-black text-cyan-500 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
             </div>
+          </div>
+        </main>
+      )}
 
-            {itensPatrimonioManuais.map(item => (
-              <div key={item.id} className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center`}>
-                <div className="flex items-center space-x-3">
-                  <Wallet className="w-5 h-5 text-amber-500" />
-                  <div>
-                    <span className="font-bold block text-sm">{item.nome}</span>
-                    <span className={`text-[10px] ${textMuted}`}>Aporte manual individual</span>
+      {/* TELA DE EXTRATO (COM FILTROS E ORIGEM) */}
+      {telaAtiva === 'extrato' && (
+        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-black">Extrato</h2>
+            <div className={`flex ${inputBg} p-1 rounded-xl border text-xs`}>
+              <button onClick={() => setFiltroExtrato('todos')} className={`px-3 py-1.5 font-bold rounded-lg ${filtroExtrato === 'todos' ? 'bg-emerald-500 text-white' : textMuted}`}>Todos</button>
+              <button onClick={() => setFiltroExtrato('entradas')} className={`px-3 py-1.5 font-bold rounded-lg ${filtroExtrato === 'entradas' ? 'bg-emerald-500 text-white' : textMuted}`}>Entradas</button>
+              <button onClick={() => setFiltroExtrato('saidas')} className={`px-3 py-1.5 font-bold rounded-lg ${filtroExtrato === 'saidas' ? 'bg-emerald-500 text-white' : textMuted}`}>Saídas</button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {transacoesFiltradas.length === 0 ? (
+              <p className={`text-center text-xs py-8 ${textMuted}`}>Nenhuma transação encontrada neste filtro.</p>
+            ) : (
+              transacoesFiltradas.map(t => (
+                <div key={t.id} className={`${cardClasse} rounded-2xl p-3.5 flex justify-between items-center text-xs md:text-sm`}>
+                  <div className="flex items-center space-x-2.5">
+                    {t.tipo === 'entrada' ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
+                    <div>
+                      <span className="font-bold block">{t.descricao}</span>
+                      <span className={`text-[10px] font-semibold text-emerald-500 block`}>
+                        {t.tipo === 'entrada' ? `Origem: ${t.origemEntrada}` : `Saiu de: ${t.poteNome}`}
+                      </span>
+                      <span className={`text-[9px] ${textMuted}`}>{t.data}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2.5">
+                    <span className={`font-black font-mono ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}
+                    </span>
+                    <button onClick={() => setTransacoes(transacoes.filter(x => x.id !== t.id))} className="text-slate-400 hover:text-rose-500">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-mono font-black text-sm md:text-base">{formatarGrana(item.valor)}</span>
-                  <button onClick={() => setItensPatrimonioManuais(itensPatrimonioManuais.filter(x => x.id !== item.id))} className="text-slate-400 hover:text-rose-500">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </main>
       )}
@@ -1017,56 +1051,41 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400">
               <X className="w-5 h-5" />
             </button>
-
             <h3 className="text-base md:text-lg font-black">Adicionar ao Patrimônio</h3>
-
             <input
               type="text"
-              placeholder="Nome (Ex: CDB, Imóvel, Poupança)"
+              placeholder="Nome (Ex: CDB, Imóvel)"
               value={nomeNovoPatrimonio}
               onChange={(e) => setNomeNovoPatrimonio(e.target.value)}
-              className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`}
+              className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold focus:outline-none border`}
             />
             <input
               type="number"
-              placeholder="Valor Guardado R$"
+              placeholder="Valor R$"
               value={valorNovoPatrimonio}
               onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))}
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`}
             />
-
-            <button
-              onClick={adicionarPatrimonioManual}
-              className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm"
-            >
-              Salvar Patrimônio
+            <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm">
+              Salvar
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL ALERTA DE ESTOURO */}
+      {/* MODAL ALERTA DE ESTOURO (CORRIGIDO) */}
       {alertaEstouro && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative border-2 border-amber-500/50`}>
             <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center">
               <ShieldAlert className="w-8 h-8" />
             </div>
-
             <div>
               <h3 className="text-base md:text-lg font-black text-amber-500">Aviso de Limite Excedido</h3>
               <p className={`text-xs mt-1 ${textMuted}`}>
                 Este gasto estourou o limite do pote <strong>{alertaEstouro.poteNome}</strong> em <strong>{formatarGrana(alertaEstouro.valorEstourado)}</strong>.
               </p>
             </div>
-
-            <div className={`${inputBg} p-3 rounded-2xl text-xs font-bold text-left space-y-1 border`}>
-              <span className={`block font-mono ${textMuted}`}>Plano de Compensação:</span>
-              <p className="text-emerald-500">
-                O valor excedente de {formatarGrana(alertaEstouro.valorEstourado)} será compensado no pote de Nosso Patrimônio para manter o equilíbrio.
-              </p>
-            </div>
-
             <div className="flex gap-2">
               <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs border`}>
                 Cancelar
@@ -1077,131 +1096,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* TELA 4: AJUSTAR LIMITES */}
-      {telaAtiva === 'ajustes' && (
-        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Sliders className="w-5 h-5 text-emerald-500" /> Ajustar Potes</h2>
-            <button onClick={() => navegarPara('dashboard')} className="text-xs font-bold text-emerald-500">Salvar & Voltar</button>
-          </div>
-
-          <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-4`}>
-            {potesAtivos.map(pote => (
-              <div key={pote.id} className="space-y-1.5">
-                <div className="flex justify-between text-xs font-bold">
-                  <span>{pote.iconeEmoji} {pote.nome}</span>
-                  <span>{pote.percentual}% da renda</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max={100 - potesAtivos.filter(p => p.id !== pote.id).reduce((a, b) => a + b.percentual, 0)}
-                  value={pote.percentual}
-                  onChange={(e) => atualizarPercentual(pote.id, Number(e.target.value))}
-                  className="w-full h-2 rounded-lg bg-slate-200 dark:bg-slate-800 accent-emerald-500 cursor-pointer"
-                />
-              </div>
-            ))}
-          </div>
-        </main>
-      )}
-
-      {/* TELA 5: METAS */}
-      {telaAtiva === 'metas' && (
-        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
-          <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500" /> Minhas Metas</h2>
-
-          <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3`}>
-            <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Nova Meta</h3>
-            <input type="text" placeholder="Nome da Meta" value={novaMetaNome} onChange={(e) => setNovaMetaNome(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`} />
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" placeholder="Valor R$" value={novaMetaValor} onChange={(e) => setNovaMetaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`} />
-              <input type="date" value={novaMetaDate} onChange={(e) => setNovaMetaDate(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`} />
-            </div>
-            <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-md text-xs md:text-sm">
-              Adicionar Meta
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {metas.map(m => {
-              const hoje = new Date();
-              const prazo = new Date(m.dataLimite);
-              const diffDias = Math.max(1, Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 3600 * 24)));
-              const diffMeses = Math.max(1, diffDias / 30);
-              const restante = Math.max(0, m.valorAlvo - m.valorAtual);
-              const precisoPorDia = restante / diffDias;
-              const precisoPorMes = restante / diffMeses;
-              const pctConcluida = Math.min(100, (m.valorAtual / m.valorAlvo) * 100);
-
-              return (
-                <div key={m.id} className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3 relative`}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="text-base font-black">{m.nome}</h4>
-                      <p className={`text-[11px] ${textMuted}`}>Prazo: {m.dataLimite} ({diffDias} dias restantes)</p>
-                    </div>
-                    <button onClick={() => setMetas(metas.filter(x => x.id !== m.id))} className="text-slate-400 hover:text-rose-500">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] font-bold">
-                      <span>Progresso: {pctConcluida.toFixed(0)}%</span>
-                      <span>{formatarGrana(m.valorAtual)} / {formatarGrana(m.valorAlvo)}</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${pctConcluida}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className={`${inputBg} p-2.5 rounded-2xl text-center border`}>
-                      <span className={`block font-bold text-[10px] ${textMuted}`}>Guardar/Dia</span>
-                      <span className="text-emerald-500 font-black">{formatarGrana(precisoPorDia)}</span>
-                    </div>
-                    <div className={`${inputBg} p-2.5 rounded-2xl text-center border`}>
-                      <span className={`block font-bold text-[10px] ${textMuted}`}>Guardar/Mês</span>
-                      <span className="text-emerald-500 font-black">{formatarGrana(precisoPorMes)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </main>
-      )}
-
-      {/* TELA 6: EXTRATO */}
-      {telaAtiva === 'extrato' && (
-        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-3">
-          <h2 className="text-xl font-black">Extrato</h2>
-          <div className="space-y-2">
-            {transacoes.map(t => (
-              <div key={t.id} className={`${cardClasse} rounded-2xl p-3.5 flex justify-between items-center text-xs md:text-sm`}>
-                <div className="flex items-center space-x-2.5">
-                  {t.tipo === 'entrada' ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
-                  <div>
-                    <span className="font-bold block">{t.descricao}</span>
-                    <span className={`text-[10px] ${textMuted}`}>{t.data}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2.5">
-                  <span className={`font-black ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}
-                  </span>
-                  <button onClick={() => setTransacoes(transacoes.filter(x => x.id !== t.id))} className="text-slate-400 hover:text-rose-500">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </main>
       )}
 
       {/* BARRA INFERIOR GLOBAL */}
@@ -1223,7 +1117,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </button>
       </nav>
 
-      {/* MODAL NOVO LANÇAMENTO */}
+      {/* MODAL NOVO LANÇAMENTO (COM CATEGORIAS PRÉ-DEFINIDAS PARA SAÍDAS E ORIGEM PARA ENTRADAS) */}
       {modalLancamento && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl`}>
@@ -1242,16 +1136,44 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               </button>
             </div>
 
-            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`} />
-            <input type="text" placeholder="Descrição" value={descLancamento} onChange={(e) => setDescLancamento(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none border`} />
+            {tipoLancamento === 'entrada' ? (
+              <div className="space-y-3">
+                <label className={`text-xs font-bold block ${textMuted}`}>Origem da Entrada:</label>
+                <div className={`flex ${inputBg} p-1 rounded-xl border`}>
+                  <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'Mercado Livre' ? 'bg-emerald-500 text-white' : textMuted}`}>
+                    Mercado Livre
+                  </button>
+                  <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'CLT' ? 'bg-emerald-500 text-white' : textMuted}`}>
+                    CLT
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className={`text-xs font-bold block ${textMuted}`}>Categoria da Saída:</label>
+                <select 
+                  value={categoriaSaidaSelecionada} 
+                  onChange={(e) => setCategoriaSaidaSelecionada(e.target.value)} 
+                  className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}
+                >
+                  <option value="Supermercado / Compras">🛒 Supermercado / Compras</option>
+                  <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
+                  <option value="Lazer Ele (Marido)">🎮 Lazer Ele (Marido)</option>
+                  <option value="Lazer Ela (Esposa)">🛍️ Lazer Ela (Esposa)</option>
+                  <option value="Pagamento de Dívida">💳 Pagamento de Dívida</option>
+                  <option value="Outros Gastos">📦 Outros Gastos</option>
+                </select>
 
-            {tipoLancamento === 'saida' && (
-              <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
-                {potesAtivos.map(p => (
-                  <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
-                ))}
-              </select>
+                <label className={`text-xs font-bold block ${textMuted}`}>Retirar do Pote:</label>
+                <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
+                  {potesAtivos.map(p => (
+                    <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
+                  ))}
+                </select>
+              </div>
             )}
+
+            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`} />
 
             <button onClick={salvarLancamento} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm">
               Registrar Lançamento
