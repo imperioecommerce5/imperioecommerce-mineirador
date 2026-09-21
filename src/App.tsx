@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FinanceCenterView from './components/FinanceCenterView';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 const EMAIL_AUTORIZADO = "Imperioecommerce5@gmail.com"; 
 
 export function App() {
-  const [estaLogado, setEstaLogado] = useState<boolean>(false);
+  const [estaLogado, setEstaLogado] = useState<boolean>(() => {
+    return localStorage.getItem('@meu_imperio_logado') === 'true';
+  });
   const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
   const [erroLogin, setErroLogin] = useState<string | null>(null);
@@ -14,6 +16,7 @@ export function App() {
     if (emailParaValidar.trim().toLowerCase() === EMAIL_AUTORIZADO.toLowerCase()) {
       setErroLogin(null);
       setEstaLogado(true);
+      localStorage.setItem('@meu_imperio_logado', 'true');
     } else {
       setErroLogin(`Acesso negado! O e-mail "${emailParaValidar}" não tem permissão para acessar este sistema.`);
     }
