@@ -63,8 +63,12 @@ interface ItemPatrimonio {
   tipo: 'automatico' | 'manual';
 }
 
-export const FinanceCenterView: React.FC = () => {
-  // Configurações Globais - Inicia SEMPRE em 'onboarding' (Montar Plano)
+interface Props {
+  emailUsuario?: string;
+}
+
+export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
+  // Configurações Globais - Inicia em 'onboarding' (Montar Plano)
   const [rendaMensal, setRendaMensal] = useState<number>(2000);
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
@@ -366,27 +370,31 @@ export const FinanceCenterView: React.FC = () => {
     return { ...pote, inicio, fim: acumulado };
   });
 
+  // CLASSES DINÂMICAS DE CONTRASTE CORRIGIDAS
   const isDark = tema === 'escuro';
-  const bgClasse = isDark ? 'bg-[#0B0F17] text-slate-100' : 'bg-[#F4F7F6] text-slate-800';
+  const bgClasse = isDark ? 'bg-[#0B0F17] text-slate-100' : 'bg-[#F4F7F6] text-slate-900';
   const cardClasse = isDark 
-    ? 'bg-[#121824] border-slate-800/80 shadow-2xl' 
-    : 'bg-white border-slate-200/80 shadow-md';
+    ? 'bg-[#121824] border-slate-800/80 shadow-2xl text-slate-100' 
+    : 'bg-white border-slate-200/80 shadow-md text-slate-900';
+
+  const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
+  const inputBg = isDark ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900';
 
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
       
       {/* HEADER */}
-      <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-300 ${isDark ? 'border-slate-800 bg-[#0B0F17]/90 backdrop-blur-md' : 'border-slate-200/80 bg-white/90 backdrop-blur-md'}`}>
+      <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-300 ${isDark ? 'border-slate-800 bg-[#0B0F17]/90 backdrop-blur-md' : 'border-slate-200 bg-white/90 backdrop-blur-md'}`}>
         <div className="flex items-center space-x-2">
           <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</span>
           <span className="text-[9px] md:text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-extrabold uppercase">Finance</span>
         </div>
 
         <div className="flex items-center space-x-2">
-          <button onClick={() => setTamparValores(!tamparValores)} className="p-2 md:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-emerald-500 transition-all">
+          <button onClick={() => setTamparValores(!tamparValores)} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all`}>
             {tamparValores ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
-          <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className="p-2 md:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-emerald-500 transition-all">
+          <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2 md:p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all`}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           <button onClick={() => setMenuAberto(!menuAberto)} className="p-2 md:p-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black shadow-md shadow-emerald-500/20 transition-all">
@@ -403,11 +411,11 @@ export const FinanceCenterView: React.FC = () => {
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3`}>
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Meta de Renda Mensal</span>
-                <span className="text-[10px] md:text-[11px] text-slate-400">Projeção para alocação</span>
+                <span className={`text-xs font-bold uppercase tracking-wider block ${textMuted}`}>Meta de Renda Mensal</span>
+                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Projeção para alocação</span>
               </div>
               <div className="flex items-center text-lg md:text-xl font-black">
-                <span className="text-xs md:text-sm text-slate-400 mr-1">R$</span>
+                <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
                 <input
                   type="number"
                   value={rendaMensal}
@@ -441,7 +449,7 @@ export const FinanceCenterView: React.FC = () => {
 
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                 <span className="text-3xl md:text-4xl font-black tracking-tight">{totalMapeado}%</span>
-                <span className="text-[10px] text-slate-400 font-semibold max-w-[80px]">
+                <span className={`text-[10px] font-semibold max-w-[80px] ${textMuted}`}>
                   {disponivelGeral > 0 ? `${disponivelGeral}% livre` : '100% preenchido'}
                 </span>
               </div>
@@ -474,7 +482,7 @@ export const FinanceCenterView: React.FC = () => {
           </div>
 
           <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <p className="text-xs font-bold text-center text-slate-400">Escolha mais potes para o seu plano:</p>
+            <p className={`text-xs font-bold text-center ${textMuted}`}>Escolha mais potes para o seu plano:</p>
             <div className="flex items-center space-x-2.5 overflow-x-auto pb-2 scrollbar-none">
               {todosPotesDisponiveis.map(pote => {
                 const selecionado = potesAtivos.some(p => p.id === pote.id);
@@ -516,11 +524,11 @@ export const FinanceCenterView: React.FC = () => {
 
               <div>
                 <h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Defina a porcentagem e especifique os compromissos</p>
+                <p className={`text-xs mt-0.5 ${textMuted}`}>Defina a porcentagem e especifique os compromissos</p>
               </div>
 
               <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center bg-white dark:bg-slate-900 shadow-inner">
+                <div className={`w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'} shadow-inner`}>
                   <span className="text-xl font-black">{percentualPendente}%</span>
                   <span className="text-[9px] font-bold text-emerald-500">
                     {formatarGrana(valorMapeadoPote)}/mês
@@ -546,7 +554,7 @@ export const FinanceCenterView: React.FC = () => {
 
                   <div className="space-y-1.5 max-h-32 overflow-y-auto">
                     {contasFixasTemp.map(c => (
-                      <div key={c.id} className="flex justify-between items-center bg-slate-100 dark:bg-slate-800/80 p-2 rounded-xl text-xs">
+                      <div key={c.id} className={`flex justify-between items-center ${inputBg} p-2 rounded-xl text-xs`}>
                         <span className="font-bold">{c.nome}</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-mono text-rose-500">{formatarGrana(c.valor)}</span>
@@ -564,14 +572,14 @@ export const FinanceCenterView: React.FC = () => {
                       placeholder="Nome da Conta/Dívida"
                       value={novaContaNome}
                       onChange={(e) => setNovaContaNome(e.target.value)}
-                      className="bg-slate-100 dark:bg-slate-800 p-2 rounded-xl text-xs flex-1 font-bold focus:outline-none"
+                      className={`${inputBg} p-2 rounded-xl text-xs flex-1 font-bold focus:outline-none`}
                     />
                     <input
                       type="number"
                       placeholder="Valor R$"
                       value={novaContaValor}
                       onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="bg-slate-100 dark:bg-slate-800 p-2 rounded-xl text-xs w-20 font-bold focus:outline-none font-mono"
+                      className={`${inputBg} p-2 rounded-xl text-xs w-20 font-bold focus:outline-none font-mono`}
                     />
                     <button onClick={adicionarContaFixaTemp} className="bg-emerald-500 text-white px-3 py-2 rounded-xl font-bold text-xs">
                       +
@@ -601,7 +609,7 @@ export const FinanceCenterView: React.FC = () => {
                 <circle key={pote.id} cx="50" cy="50" r="40" fill="transparent" stroke={pote.cor} strokeWidth="11" strokeDasharray={`${pote.percentual * 2.51327} 251.327`} strokeDashoffset={`-${pote.inicio * 2.51327}`} />
               ))}
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center p-3 text-[11px] font-semibold text-slate-500">
+            <div className={`absolute inset-0 flex items-center justify-center p-3 text-[11px] font-semibold ${textMuted}`}>
               As entradas serão diluídas automaticamente nos potes!
             </div>
           </div>
@@ -616,7 +624,7 @@ export const FinanceCenterView: React.FC = () => {
 
             <button 
               onClick={() => navegarPara('dashboard')}
-              className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-2xl transition-all text-sm"
+              className={`w-full ${inputBg} font-bold py-3 rounded-2xl transition-all text-sm`}
             >
               Ainda não tenho entrada
             </button>
@@ -633,14 +641,14 @@ export const FinanceCenterView: React.FC = () => {
             </button>
 
             <h3 className="text-base md:text-lg font-black">Qual valor entrou hoje?</h3>
-            <p className="text-xs text-slate-400">Esse valor será diluído automaticamente nos potes.</p>
+            <p className={`text-xs ${textMuted}`}>Esse valor será diluído automaticamente nos potes.</p>
 
             <input
               type="number"
               placeholder="Valor R$"
               value={valorEntradaInicial}
               onChange={(e) => setValorEntradaInicial(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-center font-black text-lg focus:outline-none font-mono"
+              className={`w-full ${inputBg} p-3 rounded-2xl text-center font-black text-lg focus:outline-none font-mono`}
             />
 
             <button
@@ -659,24 +667,24 @@ export const FinanceCenterView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`${cardClasse} rounded-3xl p-4 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
-                <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Saldo Bruto em Caixa</span>
+                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>Saldo Bruto em Caixa</span>
                 <div className="text-2xl md:text-3xl font-black text-emerald-500 mt-0.5">
                   {formatarGrana(saldoCaixaBruto)}
                 </div>
               </div>
-              <span className="text-[11px] text-slate-400 font-semibold">Total de entradas diluídas menos gastos efetuados</span>
+              <span className={`text-[11px] font-semibold ${textMuted}`}>Total de entradas diluídas menos gastos efetuados</span>
             </div>
 
             <div className={`${cardClasse} rounded-3xl p-4 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
               <div>
-                <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+                <span className={`text-[11px] uppercase font-bold tracking-wider flex items-center gap-1.5 ${textMuted}`}>
                   <CreditCard className="w-4 h-4 text-rose-500" /> Saldo Líquido Livre em Conta
                 </span>
-                <div className="text-2xl md:text-3xl font-black text-white mt-0.5 font-mono">
+                <div className={`text-2xl md:text-3xl font-black mt-0.5 font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {formatarGrana(saldoLiquidoDisponivel)}
                 </div>
               </div>
-              <span className="text-[11px] text-rose-400 font-bold">
+              <span className="text-[11px] text-rose-500 font-bold">
                 Descontado {formatarGrana(totalContasFixasEDividas)} em dívidas & contas fixas
               </span>
             </div>
@@ -710,7 +718,7 @@ export const FinanceCenterView: React.FC = () => {
                     </div>
                   </div>
 
-                  <span className="text-[11px] md:text-xs font-bold text-slate-400">
+                  <span className={`text-[11px] md:text-xs font-bold ${textMuted}`}>
                     Alocado ({pote.percentual}%): {formatarGrana(valorDiluidoNoPote)}
                   </span>
                 </div>
@@ -733,22 +741,22 @@ export const FinanceCenterView: React.FC = () => {
           </div>
 
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 text-center space-y-2 border-2 border-emerald-500/30`}>
-            <span className="text-xs uppercase font-bold text-slate-400 font-mono tracking-wider">Patrimônio Total Guardado</span>
+            <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Guardado</span>
             <div className="text-3xl md:text-4xl font-black text-emerald-500 font-mono">
               {formatarGrana(patrimonioTotalCalculado)}
             </div>
-            <p className="text-[11px] text-slate-400">Soma automática das entradas no Pote de Reserva + Investimentos e Aportes Manuais</p>
+            <p className={`text-[11px] ${textMuted}`}>Soma automática das entradas no Pote de Reserva + Investimentos e Aportes Manuais</p>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-xs font-extrabold uppercase text-slate-400">Composição do Patrimônio</h3>
+            <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Composição do Patrimônio</h3>
 
             <div className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-emerald-500`}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">🐷</span>
                 <div>
                   <span className="font-bold block text-sm">Reserva Automática dos Potes</span>
-                  <span className="text-[10px] text-slate-400">{pctReserva}% de todas as entradas gerais</span>
+                  <span className={`text-[10px] ${textMuted}`}>{pctReserva}% de todas as entradas gerais</span>
                 </div>
               </div>
               <span className="font-mono font-black text-emerald-500 text-sm md:text-base">
@@ -762,7 +770,7 @@ export const FinanceCenterView: React.FC = () => {
                   <Wallet className="w-5 h-5 text-amber-500" />
                   <div>
                     <span className="font-bold block text-sm">{item.nome}</span>
-                    <span className="text-[10px] text-slate-400">Aporte manual individual</span>
+                    <span className={`text-[10px] ${textMuted}`}>Aporte manual individual</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -792,14 +800,14 @@ export const FinanceCenterView: React.FC = () => {
               placeholder="Nome (Ex: CDB, Imóvel, Poupança)"
               value={nomeNovoPatrimonio}
               onChange={(e) => setNomeNovoPatrimonio(e.target.value)}
-              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none"
+              className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`}
             />
             <input
               type="number"
               placeholder="Valor Guardado R$"
               value={valorNovoPatrimonio}
               onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl font-black text-lg focus:outline-none font-mono"
+              className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono`}
             />
 
             <button
@@ -822,20 +830,20 @@ export const FinanceCenterView: React.FC = () => {
 
             <div>
               <h3 className="text-base md:text-lg font-black text-amber-500">Aviso de Limite Excedido</h3>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className={`text-xs mt-1 ${textMuted}`}>
                 Este gasto estourou o limite do pote <strong>{alertaEstouro.poteNome}</strong> em <strong>{formatarGrana(alertaEstouro.valorEstourado)}</strong>.
               </p>
             </div>
 
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs font-bold text-left space-y-1">
-              <span className="text-slate-400 block font-mono">Plano de Compensação:</span>
+            <div className={`${inputBg} p-3 rounded-2xl text-xs font-bold text-left space-y-1`}>
+              <span className={`block font-mono ${textMuted}`}>Plano de Compensação:</span>
               <p className="text-emerald-500">
                 O valor excedente de {formatarGrana(alertaEstouro.valorEstourado)} será compensado no pote de Reserva para manter o equilíbrio.
               </p>
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => setAlertaEstouro(null)} className="flex-1 bg-slate-200 dark:bg-slate-800 text-slate-400 font-bold py-3 rounded-2xl text-xs">
+              <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs`}>
                 Cancelar
               </button>
               <button onClick={confirmarCompensacaoEstouro} className="flex-1 bg-amber-500 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1">
@@ -881,11 +889,11 @@ export const FinanceCenterView: React.FC = () => {
           <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500" /> Minhas Metas</h2>
 
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3`}>
-            <h3 className="text-xs font-extrabold uppercase text-slate-400">Nova Meta</h3>
-            <input type="text" placeholder="Nome da Meta" value={novaMetaNome} onChange={(e) => setNovaMetaNome(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none" />
+            <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Nova Meta</h3>
+            <input type="text" placeholder="Nome da Meta" value={novaMetaNome} onChange={(e) => setNovaMetaNome(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`} />
             <div className="grid grid-cols-2 gap-2">
-              <input type="number" placeholder="Valor R$" value={novaMetaValor} onChange={(e) => setNovaMetaValor(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none" />
-              <input type="date" value={novaMetaDate} onChange={(e) => setNovaMetaDate(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none" />
+              <input type="number" placeholder="Valor R$" value={novaMetaValor} onChange={(e) => setNovaMetaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`} />
+              <input type="date" value={novaMetaDate} onChange={(e) => setNovaMetaDate(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`} />
             </div>
             <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-md text-xs md:text-sm">
               Adicionar Meta
@@ -908,7 +916,7 @@ export const FinanceCenterView: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <div>
                       <h4 className="text-base font-black">{m.nome}</h4>
-                      <p className="text-[11px] text-slate-400">Prazo: {m.dataLimite} ({diffDias} dias restantes)</p>
+                      <p className={`text-[11px] ${textMuted}`}>Prazo: {m.dataLimite} ({diffDias} dias restantes)</p>
                     </div>
                     <button onClick={() => setMetas(metas.filter(x => x.id !== m.id))} className="text-slate-400 hover:text-rose-500">
                       <Trash2 className="w-4 h-4" />
@@ -926,12 +934,12 @@ export const FinanceCenterView: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl text-center">
-                      <span className="text-slate-400 block font-bold text-[10px]">Guardar/Dia</span>
+                    <div className={`${inputBg} p-2.5 rounded-2xl text-center`}>
+                      <span className={`block font-bold text-[10px] ${textMuted}`}>Guardar/Dia</span>
                       <span className="text-emerald-500 font-black">{formatarGrana(precisoPorDia)}</span>
                     </div>
-                    <div className="bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl text-center">
-                      <span className="text-slate-400 block font-bold text-[10px]">Guardar/Mês</span>
+                    <div className={`${inputBg} p-2.5 rounded-2xl text-center`}>
+                      <span className={`block font-bold text-[10px] ${textMuted}`}>Guardar/Mês</span>
                       <span className="text-emerald-500 font-black">{formatarGrana(precisoPorMes)}</span>
                     </div>
                   </div>
@@ -960,7 +968,7 @@ export const FinanceCenterView: React.FC = () => {
                   {t.tipo === 'entrada' ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
                   <div>
                     <span className="font-bold block">{t.descricao}</span>
-                    <span className="text-[10px] text-slate-400">{t.data}</span>
+                    <span className={`text-[10px] ${textMuted}`}>{t.data}</span>
                   </div>
                 </div>
 
@@ -1007,20 +1015,20 @@ export const FinanceCenterView: React.FC = () => {
 
             <h3 className="text-base md:text-lg font-black">Novo Lançamento</h3>
 
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-              <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white' : 'text-slate-500'}`}>
+            <div className={`flex ${inputBg} p-1 rounded-xl`}>
+              <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white' : textMuted}`}>
                 Gasto (Saída)
               </button>
-              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white' : 'text-slate-500'}`}>
+              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white' : textMuted}`}>
                 Renda (Entrada)
               </button>
             </div>
 
-            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl font-black text-lg focus:outline-none font-mono" />
-            <input type="text" placeholder="Descrição" value={descLancamento} onChange={(e) => setDescLancamento(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm focus:outline-none" />
+            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono`} />
+            <input type="text" placeholder="Descrição" value={descLancamento} onChange={(e) => setDescLancamento(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none`} />
 
             {tipoLancamento === 'saida' && (
-              <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold">
+              <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold`}>
                 {potesAtivos.map(p => (
                   <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
                 ))}
@@ -1045,22 +1053,22 @@ export const FinanceCenterView: React.FC = () => {
             <h3 className="text-lg font-black text-emerald-500">MEU IMPÉRIO</h3>
 
             <div className="space-y-1.5 text-xs md:text-sm font-bold">
-              <button onClick={() => navegarPara('onboarding')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+              <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <Sliders className="w-4 h-4 text-emerald-500" /> Montar / Refazer Plano
               </button>
-              <button onClick={() => navegarPara('dashboard')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+              <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
               </button>
-              <button onClick={() => navegarPara('patrimonio')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+              <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <Vault className="w-4 h-4 text-emerald-500" /> Meu Patrimônio
               </button>
-              <button onClick={() => navegarPara('extrato')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+              <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
               </button>
-              <button onClick={() => navegarPara('ajustes')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+              <button onClick={() => navegarPara('ajustes')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <Sliders className="w-4 h-4 text-emerald-500" /> Ajustar Limites e Potes
               </button>
-              <button onClick={() => navegarPara('metas')} className="w-full text-left p-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5">
+              <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <Target className="w-4 h-4 text-emerald-500" /> Minhas Metas
               </button>
             </div>
