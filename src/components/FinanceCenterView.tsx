@@ -31,7 +31,6 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 
-// CONFIGURAÇÃO DO FIREBASE (Suas chaves reais)
 const firebaseConfig = {
   apiKey: "AIzaSyDQTXuzRMDP4vtpvpzvkTBd5Cl_0_aCM5g",
   authDomain: "imperioecommerce-mineirador.firebaseapp.com",
@@ -629,7 +628,6 @@ export const FinanceCenterView: React.FC = () => {
     );
   }
 
-  // TELA DE LOGIN COM O GOOGLE EXCLUSIVA
   if (!usuario) {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center p-4 font-sans`}>
@@ -661,7 +659,6 @@ export const FinanceCenterView: React.FC = () => {
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
       
-      {/* HEADER */}
       <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-300 ${isDark ? 'border-slate-800 bg-[#0B0F17]/90 backdrop-blur-md' : 'border-slate-200 bg-white/90 backdrop-blur-md'}`}>
         <div className="flex items-center space-x-2">
           <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</span>
@@ -681,7 +678,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       </header>
 
-      {/* TELA DE ONBOARDING / CONFIGURAÇÃO DE PLANO */}
       {telaAtiva === 'onboarding' && (
         <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
@@ -907,7 +903,6 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* MODAL CONFIGURAR POTE / PORCENTAGEM */}
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
@@ -956,7 +951,6 @@ export const FinanceCenterView: React.FC = () => {
         );
       })()}
 
-      {/* ANIMAÇÃO VISUAL DE ENTRADA */}
       {animacaoEntrada && animacaoEntrada.ativo && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/40 animate-fade-in max-h-[90vh] overflow-y-auto`}>
@@ -987,7 +981,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* TELA 3: DASHBOARD PRINCIPAL */}
       {telaAtiva === 'dashboard' && (
         <main className="max-w-5xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           
@@ -1138,7 +1131,6 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* TELA DE PATRIMÔNIO */}
       {telaAtiva === 'patrimonio' && (
         <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
@@ -1202,7 +1194,6 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* TELA DE METAS */}
       {telaAtiva === 'metas' && (
         <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
@@ -1280,7 +1271,6 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* TELA DE EXTRATO */}
       {telaAtiva === 'extrato' && (
         <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4">
           <div className="flex justify-between items-center">
@@ -1324,7 +1314,6 @@ export const FinanceCenterView: React.FC = () => {
         </main>
       )}
 
-      {/* MODAL APORTE PENDENTE */}
       {modalAportePendente && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
@@ -1347,7 +1336,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL ADICIONAR PATRIMÔNIO */}
       {modalNovoPatrimonio && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
@@ -1376,7 +1364,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL NOVA META COM APORTE INICIAL */}
       {modalNovaMeta && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto`}>
@@ -1426,7 +1413,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DEPOSITAR / TRANSFERIR PARA META */}
       {modalDepositoMeta && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
@@ -1463,7 +1449,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL ALERTA DE ESTOURO */}
       {alertaEstouro && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative border-2 border-amber-500/50`}>
@@ -1488,7 +1473,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* BARRA INFERIOR GLOBAL */}
       <nav className={`fixed bottom-0 inset-x-0 border-t p-1.5 flex justify-around items-center z-40 transition-colors duration-300 ${isDark ? 'bg-slate-950/95 border-slate-800' : 'bg-white/95 border-slate-200'}`}>
         <button onClick={() => navegarPara('dashboard')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer">
           <Home className="w-5 h-5 text-emerald-500" /> Início
@@ -1507,7 +1491,6 @@ export const FinanceCenterView: React.FC = () => {
         </button>
       </nav>
 
-      {/* MODAL NOVO LANÇAMENTO */}
       {modalLancamento && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl`}>
@@ -1572,7 +1555,6 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       )}
 
-      {/* MENU LATERAL COM BOTÃO DE SAIR */}
       {menuAberto && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex justify-end" onClick={() => setMenuAberto(false)}>
           <div className={`${cardClasse} w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between`} onClick={(e) => e.stopPropagation()}>
