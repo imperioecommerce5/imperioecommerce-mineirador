@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import FinanceCenterView from './components/FinanceCenterView';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
-// E-mail único autorizado
 const EMAIL_AUTORIZADO = "Imperioecommerce5@gmail.com"; 
 
 export function App() {
