@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import FinanceCenterView from './components/FinanceCenterView';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 const EMAIL_AUTORIZADO = "Imperioecommerce5@gmail.com"; 
 
 export function App() {
+  // Sempre verifica se já existe uma sessão salva no navegador
   const [estaLogado, setEstaLogado] = useState<boolean>(() => {
     return localStorage.getItem('@meu_imperio_logado') === 'true';
   });
+  
   const [emailInput, setEmailInput] = useState('');
   const [senhaInput, setSenhaInput] = useState('');
   const [erroLogin, setErroLogin] = useState<string | null>(null);
@@ -35,8 +37,13 @@ export function App() {
     validarEEntrar(EMAIL_AUTORIZADO);
   };
 
+  const fazerLogout = () => {
+    setEstaLogado(false);
+    localStorage.removeItem('@meu_imperio_logado');
+  };
+
   if (estaLogado) {
-    return <FinanceCenterView emailUsuario={EMAIL_AUTORIZADO} />;
+    return <FinanceCenterView emailUsuario={EMAIL_AUTORIZADO} onLogout={fazerLogout} />;
   }
 
   return (
