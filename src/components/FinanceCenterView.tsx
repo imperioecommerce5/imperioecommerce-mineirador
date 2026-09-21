@@ -587,14 +587,6 @@ export const FinanceCenterView: React.FC = () => {
     return true;
   });
 
-  if (carregandoNuvem) {
-    return (
-      <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold text-sm`}>
-        Carregando...
-      </div>
-    );
-  }
-
   if (!autenticado) {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center p-4 font-sans`}>
