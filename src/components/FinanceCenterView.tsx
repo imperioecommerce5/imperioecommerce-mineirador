@@ -16,15 +16,12 @@ import {
   Trash2,
   Check,
   CreditCard,
-  ShieldAlert,
-  ArrowRight,
   Vault,
   Sparkles,
   LayoutGrid,
   Columns2,
   LogOut,
   Target,
-  AlertTriangle,
   ArrowUpRight,
   Lock
 } from 'lucide-react';
@@ -87,6 +84,7 @@ interface ItemPatrimonio {
 }
 
 export const FinanceCenterView: React.FC = () => {
+  // AUTENTICAÇÃO
   const [autenticado, setAutenticado] = useState<boolean>(false);
   const [senhaInput, setSenhaInput] = useState<string>('');
   const [erroSenha, setErroSenha] = useState<boolean>(false);
@@ -105,10 +103,12 @@ export const FinanceCenterView: React.FC = () => {
   const fazerLogout = () => {
     setAutenticado(false);
     setSenhaInput('');
+    setMenuAberto(false);
   };
 
   const docId = 'familia_imperio';
 
+  // ESTADOS GERAIS
   const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil'>('dashboard');
   const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
 
@@ -131,7 +131,6 @@ export const FinanceCenterView: React.FC = () => {
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
   const [modalAportePendente, setModalAportePendente] = useState<boolean>(false);
-  const [valorModalAporte, setValorModalAporte] = useState<number | ''>('');
 
   const todosPotesDisponiveis: Pote[] = [
     { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 0, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
@@ -143,6 +142,7 @@ export const FinanceCenterView: React.FC = () => {
     { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
+  // FIREBASE SYNC
   useEffect(() => {
     const docRef = doc(db, 'imperio_finance', docId);
     const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
@@ -587,6 +587,16 @@ export const FinanceCenterView: React.FC = () => {
     return true;
   });
 
+  // TELA DE CARREGAMENTO
+  if (carregandoNuvem) {
+    return (
+      <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold text-sm`}>
+        Carregando...
+      </div>
+    );
+  }
+
+  // TELA ÚNICA DE LOGIN (SENHA NUMÉRICA)
   if (!autenticado) {
     return (
       <div className={`min-h-screen ${bgClasse} flex items-center justify-center p-4 font-sans`}>
@@ -628,6 +638,7 @@ export const FinanceCenterView: React.FC = () => {
     );
   }
 
+  // APLICATIVO PRINCIPAL PÓS-LOGIN
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
       
