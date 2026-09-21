@@ -1,0 +1,224 @@
+import React, { useState } from 'react';
+import { Search, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { AnalysisResult } from '../types';
+
+interface NewAnalysisViewProps {
+  onAnalysisComplete?: (result: AnalysisResult) => void;
+}
+
+export const NewAnalysisView: React.FC<NewAnalysisViewProps> = ({ onAnalysisComplete }) => {
+  const [productName, setProductName] = useState('');
+  const [vendasTotaisPagina, setVendasTotaisPagina] = useState<number | ''>('');
+  const [resultadosFiltro180d, setResultadosFiltro180d] = useState<number | ''>('');
+  const [anunciosTracaoRecentes, setAnunciosTracaoRecentes] = useState<number | ''>('');
+  const [anunciosFullRecentes, setAnunciosFullRecentes] = useState<number | ''>('');
+
+  const [resultado, setResultado] = useState<{
+    aprovado: boolean;
+    mensagem: string;
+    detalhes: string[];
+  } | null>(null);
+
+  const handleAnalise = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const totalVendas = Number(vendasTotaisPagina) || 0;
+    const qtdTracao = Number(anunciosTracaoRecentes) || 0;
+
+    // Regras atualizadas: >= 8000 vendas totais e >= 5 anúncios com tração em <= 180d
+    const atendeVendasTotais = totalVendas >= 8000;
+    const atendeTracaoRecente = qtdTracao >= 5;
+
+    const aprovado = atendeVendasTotais && atendeTracaoRecente;
+
+    const detalhes: string[] = [];
+
+    if (atendeVendasTotais) {
+      detalhes.push(`✅ Vendas totais da página (${totalVendas.toLocaleString('pt-BR')}) atingem o mínimo de 8.000.`);
+    } else {
+      detalhes.push(`❌ Vendas totais da página (${totalVendas.toLocaleString('pt-BR')}) estão abaixo do mínimo exigido de 8.000.`);
+    }
+
+    if (atendeTracaoRecente) {
+      detalhes.push(`✅ Foram encontrados ${qtdTracao} anúncios recentes (≤180d) com tração ideal (2-3 vendas/dia).`);
+    } else {
+      detalhes.push(`❌ Apenas ${qtdTracao} anúncio(s) recente(s) com tração encontrada (necessário no mínimo 5).`);
+    }
+
+    const mensagem = aprovado
+      ? 'PRODUTO APROVADO! Mercado com alta demanda e boa validação de anúncios recentes.'
+      : 'PRODUTO REPROVADO! O produto não atinge os critérios mínimos da pesquisa.';
+
+    setResultado({ aprovado, mensagem, detalhes });
+
+    if (onAnalysisComplete) {
+      onAnalysisComplete({
+        id: Date.now().toString(),
+        productName,
+        createdAt: new Date().toISOString(),
+        vendasTotaisPagina: totalVendas,
+        resultadosFiltro180d: Number(resultadosFiltro180d) || 0,
+        anunciosTracaoRecentes: qtdTracao,
+        anunciosFullRecentes: Number(anunciosFullRecentes) || 0,
+        aprovado,
+      } as any);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 p-4">
+      <div className="flex items-center space-x-3 border-b border-slate-800 pb-4">
+        <Search className="w-8 h-8 text-amber-500" />
+        <div>
+          <h1 className="text-2xl font-bold text-white">Análise de Mercado Livre Full</h1>
+          <p className="text-sm text-slate-400">Valide a viabilidade e tração recente do produto antes da mineração.</p>
+        </div>
+      </div>
+
+      <div className="bg-amber-950/30 border border-amber-600/40 p-4 rounded-xl flex items-start space-x-3">
+        <div className="bg-amber-500/20 text-amber-400 font-bold px-2 py-1 rounded text-sm shrink-0">1</div>
+        <div>
+          <h3 className="font-semibold text-amber-300 text-sm">ANTES DE PREENCHER</h3>
+          <p className="text-xs text-amber-200/80 mt-0.5">
+            No Mercado Livre, pesquise o produto e aplique o filtro de anúncios criados há 180 dias ou menos.
+            As métricas de concorrência e tração abaixo devem ser coletadas somente dentro desse filtro.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleAnalise} className="space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+              Nome ou Termo do Produto
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Ex: Organizador de Acrílico"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:outline-none focus:border-amber-500 transition-colors"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-950 border border-slate-800/80 p-4 rounded-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-200">VENDAS TOTAIS DA PÁGINA</label>
+                <span className="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-0.5 rounded">GERAL</span>
+              </div>
+              <input
+                type="number"
+                required
+                placeholder="Ex: 8000"
+                value={vendasTotaisPagina}
+                onChange={(e) => setVendasTotaisPagina(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white font-mono text-lg focus:outline-none focus:border-amber-500"
+              />
+              <p className="text-[11px] text-slate-400">
+                Exige o mínimo de <strong>8.000 vendas</strong> na página do Mercado Livre.
+              </p>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800/80 p-4 rounded-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-200">RESULTADOS APÓS FILTRO ≤180D</label>
+                <span className="text-[10px] bg-purple-900/50 text-purple-300 font-semibold px-2 py-0.5 rounded">BASE RECENTE</span>
+              </div>
+              <input
+                type="number"
+                required
+                placeholder="Ex: 12"
+                value={resultadosFiltro180d}
+                onChange={(e) => setResultadosFiltro180d(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white font-mono text-lg focus:outline-none focus:border-purple-500"
+              />
+              <p className="text-[11px] text-slate-400">
+                Quantidade de anúncios encontrados após aplicar o filtro de até 180 dias.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800/80 p-4 rounded-lg space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-slate-200">TRAÇÃO DOS ANÚNCIOS RECENTES (≤180D)</h4>
+              <p className="text-[11px] text-slate-400">
+                Conte somente anúncios no filtro ≤180 dias com tração de <strong>2 a 3 vendas por dia</strong>.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">
+                  Anúncios com tração (2-3 vendas/dia)
+                </label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Ex: 5"
+                  value={anunciosTracaoRecentes}
+                  onChange={(e) => setAnunciosTracaoRecentes(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white font-mono text-lg focus:outline-none focus:border-amber-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Requisito: Mínimo de 5 anúncios.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">
+                  Anúncios no FULL (dentro dos ≤180d)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ex: 3"
+                  value={anunciosFullRecentes}
+                  onChange={(e) => setAnunciosFullRecentes(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-slate-900 border border-slate-800 rounded p-2.5 text-white font-mono text-lg focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Métrica de concorrência no Full.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3.5 px-6 rounded-xl transition-all flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/10 cursor-pointer"
+        >
+          <span>Analisar e Validar Produto</span>
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      </form>
+
+      {resultado && (
+        <div className={`border rounded-xl p-5 space-y-4 ${
+          resultado.aprovado 
+            ? 'bg-emerald-950/20 border-emerald-500/50 text-emerald-100' 
+            : 'bg-rose-950/20 border-rose-500/50 text-rose-100'
+        }`}>
+          <div className="flex items-center space-x-3">
+            {resultado.aprovado ? (
+              <CheckCircle className="w-7 h-7 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-7 h-7 text-rose-400 shrink-0" />
+            )}
+            <div>
+              <h3 className="text-lg font-bold">
+                {resultado.aprovado ? 'Produto Aprovado para Mineração!' : 'Produto Reprovado'}
+              </h3>
+              <p className="text-xs opacity-80">{resultado.mensagem}</p>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-800/80 pt-3 space-y-1.5 text-xs font-mono">
+            {resultado.detalhes.map((detalhe, idx) => (
+              <p key={idx}>{detalhe}</p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NewAnalysisView;
