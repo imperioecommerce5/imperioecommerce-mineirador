@@ -1,54 +1,15 @@
-import React, { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
-// Componentes para Renderizar os Ícones Visuais 3D Estilo App Original
-const IconePorquinho3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    🐷
-  </div>
-);
-
-const IconeCarro3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    🚗
-  </div>
-);
-
-const IconeSupermercado3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    🧺
-  </div>
-);
-
-const IconeControle3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    🎮
-  </div>
-);
-
-const IconeSacola3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    🛍️
-  </div>
-);
-
-const IconeDividas3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    💳
-  </div>
-);
-
-const IconeDizimo3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    ✉️
-  </div>
-);
-
-const IconeInvestimento3D = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-2xl select-none">
-    📈
-  </div>
-);
+// Ícones visuais em estilo 3D
+const IconePorquinho3D = () => <div className="text-3xl select-none">🐷</div>;
+const IconeCarro3D = () => <div className="text-3xl select-none">🚗</div>;
+const IconeSupermercado3D = () => <div className="text-3xl select-none">🧺</div>;
+const IconeControle3D = () => <div className="text-3xl select-none">🎮</div>;
+const IconeSacola3D = () => <div className="text-3xl select-none">🛍️</div>;
+const IconeDividas3D = () => <div className="text-3xl select-none">💳</div>;
+const IconeDizimo3D = () => <div className="text-3xl select-none">✉️</div>;
+const IconeInvestimento3D = () => <div className="text-3xl select-none">📈</div>;
 
 interface Pote {
   id: string;
@@ -60,11 +21,10 @@ interface Pote {
 }
 
 export const FinanceCenterView: React.FC = () => {
-  // Estado 1: Renda e Frequência
   const [rendaMensal, setRendaMensal] = useState<number>(2000);
   const [frequencia, setFrequencia] = useState<'dia' | 'semana' | 'quinzena' | 'mes'>('mes');
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Potes Disponíveis no Banco/Carrossel Inferior
   const todosPotesDisponiveis: Pote[] = [
     { id: 'reserva', nome: 'Reserva', percentual: 0, cor: '#EAB308', IconeComponente: IconePorquinho3D },
     { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', IconeComponente: IconeCarro3D },
@@ -76,14 +36,11 @@ export const FinanceCenterView: React.FC = () => {
     { id: 'investimento_ml', nome: 'Investimento ML', percentual: 0, cor: '#F59E0B', IconeComponente: IconeInvestimento3D },
   ];
 
-  // Potes selecionados para o plano
   const [potesSelecionados, setPotesSelecionados] = useState<Pote[]>([]);
   const [poteEmEdicao, setPoteEmEdicao] = useState<Pote | null>(null);
 
-  // Total do Círculo
   const totalMapeado = potesSelecionados.reduce((acc, p) => acc + p.percentual, 0);
 
-  // Adicionar pote do carrossel para a área central
   const adicionarPote = (pote: Pote) => {
     if (!potesSelecionados.some(p => p.id === pote.id)) {
       const novoPote = { ...pote, percentual: 10 };
@@ -92,12 +49,10 @@ export const FinanceCenterView: React.FC = () => {
     }
   };
 
-  // Remover pote da área central
   const removerPote = (id: string) => {
     setPotesSelecionados(potesSelecionados.filter(p => p.id !== id));
   };
 
-  // Atualizar percentual do pote
   const atualizarPercentual = (id: string, novoPercentual: number) => {
     setPotesSelecionados(prev => prev.map(p => p.id === id ? { ...p, percentual: novoPercentual } : p));
     if (poteEmEdicao && poteEmEdicao.id === id) {
@@ -105,7 +60,33 @@ export const FinanceCenterView: React.FC = () => {
     }
   };
 
-  // Cálculo das fatias do Círculo SVG
+  // Funções de deslizar o carrossel inferior com as setas
+  const scrollEsquerda = () => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+  };
+
+  const scrollDireita = () => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+  };
+
+  // Handlers de Drag and Drop
+  const handleDragStart = (e: React.DragEvent, pote: Pote) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(pote));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const data = e.dataTransfer.getData('application/json');
+    if (data) {
+      const pote: Pote = JSON.parse(data);
+      adicionarPote(pote);
+    }
+  };
+
   let acumulado = 0;
   const fatiasSVG = potesSelecionados.map(pote => {
     const inicio = acumulado;
@@ -114,7 +95,7 @@ export const FinanceCenterView: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#FBFBFA] text-slate-800 p-4 md:p-8 font-sans flex flex-col items-center justify-between">
+    <div className="min-h-screen bg-[#F8F9FA] text-slate-800 p-4 md:p-8 font-sans flex flex-col items-center justify-between">
       
       {/* Título Principal */}
       <div className="w-full max-w-2xl text-left mb-4">
@@ -124,7 +105,7 @@ export const FinanceCenterView: React.FC = () => {
       </div>
 
       {/* Card Superior: Renda e Frequência */}
-      <div className="w-full max-w-xl bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-200/60 space-y-4 mb-6">
+      <div className="w-full max-w-xl bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-200/60 space-y-4 mb-4">
         <div className="flex justify-between items-center">
           <div className="text-xs font-semibold text-slate-500">
             Sua renda por mês
@@ -174,16 +155,18 @@ export const FinanceCenterView: React.FC = () => {
         </div>
       </div>
 
-      {/* ÁREA CENTRAL: CÍRCULO E POTES ATIVOS */}
-      <div className="relative w-full max-w-2xl flex flex-col items-center justify-center my-4 min-h-[340px]">
+      {/* ÁREA CENTRAL (DROP ZONE): CÍRCULO E POTES ATIVOS */}
+      <div 
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className="relative w-full max-w-2xl flex flex-col items-center justify-center my-2 p-4 min-h-[340px] rounded-3xl border-2 border-dashed border-transparent hover:border-amber-300/50 transition-all"
+      >
         
-        {/* Círculo Central Progressivo com Base Amarela */}
+        {/* Círculo Central Progressivo */}
         <div className="relative w-52 h-52 md:w-60 md:h-60 flex items-center justify-center">
           <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-            {/* Círculo base amarelo suave (quando 0%) */}
             <circle cx="50" cy="50" r="40" fill="transparent" stroke="#FEF08A" strokeWidth="10" />
             
-            {/* Fatias coloridas */}
             {fatiasSVG.map(pote => {
               if (pote.percentual <= 0) return null;
               const dashArray = `${pote.percentual * 2.51327} 251.327`;
@@ -205,7 +188,6 @@ export const FinanceCenterView: React.FC = () => {
             })}
           </svg>
 
-          {/* Texto Central */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
             <span className="text-3xl md:text-4xl font-black text-slate-900">{totalMapeado}%</span>
             <span className="text-[10px] md:text-xs font-medium text-slate-500 max-w-[90px]">
@@ -214,7 +196,7 @@ export const FinanceCenterView: React.FC = () => {
           </div>
         </div>
 
-        {/* Potes Ativos em volta do Círculo */}
+        {/* Potes Ativos em Volta do Círculo */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-6">
           {potesSelecionados.map(pote => {
             const Icone = pote.IconeComponente;
@@ -247,45 +229,69 @@ export const FinanceCenterView: React.FC = () => {
 
       </div>
 
-      {/* CARROSSEL INFERIOR: SELEÇÃO DE POTES */}
-      <div className="w-full max-w-2xl mt-auto pt-4 border-t border-slate-200/80 space-y-2">
+      {/* CARROSSEL INFERIOR COM NAVEGAÇÃO POR SETAS E ARRASTE */}
+      <div className="w-full max-w-2xl mt-auto pt-4 border-t border-slate-200/80 space-y-3">
         <p className="text-xs font-bold text-center text-slate-500">
           Escolha seus potes — {potesSelecionados.length} escolhidos de {todosPotesDisponiveis.length}
         </p>
 
-        <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
-          {todosPotesDisponiveis.map(pote => {
-            const Icone = pote.IconeComponente;
-            const jaSelecionado = potesSelecionados.some(p => p.id === pote.id);
+        <div className="relative flex items-center">
+          {/* Seta para a Esquerda */}
+          <button 
+            type="button"
+            onClick={scrollEsquerda}
+            className="p-2 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-700 transition-colors shrink-0 z-10 mr-1"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
 
-            return (
-              <button
-                key={pote.id}
-                type="button"
-                onClick={() => !jaSelecionado && adicionarPote(pote)}
-                disabled={jaSelecionado}
-                className={`flex-shrink-0 bg-white rounded-2xl p-3 border text-center flex flex-col items-center space-y-1 w-28 transition-all ${
-                  jaSelecionado 
-                    ? 'opacity-40 border-slate-200 grayscale cursor-not-allowed' 
-                    : 'border-slate-200/80 hover:border-amber-400 hover:shadow-sm cursor-pointer'
-                }`}
-              >
-                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                  <Icone />
+          {/* Carrossel Deslizante de Potes */}
+          <div 
+            ref={scrollRef}
+            className="flex items-center space-x-3 overflow-x-auto py-2 scrollbar-none scroll-smooth w-full px-1"
+          >
+            {todosPotesDisponiveis.map(pote => {
+              const Icone = pote.IconeComponente;
+              const jaSelecionado = potesSelecionados.some(p => p.id === pote.id);
+
+              return (
+                <div
+                  key={pote.id}
+                  draggable={!jaSelecionado}
+                  onDragStart={(e) => handleDragStart(e, pote)}
+                  onClick={() => !jaSelecionado && adicionarPote(pote)}
+                  className={`flex-shrink-0 bg-white rounded-2xl p-3 border text-center flex flex-col items-center space-y-1 w-28 select-none transition-all ${
+                    jaSelecionado 
+                      ? 'opacity-40 border-slate-200 grayscale cursor-not-allowed' 
+                      : 'border-slate-200/80 hover:border-amber-400 hover:shadow-sm cursor-grab active:cursor-grabbing'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                    <Icone />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-800 truncate w-full">{pote.nome}</span>
+                  {pote.subtexto && (
+                    <span className="text-[9px] text-slate-400 truncate w-full">{pote.subtexto}</span>
+                  )}
                 </div>
-                <span className="text-[11px] font-bold text-slate-800 truncate w-full">{pote.nome}</span>
-                {pote.subtexto && (
-                  <span className="text-[9px] text-slate-400 truncate w-full">{pote.subtexto}</span>
-                )}
-              </button>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Seta para a Direita */}
+          <button 
+            type="button"
+            onClick={scrollDireita}
+            className="p-2 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-700 transition-colors shrink-0 z-10 ml-1"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      {/* MODAL DE AJUSTE INDIVIDUAL DO POTE */}
+      {/* MODAL DE AJUSTE INDIVIDUAL */}
       {poteEmEdicao && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center space-y-5 shadow-xl relative border border-slate-100">
             <button 
               onClick={() => setPoteEmEdicao(null)}
@@ -305,7 +311,6 @@ export const FinanceCenterView: React.FC = () => {
               </p>
             </div>
 
-            {/* Anel de Ajuste com Destaque Amarelo */}
             <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
               <div className="w-32 h-32 rounded-full border-8 border-amber-400 flex flex-col items-center justify-center bg-white shadow-inner">
                 <span className="text-2xl font-black text-slate-900">{poteEmEdicao.percentual}%</span>
@@ -315,7 +320,6 @@ export const FinanceCenterView: React.FC = () => {
               </div>
             </div>
 
-            {/* Controle Deslizante Amarelo */}
             <input
               type="range"
               min="0"
