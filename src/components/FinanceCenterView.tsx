@@ -24,7 +24,8 @@ import {
   Columns2,
   LogOut,
   Target,
-  AlertTriangle
+  AlertTriangle,
+  ArrowUpRight
 } from 'lucide-react';
 
 interface ContaFixa {
@@ -154,7 +155,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
   
-  // Estados para adicionar nova conta fixa / dívida
   const [novaContaNome, setNovaContaNome] = useState('');
   const [novaContaValor, setNovaContaValor] = useState<number | ''>('');
   const [novaContaMeses, setNovaContaMeses] = useState<number | ''>('');
@@ -176,6 +176,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [valorNovaMeta, setValorNovaMeta] = useState<number | ''>('');
   const [guardadoNovaMeta, setGuardadoNovaMeta] = useState<number | ''>('');
   const [mesesNovaMeta, setMesesNovaMeta] = useState<number | ''>('');
+
+  // Estados para o modal de transferência/depósito em metas
+  const [modalDepositoMeta, setModalDepositoMeta] = useState<boolean>(false);
+  const [metaSelecionadaId, setMetaSelecionadaId] = useState<string>('');
+  const [valorDepositoMeta, setValorDepositoMeta] = useState<number | ''>('');
+  const [origemDepositoMeta, setOrigemDepositoMeta] = useState<'disponivel' | 'nosso_patrimonio' | 'patrimonio_manuela'>('disponivel');
 
   const [animacaoEntrada, setAnimacaoEntrada] = useState<{
     ativo: boolean;
@@ -403,14 +409,84 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const adicionarMeta = () => {
     if (!nomeNovaMeta || !valorNovaMeta || Number(valorNovaMeta) <= 0 || !mesesNovaMeta || Number(mesesNovaMeta) <= 0) return;
+    const valorGuardadoInicial = guardadoNovaMeta !== '' ? Number(guardadoNovaMeta) : 0;
+
+    // Se informou valor inicial, cria uma transação de saída para descontar do saldo disponível
+    if (valorGuardadoInicial > 0) {
+      if (valorGuardadoInicial > saldoLiquidoDisponivel) {
+        alert("O valor inicial guardado não pode ser maior que o Saldo Líquido Disponível!");
+        return;
+      }
+      const novaSaida: Transacao = {
+        id: Date.now().toString(),
+        descricao: `Aporte inicial Meta: ${nomeNovaMeta}`,
+        valor: valorGuardadoInicial,
+        tipo: 'saida',
+        poteId: 'meta_aporte',
+        poteNome: `Meta: ${nomeNovaMeta}`,
+        data: new Date().toLocaleDateString('pt-BR')
+      };
+      setTransacoes(prev => [novaSaida, ...prev]);
+    }
+
     setMetas([...metas, {
       id: Date.now().toString(),
       nome: nomeNovaMeta,
       valorAlvo: Number(valorNovaMeta),
-      valorGuardado: guardadoNovaMeta !== '' ? Number(guardadoNovaMeta) : 0,
+      valorGuardado: valorGuardadoInicial,
       meses: Number(mesesNovaMeta)
     }]);
+
     setNomeNovaMeta(''); setValorNovaMeta(''); setGuardadoNovaMeta(''); setMesesNovaMeta(''); setModalNovaMeta(false);
+  };
+
+  const efetivarTransferenciaMeta = () => {
+    if (!metaSelecionadaId || valorDepositoMeta === '' || Number(valorDepositoMeta) <= 0) return;
+    const valorTransf = Number(valorDepositoMeta);
+
+    if (origemDepositoMeta === 'disponivel') {
+      if (valorTransf > saldoLiquidoDisponivel) {
+        alert("Valor superior ao Saldo Líquido Disponível!");
+        return;
+      }
+      // Registra saída do caixa geral
+      const novaSaida: Transacao = {
+        id: Date.now().toString(),
+        descricao: `Transferência para Meta`,
+        valor: valorTransf,
+        tipo: 'saida',
+        poteId: 'meta_transf',
+        poteNome: 'Depósito em Meta',
+        data: new Date().toLocaleDateString('pt-BR')
+      };
+      setTransacoes(prev => [novaSaida, ...prev]);
+    } else {
+      // Origem é Patrimônio ("Nosso Patrimônio" ou "Manuela") -> abate criando uma saída simulada em compensação de patrimônio
+      const nomeOrigemPatri = origemDepositoMeta === 'nosso_patrimonio' ? 'Nosso Patrimônio' : 'Patrimônio Manuela';
+      const saldoMaxPatri = origemDepositoMeta === 'nosso_patrimonio' ? saldoNossoPatrimonio : saldoPatrimonioManuela;
+
+      if (valorTransf > saldoMaxPatri) {
+        alert(`Valor superior ao disponível no pote ${nomeOrigemPatri}!`);
+        return;
+      }
+
+      const saidaPatri: Transacao = {
+        id: Date.now().toString(),
+        descricao: `Resgate de ${nomeOrigemPatri} para Meta`,
+        valor: valorTransf,
+        tipo: 'saida',
+        poteId: origemDepositoMeta,
+        poteNome: nomeOrigemPatri,
+        data: new Date().toLocaleDateString('pt-BR')
+      };
+      setTransacoes(prev => [saidaPatri, ...prev]);
+    }
+
+    // Atualiza a meta selecionada
+    setMetas(metas.map(m => m.id === metaSelecionadaId ? { ...m, valorGuardado: m.valorGuardado + valorTransf } : m));
+    setModalDepositoMeta(false);
+    setValorDepositoMeta('');
+    setMetaSelecionadaId('');
   };
 
   const efetivarAportePendente = () => {
@@ -513,7 +589,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
           </div>
 
-          {/* PASSO 1: DÍVIDAS E CONTAS FIXAS OBRIGATÓRIAS EM R$ */}
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-4 border-2 border-rose-500/20`}>
             <div className="flex justify-between items-center">
               <div>
@@ -578,7 +653,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
           </div>
 
-          {/* PASSO 2: DISTRIBUIÇÃO DO RESTANTE EM PORCENTAGEM */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-4 md:p-8 rounded-3xl bg-emerald-500/5 border border-emerald-500/10">
             <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center drop-shadow-xl shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
@@ -1007,9 +1081,20 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                         <span className="text-2xl">🎯</span>
                         <span className="font-black text-base">{meta.nome}</span>
                       </div>
-                      <button onClick={() => setMetas(metas.filter(m => m.id !== meta.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => {
+                            setMetaSelecionadaId(meta.id);
+                            setModalDepositoMeta(true);
+                          }} 
+                          className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" /> + Depositar
+                        </button>
+                        <button onClick={() => setMetas(metas.filter(m => m.id !== meta.id))} className="text-slate-400 hover:text-rose-500 cursor-pointer">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-1">
@@ -1141,7 +1226,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </div>
       )}
 
-      {/* MODAL NOVA META */}
+      {/* MODAL NOVA META COM APORTE INICIAL */}
       {modalNovaMeta && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto`}>
@@ -1163,13 +1248,20 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               onChange={(e) => setValorNovaMeta(e.target.value === '' ? '' : Number(e.target.value))}
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
             />
-            <input
-              type="number"
-              placeholder="Quanto já guardou/depositou R$ (Opcional)"
-              value={guardadoNovaMeta}
-              onChange={(e) => setGuardadoNovaMeta(e.target.value === '' ? '' : Number(e.target.value))}
-              className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
-            />
+            
+            <div className="space-y-1">
+              <label className={`text-[11px] font-bold block ${textMuted}`}>
+                Aportar Valor Inicial (Disponível: {formatarGrana(saldoLiquidoDisponivel)})
+              </label>
+              <input
+                type="number"
+                placeholder="Valor inicial para esta meta R$"
+                value={guardadoNovaMeta}
+                onChange={(e) => setGuardadoNovaMeta(e.target.value === '' ? '' : Number(e.target.value))}
+                className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
+              />
+            </div>
+
             <input
               type="number"
               placeholder="Tempo de Conclusão (Meses)"
@@ -1178,7 +1270,44 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
             />
             <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer">
-              Salvar Meta
+              Salvar Meta com Aporte
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DEPOSITAR / TRANSFERIR PARA META */}
+      {modalDepositoMeta && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
+            <button onClick={() => setModalDepositoMeta(false)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-base md:text-lg font-black">Transferir para Meta</h3>
+            
+            <div className="space-y-3">
+              <label className={`text-xs font-bold block ${textMuted}`}>Origem dos Fundos:</label>
+              <select 
+                value={origemDepositoMeta} 
+                onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} 
+                className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border`}
+              >
+                <option value="disponivel">💳 Saldo Líquido Disponível ({formatarGrana(saldoLiquidoDisponivel)})</option>
+                <option value="nosso_patrimonio">🐷 Nosso Patrimônio ({formatarGrana(saldoNossoPatrimonio)})</option>
+                <option value="patrimonio_manuela">👶 Patrimônio Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
+              </select>
+
+              <input
+                type="number"
+                placeholder="Valor a Transferir R$"
+                value={valorDepositoMeta}
+                onChange={(e) => setValorDepositoMeta(e.target.value === '' ? '' : Number(e.target.value))}
+                className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`}
+              />
+            </div>
+
+            <button onClick={efetivarTransferenciaMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm cursor-pointer">
+              Efetivar Transferência
             </button>
           </div>
         </div>
