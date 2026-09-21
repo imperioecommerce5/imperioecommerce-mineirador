@@ -283,6 +283,7 @@ export const FinanceCenterView: React.FC = () => {
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
+  // Saldo Bruto é exatamente o dinheiro em conta (entradas - saídas totais)
   const saldoBrutoTotal = totalEntradas - totalSaidas;
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
@@ -301,7 +302,7 @@ export const FinanceCenterView: React.FC = () => {
     .reduce((acc, p) => acc + p.percentual, 0);
 
   const valorRetidoAutomaticoTotal = (rendaRestanteAposDividas * percentualTotalRetencao) / 100;
-  const saldoLiquidoDisponivel = Math.max(0, saldoBrutoTotal - valorRetidoAutomaticoTotal - totalContasFixasValor);
+  const saldoLiquidoDisponivel = Math.max(0, saldoBrutoTotal - valorRetidoAutomaticoTotal);
 
   const adicionarContaFixaObrigatoria = async () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
@@ -400,8 +401,26 @@ export const FinanceCenterView: React.FC = () => {
       setValorLancamento(''); setModalLancamento(false);
     } else {
       const valorGasto = Number(valorLancamento);
-      const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
 
+      // Se for pagamento de Dívida / Conta Fixa, sai direto do Saldo Bruto (sem mexer em potes)
+      if (poteSelecionadoId === 'divida_fixa') {
+        const novaSaida: Transacao = {
+          id: Date.now().toString(),
+          descricao: `Pagamento de Dívida: ${categoriaSaidaSelecionada}`,
+          valor: valorGasto,
+          tipo: 'saida',
+          poteId: 'divida_fixa',
+          poteNome: 'Dívida / Conta Fixa',
+          data: new Date().toLocaleDateString('pt-BR')
+        };
+        const novasTransacoes = [novaSaida, ...transacoes];
+        setTransacoes(novasTransacoes);
+        setValorLancamento(''); setModalLancamento(false);
+        await salvarDadosNaNuvem({ transacoes: novasTransacoes });
+        return;
+      }
+
+      const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
       if (!poteAlvo) return;
 
       const valorDiluidoNoPote = (rendaRestanteAposDividas * poteAlvo.percentual) / 100;
@@ -1001,12 +1020,12 @@ export const FinanceCenterView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
-                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO (CAIXA REAL)</span>
+                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO (DINHEIRO EM CONTA)</span>
                 <div className="text-3xl md:text-4xl font-black text-emerald-500 mt-1 font-mono">
                   {formatarGrana(saldoBrutoTotal)}
                 </div>
               </div>
-              <span className={`text-[11px] font-semibold ${textMuted}`}>Entradas + aporte inicial menos saídas</span>
+              <span className={`text-[11px] font-semibold ${textMuted}`}>Entradas menos todas as saídas e pagamentos</span>
             </div>
 
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
@@ -1019,7 +1038,7 @@ export const FinanceCenterView: React.FC = () => {
                 </div>
               </div>
               <span className="text-[11px] font-bold text-slate-400">
-                Comprometido com dívidas: <span className="text-rose-400">{formatarGrana(totalContasFixasValor)}</span>
+                Livre descontando retenções automáticas de patrimônio
               </span>
             </div>
           </div>
@@ -1535,12 +1554,13 @@ export const FinanceCenterView: React.FC = () => {
                   <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
                   <option value="Lazer Ele (Marido)">🎮 Lazer Ele (Marido)</option>
                   <option value="Lazer Ela (Esposa)">🛍️ Lazer Ela (Esposa)</option>
-                  <option value="Pagamento de Dívida">💳 Pagamento de Dívida</option>
+                  <option value="Pagamento de Dívida / Conta Fixa">💳 Pagamento de Dívida / Conta Fixa</option>
                   <option value="Outros Gastos">📦 Outros Gastos</option>
                 </select>
 
-                <label className={`text-xs font-bold block ${textMuted}`}>Retirar do Pote:</label>
+                <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
                 <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
+                  <option value="divida_fixa">💳 Direto do Saldo Bruto (Pagamento de Dívida / Conta)</option>
                   {potesAtivos.map(p => (
                     <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
                   ))}
