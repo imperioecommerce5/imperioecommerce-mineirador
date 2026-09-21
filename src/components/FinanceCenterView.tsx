@@ -14,29 +14,25 @@ import {
   Sliders,
   MoreHorizontal,
   Trash2,
-  Target,
   Check,
-  Receipt,
   CreditCard,
   ShieldAlert,
   ArrowRight,
   Vault,
-  Wallet,
   Sparkles,
-  Layers,
   BrainCircuit,
   LayoutGrid,
   Columns2,
-  LogOut
+  LogOut,
+  FileText
 } from 'lucide-react';
 
 interface ContaFixa {
   id: string;
   nome: string;
   valor: number;
-  tipo: 'a_vista' | 'parcelado';
-  parcelaAtual?: number;
-  totalParcelas?: number;
+  mesesTotales: number;
+  mesesRestantes: number;
 }
 
 interface Pote {
@@ -83,7 +79,10 @@ interface Props {
 export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
   const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>('onboarding');
 
-  const [rendaMensal, setRendaMensal] = useState<number>(0);
+  const [rendaMensal, setRendaMensal] = useState<number>(() => {
+    const salvo = localStorage.getItem('@meu_imperio_renda');
+    return salvo ? Number(salvo) : 0;
+  });
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
@@ -94,10 +93,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     { id: 'patrimonio_manuela', nome: 'Patrimônio Manuela', percentual: 0, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
     { id: 'supermercado', nome: 'Supermercado', percentual: 0, cor: '#F97316', iconeEmoji: '🧺' },
     { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', iconeEmoji: '🚗' },
-    { id: 'academia', nome: 'Academia', percentual: 0, cor: '#EAB308', iconeEmoji: '🏋️' },
     { id: 'desfrute_ele', nome: 'Desfrute ele', percentual: 0, cor: '#8B5CF6', iconeEmoji: '🎮' },
     { id: 'desfrute_ela', nome: 'Desfrute ela', percentual: 0, cor: '#EC4899', iconeEmoji: '🛍️' },
-    { id: 'dividas', nome: 'Dívidas & Contas Fixas', percentual: 0, cor: '#EF4444', iconeEmoji: '💳', retencaoAutomatica: true, contasFixas: [] },
+    { id: 'dividas_contas', nome: 'Dívidas & Contas Fixas', percentual: 0, cor: '#EF4444', iconeEmoji: '💳', retencaoAutomatica: true, contasFixas: [] },
     { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
@@ -111,11 +109,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     return salvo ? JSON.parse(salvo) : [];
   });
 
-  const [metas, setMetas] = useState<Meta[]>(() => {
-    const salvo = localStorage.getItem('@meu_imperio_metas');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
   const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>(() => {
     const salvo = localStorage.getItem('@meu_imperio_patrimonio');
     return salvo ? JSON.parse(salvo) : [];
@@ -125,15 +118,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     localStorage.setItem('@meu_imperio_renda', rendaMensal.toString());
     localStorage.setItem('@meu_imperio_potes', JSON.stringify(potesAtivos));
     localStorage.setItem('@meu_imperio_transacoes', JSON.stringify(transacoes));
-    localStorage.setItem('@meu_imperio_metas', JSON.stringify(metas));
     localStorage.setItem('@meu_imperio_patrimonio', JSON.stringify(itensPatrimonioManuais));
-  }, [rendaMensal, potesAtivos, transacoes, metas, itensPatrimonioManuais]);
+  }, [rendaMensal, potesAtivos, transacoes, itensPatrimonioManuais]);
 
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
   const [contasFixasTemp, setContasFixasTemp] = useState<ContaFixa[]>([]);
   const [novaContaNome, setNovaContaNome] = useState('');
   const [novaContaValor, setNovaContaValor] = useState<number | ''>('');
+  const [novaContaMeses, setNovaContaMeses] = useState<number | ''>('');
 
   const [modalEntradaInicial, setModalEntradaInicial] = useState<boolean>(false);
   const [valorEntradaInicial, setValorEntradaInicial] = useState<number | ''>('');
@@ -155,7 +148,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     ativo: boolean;
     valorTotal: number;
     detalhes: { nome: string; icone: string; valor: number; percentual: number; cor: string }[];
-    sobraLivre: number;
   } | null>(null);
 
   const [alertaEstouro, setAlertaEstouro] = useState<{
@@ -177,25 +169,40 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   
   const saldoCaixaBruto = totalEntradas - totalSaidas;
 
-  const poteDividasObj = potesAtivos.find(p => p.id === 'dividas' || p.nome.toLowerCase().includes('dívida'));
+  const poteDividasObj = potesAtivos.find(p => p.id === 'dividas_contas' || p.nome.toLowerCase().includes('dívida'));
   const totalContasFixasEDividas = poteDividasObj?.contasFixas?.reduce((acc, c) => acc + c.valor, 0) || 0;
 
   const saldoLiquidoDisponivel = Math.max(0, saldoCaixaBruto - totalContasFixasEDividas);
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
-  const acumuladoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
-  const saidasNossoPatrimonio = transacoes.filter(t => t.tipo === 'saida' && t.poteId === 'nosso_patrimonio').reduce((acc, t) => acc + t.valor, 0);
-  const saldoNossoPatrimonio = Math.max(0, acumuladoNossoPatrimonio - saidasNossoPatrimonio);
+  const saldoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
 
   const potePatrimonioManuela = potesAtivos.find(p => p.id === 'patrimonio_manuela');
   const pctPatrimonioManuela = potePatrimonioManuela ? potePatrimonioManuela.percentual : 0;
-  const acumuladoPatrimonioManuela = (totalEntradas * pctPatrimonioManuela) / 100;
-  const saidasPatrimonioManuela = transacoes.filter(t => t.tipo === 'saida' && t.poteId === 'patrimonio_manuela').reduce((acc, t) => acc + t.valor, 0);
-  const saldoPatrimonioManuela = Math.max(0, acumuladoPatrimonioManuela - saidasPatrimonioManuela);
+  const saldoPatrimonioManuela = (totalEntradas * pctPatrimonioManuela) / 100;
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
+
+  const adicionarContaFixaTemp = () => {
+    if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
+    const meses = Number(novaContaMeses);
+    setContasFixasTemp([...contasFixasTemp, {
+      id: Date.now().toString(),
+      nome: novaContaNome,
+      valor: Number(novaContaValor),
+      mesesTotales: meses,
+      mesesRestantes: meses
+    }]);
+    setNovaContaNome('');
+    setNovaContaValor('');
+    setNovaContaMeses('');
+  };
+
+  const removerContaFixaTemp = (id: string) => {
+    setContasFixasTemp(contasFixasTemp.filter(c => c.id !== id));
+  };
 
   const solicitarAdicaoPote = (pote: Pote) => {
     if (!potesAtivos.some(p => p.id === pote.id)) {
@@ -247,14 +254,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       cor: pote.cor
     }));
 
-    const totalAlocado = detalhes.reduce((acc, d) => acc + d.valor, 0);
-    const sobraLivre = Math.max(0, valor - totalAlocado);
-
     setAnimacaoEntrada({
       ativo: true,
       valorTotal: valor,
-      detalhes,
-      sobraLivre
+      detalhes
     });
   };
 
@@ -322,7 +325,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         descricao: `Compensação de estouro em ${poteAlvo.nome}`,
         valor: alertaEstouro.valorEstourado,
         tipo: 'saida',
-        poteId: alertaEstouro.poteCompensadorId,
+        poteId:alertaEstouro.poteCompensadorId,
         poteNome: 'Nosso Patrimônio (Compensação)',
         data: new Date().toLocaleDateString('pt-BR')
       };
@@ -359,13 +362,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  let acumulado = 0;
-  const fatiasSVG = potesAtivos.map(pote => {
-    const inicio = acumulado;
-    acumulado += pote.percentual;
-    return { ...pote, inicio, fim: acumulado };
-  });
-
   const isDark = tema === 'escuro';
   const bgClasse = isDark ? 'bg-[#0B0F17] text-slate-100' : 'bg-[#F4F7F6] text-slate-900';
   const cardClasse = isDark 
@@ -374,9 +370,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-600';
   const inputBg = isDark ? 'bg-slate-900 text-slate-100 border-slate-800' : 'bg-slate-100 text-slate-900 border-slate-300';
-
-  const pctPatrimonioTotal = pctNossoPatrimonio + pctPatrimonioManuela;
-  const pctDividasTotal = poteDividasObj ? poteDividasObj.percentual : 0;
 
   const transacoesFiltradas = transacoes.filter(t => {
     if (filtroExtrato === 'entradas') return t.tipo === 'entrada';
@@ -435,21 +428,28 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center drop-shadow-xl shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke={isDark ? "#1E293B" : "#E2E8F0"} strokeWidth="11" />
-                {fatiasSVG.map(pote => {
-                  if (pote.percentual <= 0) return null;
-                  return (
-                    <circle
-                      key={pote.id}
-                      cx="50" cy="50" r="40"
-                      fill="transparent"
-                      stroke={pote.cor}
-                      strokeWidth="11"
-                      strokeDasharray={`${pote.percentual * 2.51327} 251.327`}
-                      strokeDashoffset={`-${pote.inicio * 2.51327}`}
-                      className="transition-all duration-300 ease-out"
-                    />
-                  );
-                })}
+                {(() => {
+                  let acumulado = 0;
+                  return potesAtivos.map(pote => {
+                    const inicio = acumulado;
+                    acumulado += pote.percentual;
+                    const dashArray = `${pote.percentual * 2.51327} 251.327`;
+                    const dashOffset = `-${inicio * 2.51327}`;
+                    if (pote.percentual <= 0) return null;
+                    return (
+                      <circle
+                        key={pote.id}
+                        cx="50" cy="50" r="40"
+                        fill="transparent"
+                        stroke={pote.cor}
+                        strokeWidth="11"
+                        strokeDasharray={dashArray}
+                        strokeDashoffset={dashOffset}
+                        className="transition-all duration-300 ease-out"
+                      />
+                    );
+                  });
+                })()}
               </svg>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -482,9 +482,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 ))}
               </div>
 
-              <button onClick={() => navegarPara('confirmacao')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
-                Concluir Plano Financeiro
-              </button>
+              {totalMapeado === 100 ? (
+                <button onClick={() => navegarPara('confirmacao')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
+                  Concluir Plano Financeiro
+                </button>
+              ) : (
+                <div className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold py-3 px-4 rounded-2xl text-center">
+                  ⚠️ O plano precisa atingir exatamente 100% para prosseguir ({totalMapeado}% preenchido).
+                </div>
+              )}
             </div>
           </div>
 
@@ -514,12 +520,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </main>
       )}
 
-      {/* MODAL CONFIGURAR POTE */}
+      {/* MODAL CONFIGURAR POTE / CONTAS FIXAS / DÍVIDAS */}
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
         const valorMapeadoPote = (rendaMensal * percentualPendente) / 100;
-        const eDividas = potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida');
+        const eDividasOuContas = potePendente.id === 'dividas_contas' || potePendente.nome.toLowerCase().includes('dívida');
 
         return (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -543,7 +549,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </div>
               </div>
 
-              {!eDividas && (
+              {!eDividasOuContas && (
                 <input
                   type="range"
                   min="1"
@@ -552,6 +558,61 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                   onChange={(e) => setPercentualPendente(Number(e.target.value))}
                   className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                 />
+              )}
+
+              {eDividasOuContas && (
+                <div className="space-y-3 pt-2 text-left border-t border-slate-800">
+                  <span className="text-xs font-bold text-emerald-500 block">Adicionar Contas Fixas & Dívidas (Com Duração):</span>
+                  
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Nome (Ex: Luz, Água, Aluguel, Empréstimo)"
+                      value={novaContaNome}
+                      onChange={(e) => setNovaContaNome(e.target.value)}
+                      className={`w-full ${inputBg} p-2.5 rounded-xl text-xs font-bold border`}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        placeholder="Valor Mensal R$"
+                        value={novaContaValor}
+                        onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))}
+                        className={`w-full ${inputBg} p-2.5 rounded-xl text-xs font-bold border font-mono`}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Duração (Meses)"
+                        value={novaContaMeses}
+                        onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))}
+                        className={`w-full ${inputBg} p-2.5 rounded-xl text-xs font-bold border font-mono`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={adicionarContaFixaTemp}
+                      className="w-full bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar na Lista
+                    </button>
+                  </div>
+
+                  {contasFixasTemp.length > 0 && (
+                    <div className="space-y-1.5 pt-2 max-h-36 overflow-y-auto">
+                      {contasFixasTemp.map(c => (
+                        <div key={c.id} className={`${inputBg} p-2.5 rounded-xl flex justify-between items-center text-xs border`}>
+                          <div>
+                            <span className="font-bold block">{c.nome}</span>
+                            <span className="text-[10px] text-slate-400">{formatarGrana(c.valor)}/mês • {c.mesesTotales} meses</span>
+                          </div>
+                          <button onClick={() => removerContaFixaTemp(c.id)} className="text-rose-500">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               <button
@@ -678,7 +739,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </div>
               </div>
               <span className="text-[11px] font-bold text-slate-400">
-                <span className="text-rose-500">Descontado {formatarGrana(totalContasFixasEDividas)}</span> em dívidas & contas fixas
+                <span className="text-rose-500">Descontado {formatarGrana(totalContasFixasEDividas)}</span> em contas fixas & dívidas
               </span>
             </div>
           </div>
@@ -688,7 +749,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">🐷</span>
                 <div>
-                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança (Diluição Automática)</span>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Patrimônio Integrado</span>
                   <span className="font-black text-sm block">Nosso Patrimônio</span>
                 </div>
               </div>
@@ -699,7 +760,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">👶</span>
                 <div>
-                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança (Diluição Automática)</span>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Patrimônio Integrado</span>
                   <span className="font-black text-sm block">Manuela</span>
                 </div>
               </div>
@@ -726,7 +787,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </button>
           </div>
 
-          {/* GRID OU COLUNA DOS POTES */}
+          {/* GRID OU COLUNA DOS POTES COM GRÁFICOS VISÍVEIS */}
           <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
@@ -775,10 +836,16 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     <span className={`text-xs font-bold block ${textMuted}`}>
                       Alocado ({pote.percentual}%): {formatarGrana(valorDiluidoNoPote)}
                     </span>
-                    {!pote.retencaoAutomatica && (
-                      <span className="text-[10px] text-emerald-500 font-extrabold block">
-                        Teto livre para gastar: {formatarGrana(saldoRealPote)}
-                      </span>
+                    {pote.contasFixas && pote.contasFixas.length > 0 && (
+                      <div className="pt-2 text-left space-y-1 border-t border-slate-800/60 mt-2">
+                        <span className="text-[10px] font-bold text-slate-400 block">Contas Fixas & Dívidas:</span>
+                        {pote.contasFixas.map(cf => (
+                          <div key={cf.id} className="flex justify-between text-[11px] font-semibold">
+                            <span className="truncate pr-2">{cf.nome}</span>
+                            <span className="font-mono text-rose-400">{formatarGrana(cf.valor)}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -788,44 +855,20 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </main>
       )}
 
-      {/* DIAGNÓSTICO DE PERFIL */}
-      {telaAtiva === 'perfil' && (
-        <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
-          <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
-            <BrainCircuit className="w-6 h-6 text-emerald-500" /> Diagnóstico de Perfil Financeiro
-          </h2>
-          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 space-y-4 border-l-4 border-l-emerald-500`}>
-            <div>
-              <span className={`text-xs font-bold uppercase ${textMuted}`}>Seu Perfil Atual</span>
-              <h3 className="text-xl font-black text-emerald-500 mt-0.5">
-                {pctPatrimonioTotal >= 30 ? '🛡️ Construtores de Império (Conservador/Acumulador)' : pctDividasTotal > 30 ? '⚠️ Alerta de Alavancagem (Alto Custo Fixo)' : '⚖️ Equilibrado'}
-              </h3>
-            </div>
-            <p className="text-xs md:text-sm font-semibold leading-relaxed">
-              {pctPatrimonioTotal >= 30 
-                ? 'Excelente! Vocês estão destinando mais de 30% de tudo o que entra para o patrimônio da família.'
-                : pctDividasTotal > 30
-                ? 'Atenção ao custo fixo! As dívidas e compromissos estão consumindo mais de 30% da renda.'
-                : 'Seu plano está bem distribuído entre os potes de vida pessoal e investimentos.'}
-            </p>
-          </div>
-        </main>
-      )}
-
       {/* TELA DE PATRIMÔNIO */}
       {telaAtiva === 'patrimonio' && (
         <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
-              <Vault className="w-6 h-6 text-emerald-500" /> Patrimônio da Família
+              <Vault className="w-6 h-6 text-emerald-500" /> Patrimônio da Família (Integrado)
             </h2>
             <button onClick={() => setModalNovoPatrimonio(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold">
-              + Adicionar
+              + Adicionar Manual
             </button>
           </div>
 
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 text-center space-y-2 border-2 border-emerald-500/30`}>
-            <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Guardado</span>
+            <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Consolidado</span>
             <div className="text-3xl md:text-4xl font-black text-emerald-500 font-mono">
               {formatarGrana(patrimonioTotalCalculado)}
             </div>
@@ -836,7 +879,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">🐷</span>
                 <div>
-                  <span className="font-bold block text-sm">Nosso Patrimônio</span>
+                  <span className="font-bold block text-sm">Nosso Patrimônio (Automático)</span>
                   <span className={`text-[10px] ${textMuted}`}>{pctNossoPatrimonio}% de todas as entradas</span>
                 </div>
               </div>
@@ -847,7 +890,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">👶</span>
                 <div>
-                  <span className="font-bold block text-sm">Patrimônio Manuela</span>
+                  <span className="font-bold block text-sm">Patrimônio Manuela (Automático)</span>
                   <span className={`text-[10px] ${textMuted}`}>{pctPatrimonioManuela}% de todas as entradas</span>
                 </div>
               </div>
@@ -908,10 +951,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400">
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-base md:text-lg font-black">Adicionar ao Patrimônio</h3>
+            <h3 className="text-base md:text-lg font-black">Adicionar ao Patrimônio Manual</h3>
             <input
               type="text"
-              placeholder="Nome (Ex: CDB, Imóvel)"
+              placeholder="Nome (Ex: Imóvel, Veículo)"
               value={nomeNovoPatrimonio}
               onChange={(e) => setNomeNovoPatrimonio(e.target.value)}
               className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold focus:outline-none border`}
@@ -1015,7 +1058,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 >
                   <option value="Supermercado / Compras">🛒 Supermercado / Compras</option>
                   <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
-                  <option value="Academia">🏋️ Academia</option>
                   <option value="Lazer Ele (Marido)">🎮 Lazer Ele (Marido)</option>
                   <option value="Lazer Ela (Esposa)">🛍️ Lazer Ela (Esposa)</option>
                   <option value="Pagamento de Dívida">💳 Pagamento de Dívida</option>
@@ -1066,9 +1108,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </button>
                 <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
-                </button>
-                <button onClick={() => navegarPara('ajustes')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                  <Sliders className="w-4 h-4 text-emerald-500" /> Ajustar Limites e Potes
                 </button>
               </div>
             </div>
