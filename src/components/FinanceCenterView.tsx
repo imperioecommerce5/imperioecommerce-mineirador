@@ -183,7 +183,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   // Valor total reservado/subtraído automaticamente para retenções com base nas entradas
   const valorRetidoAutomaticoTotal = (totalEntradas * percentualTotalRetencao) / 100;
 
-  // SALDO LÍQUIDO LIVRE EM CONTA = Caixa Bruto menos as retenções automáticas e saídas de consumo
+  // SALDO LÍQUIDO DISPONÍVEL = Caixa Bruto menos as retenções automáticas e saídas de consumo
   const saldoLiquidoDisponivel = Math.max(0, caixaBrutoAtual - valorRetidoAutomaticoTotal);
 
   const adicionarContaFixaTemp = () => {
@@ -799,7 +799,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
               // Círculo SVG preenchendo proporcionalmente
               const percentualProgresso = pote.retencaoAutomatica 
-                ? pote.percentual // No pote de retenção, preenche a fatia correspondente ao seu percentual no plano geral
+                ? pote.percentual 
                 : (valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100);
               
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
