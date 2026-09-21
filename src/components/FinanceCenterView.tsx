@@ -115,11 +115,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const todosPotesDisponiveis: Pote[] = [
     { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 0, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
-    { id: 'patrimonio_manuela', nome: 'Patrimônio Manuela', percentual: 0, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
+    { id: 'patrimonio_manuela', nome: 'Poupança Manuela (Futuro Filha)', percentual: 0, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
     { id: 'supermercado', nome: 'Supermercado', percentual: 0, cor: '#F97316', iconeEmoji: '🧺' },
     { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', iconeEmoji: '🚗' },
-    { id: 'desfrute_ele', nome: 'Desfrute ele', percentual: 0, cor: '#8B5CF6', iconeEmoji: '🎮' },
-    { id: 'desfrute_ela', nome: 'Desfrute ela', percentual: 0, cor: '#EC4899', iconeEmoji: '🛍️' },
+    { id: 'desfrute_familia', nome: 'Desfrute Família', percentual: 0, cor: '#8B5CF6', iconeEmoji: '🎮' },
     { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
@@ -386,28 +385,25 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const salvarLancamento = async () => {
     if (!valorLancamento || Number(valorLancamento) <= 0) return;
+    const valorGasto = Number(valorLancamento);
 
     if (tipoLancamento === 'entrada') {
-      await processarEntradaComAnimacao(Number(valorLancamento), origemEntradaModal);
+      await processarEntradaComAnimacao(valorGasto, origemEntradaModal);
       setValorLancamento(''); setModalLancamento(false);
     } else {
-      const valorGasto = Number(valorLancamento);
+      // TRAVA DE SEGURANÇA DE GASTOS (NÃO PODE FUGIR DO LIMITE)
+      if (poteSelecionadoId !== 'divida_fixa') {
+        const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
+        if (poteAlvo) {
+          const valorDiluidoNoPote = (rendaRestanteAposDividas * poteAlvo.percentual) / 100;
+          const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
+          const saldoDisponivelNoPote = poteAlvo.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
 
-      if (poteSelecionadoId === 'divida_fixa') {
-        const novaSaida: Transacao = {
-          id: Date.now().toString(),
-          descricao: `Pagamento: ${categoriaSaidaSelecionada}`,
-          valor: valorGasto,
-          tipo: 'saida',
-          poteId: 'divida_fixa',
-          poteNome: 'Direto do Saldo (Gasto / Dívida)',
-          data: new Date().toLocaleDateString('pt-BR')
-        };
-        const novasTransacoes = [novaSaida, ...transacoes];
-        setTransacoes(novasTransacoes);
-        setValorLancamento(''); setModalLancamento(false);
-        await salvarDadosNaNuvem({ transacoes: novasTransacoes });
-        return;
+          if (!poteAlvo.retencaoAutomatica && valorGasto > saldoDisponivelNoPote) {
+            alert(`⚠️ Trava de Segurança Ativada!\n\nO valor do gasto (${formatarGrana(valorGasto)}) é superior ao saldo disponível no pote "${poteAlvo.nome}" (${formatarGrana(saldoDisponivelNoPote)}). Reduza o valor ou ajuste o orçamento.`);
+            return;
+          }
+        }
       }
 
       const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
@@ -511,11 +507,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       };
       novasTransacoes = [novaSaida, ...novasTransacoes];
     } else {
-      const nomeOrigemPatri = origemDepositoMeta === 'nosso_patrimonio' ? 'Nosso Patrimônio' : 'Patrimônio Manuela';
+      const nomeOrigemPatri = origemDepositoMeta === 'nosso_patrimonio' ? 'Nosso Patrimônio' : 'Poupança Manuela';
       const saldoMaxPatri = origemDepositoMeta === 'nosso_patrimonio' ? saldoNossoPatrimonio : saldoPatrimonioManuela;
 
       if (valorTransf > saldoMaxPatri) {
-        alert(`Valor superior ao disponível no pote ${nomeOrigemPatri}!`);
+        alert(`Valor superior ao disponível em ${nomeOrigemPatri}!`);
         return;
       }
 
@@ -958,8 +954,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">👶</span>
                 <div>
-                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Alocação em Patrimônio</span>
-                  <span className="font-black text-sm block">Manuela ({pctPatrimonioManuela}%)</span>
+                  <span className={`text-[10px] uppercase font-extrabold ${textMuted}`}>Poupança Exclusiva</span>
+                  <span className="font-black text-sm block">Poupança Manuela ({pctPatrimonioManuela}%)</span>
                 </div>
               </div>
               <span className="font-mono font-black text-cyan-500 text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
@@ -1080,8 +1076,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">👶</span>
                 <div>
-                  <span className="font-bold block text-sm">Patrimônio Manuela (Automático)</span>
-                  <span className={`text-[10px] ${textMuted}`}>{pctPatrimonioManuela}% do saldo restante</span>
+                  <span className="font-bold block text-sm">Poupança Manuela (Futuro da Filha)</span>
+                  <span className={`text-[10px] text-cyan-400 font-bold`}>🔒 Valor guardado intocável ({pctPatrimonioManuela}%)</span>
                 </div>
               </div>
               <span className="font-mono font-black text-cyan-500 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
@@ -1418,7 +1414,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               >
                 <option value="disponivel">💳 Saldo Líquido Disponível ({formatarGrana(saldoLiquidoDisponivel)})</option>
                 <option value="nosso_patrimonio">🐷 Nosso Patrimônio ({formatarGrana(saldoNossoPatrimonio)})</option>
-                <option value="patrimonio_manuela">👶 Patrimônio Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
+                <option value="patrimonio_manuela">👶 Poupança Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
               </select>
 
               <input
@@ -1495,8 +1491,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 >
                   <option value="Supermercado / Compras">🛒 Supermercado / Compras</option>
                   <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
-                  <option value="Lazer Ele (Marido)">🎮 Lazer Ele (Marido)</option>
-                  <option value="Lazer Ela (Esposa)">🛍️ Lazer Ela (Esposa)</option>
+                  <option value="Desfrute Família">🎮 Desfrute Família</option>
                   <option value="Pagamento de Dívida / Conta Fixa">💳 Pagamento de Dívida / Conta Fixa</option>
                   <option value="Outros Gastos">📦 Outros Gastos</option>
                 </select>
