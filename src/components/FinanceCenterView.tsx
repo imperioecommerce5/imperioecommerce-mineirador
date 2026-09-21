@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Plus, 
@@ -21,13 +21,19 @@ import {
   ShieldAlert,
   ArrowRight,
   Vault,
-  Wallet
+  Wallet,
+  Sparkles,
+  Layers,
+  BrainCircuit
 } from 'lucide-react';
 
 interface ContaFixa {
   id: string;
   nome: string;
   valor: number;
+  tipo: 'a_vista' | 'parcelado';
+  parcelaAtual?: number;
+  totalParcelas?: number;
 }
 
 interface Pote {
@@ -36,6 +42,7 @@ interface Pote {
   percentual: number;
   cor: string;
   iconeEmoji: string;
+  retencaoAutomatica?: boolean;
   contasFixas?: ContaFixa[];
 }
 
@@ -68,11 +75,11 @@ interface Props {
 }
 
 export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
-  // Configurações Globais - Inicia em 'onboarding' (Montar Plano)
-  const [rendaMensal, setRendaMensal] = useState<number>(2000);
+  // Configurações Globais
+  const [rendaMensal, setRendaMensal] = useState<number>(3500);
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio'>('onboarding');
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>('onboarding');
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
   // Seleção e Gerenciamento de Potes
@@ -81,8 +88,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
   const [contasFixasTemp, setContasFixasTemp] = useState<ContaFixa[]>([]);
   const [novaContaNome, setNovaContaNome] = useState('');
   const [novaContaValor, setNovaContaValor] = useState<number | ''>('');
+  const [novaContaTipo, setNovaContaTipo] = useState<'a_vista' | 'parcelado'>('a_vista');
+  const [novaContaParcelaAtual, setNovaContaParcelaAtual] = useState<number | ''>(1);
+  const [novaContaTotalParcelas, setNovaContaTotalParcelas] = useState<number | ''>(12);
 
-  // Modais de Lançamento / Compensação
+  // Modais
   const [modalEntradaInicial, setModalEntradaInicial] = useState<boolean>(false);
   const [valorEntradaInicial, setValorEntradaInicial] = useState<number | ''>('');
 
@@ -92,87 +102,143 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
   const [descLancamento, setDescLancamento] = useState<string>('');
   const [poteSelecionadoId, setPoteSelecionadoId] = useState<string>('supermercado');
 
-  // Modal Patrimônio Manual
+  // Modal Patrimônio
   const [modalNovoPatrimonio, setModalNovoPatrimonio] = useState<boolean>(false);
   const [nomeNovoPatrimonio, setNomeNovoPatrimonio] = useState('');
   const [valorNovoPatrimonio, setValorNovoPatrimonio] = useState<number | ''>('');
 
-  // Sistema de Alerta e Reposição
+  // Animação de Entrada
+  const [animacaoEntrada, setAnimacaoEntrada] = useState<{
+    ativo: boolean;
+    valorTotal: number;
+    detalhes: { nome: string; icone: string; valor: number; percentual: number; cor: string }[];
+    sobraLivre: number;
+  } | null>(null);
+
+  // Alerta de Estouro
   const [alertaEstouro, setAlertaEstouro] = useState<{
     poteNome: string;
     valorEstourado: number;
     poteCompensadorId: string;
   } | null>(null);
 
-  // Histórico de Transações
+  // Transações
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
 
-  // Potes Disponíveis
+  // Potes Padrão
   const todosPotesDisponiveis: Pote[] = [
-    { id: 'reserva', nome: 'Reserva', percentual: 30, cor: '#10B981', iconeEmoji: '🐷' },
-    { id: 'transporte', nome: 'Transporte', percentual: 10, cor: '#3B82F6', iconeEmoji: '🚗' },
+    { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 20, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
+    { id: 'patrimonio_manuela', nome: 'Patrimônio Manuela', percentual: 10, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
     { id: 'supermercado', nome: 'Supermercado', percentual: 20, cor: '#F97316', iconeEmoji: '🧺' },
-    { id: 'desfrute_marido', nome: 'Desfrute ele', percentual: 10, cor: '#8B5CF6', iconeEmoji: '🎮' },
-    { id: 'desfrute_esposa', nome: 'Desfrute ela', percentual: 10, cor: '#EC4899', iconeEmoji: '🛍️' },
-    { id: 'dividas', nome: 'Dívidas & Contas Fixas', percentual: 15, cor: '#EF4444', iconeEmoji: '💳', contasFixas: [
-      { id: '1', nome: 'Luz & Água', valor: 150 },
-      { id: '2', nome: 'Cartão de Crédito', valor: 150 }
-    ]},
-    { id: 'dizimo', nome: 'Dízimo', percentual: 5, cor: '#84CC16', iconeEmoji: '✉️' },
-    { id: 'investimentos', nome: 'Investimentos Gerais', percentual: 10, cor: '#F59E0B', iconeEmoji: '📈' },
+    { id: 'transporte', nome: 'Transporte', percentual: 10, cor: '#3B82F6', iconeEmoji: '🚗' },
+    { id: 'desfrute_ele', nome: 'Desfrute ele', percentual: 10, cor: '#8B5CF6', iconeEmoji: '🎮' },
+    { id: 'desfrute_ela', nome: 'Desfrute ela', percentual: 10, cor: '#EC4899', iconeEmoji: '🛍️' },
+    { 
+      id: 'dividas', 
+      nome: 'Dívidas & Contas Fixas', 
+      percentual: 15, 
+      cor: '#EF4444', 
+      iconeEmoji: '💳',
+      retencaoAutomatica: true,
+      contasFixas: [
+        { id: '1', nome: 'Luz & Água', valor: 120, tipo: 'a_vista' },
+        { id: '2', nome: 'Cartão de Crédito', valor: 150, tipo: 'parcelado', parcelaAtual: 3, totalParcelas: 10 }
+      ]
+    },
+    { id: 'dizimo', nome: 'Dízimo', percentual: 5, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
   const [potesAtivos, setPotesAtivos] = useState<Pote[]>([
     todosPotesDisponiveis[0],
     todosPotesDisponiveis[1],
     todosPotesDisponiveis[2],
-    todosPotesDisponiveis[5]
+    todosPotesDisponiveis[3],
+    todosPotesDisponiveis[4],
+    todosPotesDisponiveis[5],
+    todosPotesDisponiveis[6],
+    todosPotesDisponiveis[7]
   ]);
 
-  // Metas & Patrimônio Manual
+  // Metas e Patrimônio
   const [metas, setMetas] = useState<Meta[]>([
-    { id: '1', nome: 'Reserva de Emergência', valorAlvo: 5000, valorAtual: 500, dataLimite: '2026-12-31' }
+    { id: '1', nome: 'Fundo da Manuela', valorAlvo: 10000, valorAtual: 1200, dataLimite: '2027-12-31' }
   ]);
   const [novaMetaNome, setNovaMetaNome] = useState('');
   const [novaMetaValor, setNovaMetaValor] = useState<number | ''>('');
   const [novaMetaDate, setNovaMetaDate] = useState('');
-  const [metaAporteId, setMetaAporteId] = useState<string | null>(null);
-  const [valorAporteMeta, setValorAporteMeta] = useState<number | ''>('');
 
   const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>([
-    { id: '1', nome: 'Reserva em CDB / Renda Fixa', valor: 2000, tipo: 'manual' }
+    { id: '1', nome: 'Reserva Renda Fixa / CDB', valor: 3500, tipo: 'manual' }
   ]);
 
-  // Lógica de Navegação
   const navegarPara = (tela: typeof telaAtiva) => {
     setTelaAtiva(tela);
     setMenuAberto(false);
   };
 
-  // Cálculos Automáticos
+  // CÁLCULOS FINANCEIROS
   const totalMapeado = potesAtivos.reduce((acc, p) => acc + p.percentual, 0);
   const disponivelGeral = Math.max(0, 100 - totalMapeado);
 
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
+  
+  // Saldo Bruto em Caixa
   const saldoCaixaBruto = totalEntradas - totalSaidas;
 
-  // Cálculo das Dívidas / Contas Fixas
+  // Dívidas & Compromissos Fixos
   const poteDividasObj = potesAtivos.find(p => p.id === 'dividas' || p.nome.toLowerCase().includes('dívida'));
   const totalContasFixasEDividas = poteDividasObj?.contasFixas?.reduce((acc, c) => acc + c.valor, 0) || 0;
+
+  // Saldo Líquido Livre em Conta
   const saldoLiquidoDisponivel = Math.max(0, saldoCaixaBruto - totalContasFixasEDividas);
 
-  // Cálculo do Patrimônio Total
-  const poteReserva = potesAtivos.find(p => p.id === 'reserva' || p.nome.toLowerCase().includes('reserva'));
-  const pctReserva = poteReserva ? poteReserva.percentual : 0;
-  const acumuladoReservaEntradas = (totalEntradas * pctReserva) / 100;
-  const saídasReserva = transacoes.filter(t => t.tipo === 'saida' && t.poteId === 'reserva').reduce((acc, t) => acc + t.valor, 0);
-  const saldoReservaAtual = Math.max(0, acumuladoReservaEntradas - saídasReserva);
+  // Patrimônios Separados
+  const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
+  const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
+  const acumuladoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
+  const saidasNossoPatrimonio = transacoes.filter(t => t.tipo === 'saida' && t.poteId === 'nosso_patrimonio').reduce((acc, t) => acc + t.valor, 0);
+  const saldoNossoPatrimonio = Math.max(0, acumuladoNossoPatrimonio - saidasNossoPatrimonio);
+
+  const potePatrimonioManuela = potesAtivos.find(p => p.id === 'patrimonio_manuela');
+  const pctPatrimonioManuela = potePatrimonioManuela ? potePatrimonioManuela.percentual : 0;
+  const acumuladoPatrimonioManuela = (totalEntradas * pctPatrimonioManuela) / 100;
+  const saidasPatrimonioManuela = transacoes.filter(t => t.tipo === 'saida' && t.poteId === 'patrimonio_manuela').reduce((acc, t) => acc + t.valor, 0);
+  const saldoPatrimonioManuela = Math.max(0, acumuladoPatrimonioManuela - saidasPatrimonioManuela);
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
-  const patrimonioTotalCalculado = saldoReservaAtual + totalPatrimonioManual;
+  const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
-  // Manipulação de Potes
+  // Atualização Automática de % das Dívidas
+  useEffect(() => {
+    if (rendaMensal > 0) {
+      const somaDividas = contasFixasTemp.reduce((acc, c) => acc + c.valor, 0);
+      const percentualCalculado = Math.min(100, Math.ceil((somaDividas / rendaMensal) * 100));
+      if (potePendente && (potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida'))) {
+        setPercentualPendente(Math.max(1, percentualCalculado));
+      }
+    }
+  }, [contasFixasTemp, rendaMensal]);
+
+  // Adicionar Dívidas (À Vista ou Parceladas)
+  const adicionarContaFixaTemp = () => {
+    if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0) return;
+    setContasFixasTemp([...contasFixasTemp, {
+      id: Date.now().toString(),
+      nome: novaContaNome,
+      valor: Number(novaContaValor),
+      tipo: novaContaTipo,
+      parcelaAtual: novaContaTipo === 'parcelado' ? Number(novaContaParcelaAtual) || 1 : undefined,
+      totalParcelas: novaContaTipo === 'parcelado' ? Number(novaContaTotalParcelas) || 12 : undefined,
+    }]);
+    setNovaContaNome('');
+    setNovaContaValor('');
+  };
+
+  const removerContaFixaTemp = (id: string) => {
+    setContasFixasTemp(contasFixasTemp.filter(c => c.id !== id));
+  };
+
   const solicitarAdicaoPote = (pote: Pote) => {
     if (!potesAtivos.some(p => p.id === pote.id)) {
       if (disponivelGeral <= 0) {
@@ -183,21 +249,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
       setPercentualPendente(Math.min(10, disponivelGeral));
       setContasFixasTemp(pote.contasFixas || []);
     }
-  };
-
-  const adicionarContaFixaTemp = () => {
-    if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0) return;
-    setContasFixasTemp([...contasFixasTemp, {
-      id: Date.now().toString(),
-      nome: novaContaNome,
-      valor: Number(novaContaValor)
-    }]);
-    setNovaContaNome('');
-    setNovaContaValor('');
-  };
-
-  const removerContaFixaTemp = (id: string) => {
-    setContasFixasTemp(contasFixasTemp.filter(c => c.id !== id));
   };
 
   const confirmarAdicionarPote = () => {
@@ -225,8 +276,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     setPotesAtivos(prev => prev.map(p => p.id === id ? { ...p, percentual: valorFinal } : p));
   };
 
-  // Lançamentos e Entrada Geral
-  const processarEntrada = (valor: number, desc: string) => {
+  // Entrada com Animação
+  const processarEntradaComAnimacao = (valor: number, desc: string) => {
     const novaEntrada: Transacao = {
       id: Date.now().toString(),
       descricao: desc,
@@ -236,13 +287,31 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
       data: new Date().toLocaleDateString('pt-BR')
     };
     setTransacoes(prev => [novaEntrada, ...prev]);
+
+    const detalhes = potesAtivos.map(pote => ({
+      nome: pote.nome,
+      icone: pote.iconeEmoji,
+      valor: (valor * pote.percentual) / 100,
+      percentual: pote.percentual,
+      cor: pote.cor
+    }));
+
+    const totalAlocado = detalhes.reduce((acc, d) => acc + d.valor, 0);
+    const sobraLivre = Math.max(0, valor - totalAlocado);
+
+    setAnimacaoEntrada({
+      ativo: true,
+      valorTotal: valor,
+      detalhes,
+      sobraLivre
+    });
   };
 
   const salvarLancamento = () => {
     if (!valorLancamento || valorLancamento <= 0) return;
 
     if (tipoLancamento === 'entrada') {
-      processarEntrada(Number(valorLancamento), descLancamento || 'Entrada Rápida');
+      processarEntradaComAnimacao(Number(valorLancamento), descLancamento || 'Entrada Registrada');
       setValorLancamento(''); setDescLancamento(''); setModalLancamento(false);
     } else {
       const valorGasto = Number(valorLancamento);
@@ -261,7 +330,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         setAlertaEstouro({
           poteNome: poteAlvo.nome,
           valorEstourado: excesso,
-          poteCompensadorId: outroPoteCompensador ? outroPoteCompensador.id : 'reserva'
+          poteCompensadorId: outroPoteCompensador ? outroPoteCompensador.id : 'nosso_patrimonio'
         });
         return;
       }
@@ -297,7 +366,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
       const compensacaoSaida: Transacao = {
         id: (Date.now() + 1).toString(),
-        descricao: `Compensação automática para estouro em ${poteAlvo.nome}`,
+        descricao: `Compensação de estouro em ${poteAlvo.nome}`,
         valor: alertaEstouro.valorEstourado,
         tipo: 'saida',
         poteId: alertaEstouro.poteCompensadorId,
@@ -315,7 +384,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
   const confirmarEntradaInicial = () => {
     if (valorEntradaInicial && Number(valorEntradaInicial) > 0) {
-      processarEntrada(Number(valorEntradaInicial), 'Renda Inicial Registrada');
+      processarEntradaComAnimacao(Number(valorEntradaInicial), 'Renda Inicial Registrada');
     }
     setModalEntradaInicial(false);
     navegarPara('dashboard');
@@ -330,20 +399,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
       tipo: 'manual'
     }]);
     setNomeNovoPatrimonio(''); setValorNovoPatrimonio(''); setModalNovoPatrimonio(false);
-  };
-
-  const salvarAporteMeta = () => {
-    if (!metaAporteId || !valorAporteMeta || valorAporteMeta <= 0) return;
-    setMetas(metas.map(m => m.id === metaAporteId ? { ...m, valorAtual: m.valorAtual + Number(valorAporteMeta) } : m));
-    setTransacoes(prev => [{
-      id: Date.now().toString(),
-      descricao: `Aporte Meta: ${metas.find(m => m.id === metaAporteId)?.nome}`,
-      valor: Number(valorAporteMeta),
-      tipo: 'saida',
-      poteId: 'reserva',
-      data: new Date().toLocaleDateString('pt-BR')
-    }, ...prev]);
-    setMetaAporteId(null); setValorAporteMeta('');
   };
 
   const adicionarMeta = () => {
@@ -370,15 +425,18 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
     return { ...pote, inicio, fim: acumulado };
   });
 
-  // CLASSES DINÂMICAS DE CONTRASTE CORRIGIDAS
+  // Estilos
   const isDark = tema === 'escuro';
   const bgClasse = isDark ? 'bg-[#0B0F17] text-slate-100' : 'bg-[#F4F7F6] text-slate-900';
   const cardClasse = isDark 
     ? 'bg-[#121824] border-slate-800/80 shadow-2xl text-slate-100' 
     : 'bg-white border-slate-200/80 shadow-md text-slate-900';
 
-  const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
-  const inputBg = isDark ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900';
+  const textMuted = isDark ? 'text-slate-400' : 'text-slate-600';
+  const inputBg = isDark ? 'bg-slate-900 text-slate-100 border-slate-800' : 'bg-slate-100 text-slate-900 border-slate-300';
+
+  const pctPatrimonioTotal = pctNossoPatrimonio + pctPatrimonioManuela;
+  const pctDividasTotal = poteDividasObj ? poteDividasObj.percentual : 0;
 
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-300 pb-28 select-none`}>
@@ -403,16 +461,16 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </div>
       </header>
 
-      {/* TELA INICIAL (1): MONTAR PLANO FINANCEIRO */}
+      {/* TELA 1: MONTAR PLANO */}
       {telaAtiva === 'onboarding' && (
-        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+        <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-center md:text-left">Montando seu plano financeiro</h1>
 
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3`}>
             <div className="flex justify-between items-center">
               <div>
                 <span className={`text-xs font-bold uppercase tracking-wider block ${textMuted}`}>Meta de Renda Mensal</span>
-                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Projeção para alocação</span>
+                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Base para o cálculo automático das porcentagens</span>
               </div>
               <div className="flex items-center text-lg md:text-xl font-black">
                 <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
@@ -420,14 +478,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                   type="number"
                   value={rendaMensal}
                   onChange={(e) => setRendaMensal(Number(e.target.value))}
-                  className="w-24 md:w-28 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black"
+                  className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center space-y-4 md:space-y-6 p-4 md:p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/10">
-            <div className="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center drop-shadow-xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-4 md:p-8 rounded-3xl bg-emerald-500/5 border border-emerald-500/10">
+            <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center drop-shadow-xl shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke={isDark ? "#1E293B" : "#E2E8F0"} strokeWidth="11" />
                 {fatiasSVG.map(pote => {
@@ -455,30 +513,32 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full">
-              {potesAtivos.map(pote => (
-                <div 
-                  key={pote.id} 
-                  onClick={() => {
-                    setPotePendente(pote);
-                    setPercentualPendente(pote.percentual);
-                    setContasFixasTemp(pote.contasFixas || []);
-                  }}
-                  className={`${cardClasse} p-3 rounded-2xl flex flex-col items-center text-center cursor-pointer relative group transition-all active:scale-95`}
-                >
-                  <button onClick={(e) => { e.stopPropagation(); removerPote(pote.id); }} className="absolute top-1.5 right-1.5 text-slate-400 hover:text-rose-500">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-2xl md:text-3xl mb-1">{pote.iconeEmoji}</span>
-                  <span className="text-[11px] md:text-xs font-bold truncate w-full">{pote.nome}</span>
-                  <span className="text-xs font-black text-emerald-500">{pote.percentual}%</span>
-                </div>
-              ))}
-            </div>
+            <div className="w-full space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5 w-full">
+                {potesAtivos.map(pote => (
+                  <div 
+                    key={pote.id} 
+                    onClick={() => {
+                      setPotePendente(pote);
+                      setPercentualPendente(pote.percentual);
+                      setContasFixasTemp(pote.contasFixas || []);
+                    }}
+                    className={`${cardClasse} p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative group transition-all active:scale-95 hover:border-emerald-500/50`}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); removerPote(pote.id); }} className="absolute top-1.5 right-1.5 text-slate-400 hover:text-rose-500">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-2xl md:text-3xl mb-1">{pote.iconeEmoji}</span>
+                    <span className="text-[11px] md:text-xs font-bold truncate w-full">{pote.nome}</span>
+                    <span className="text-xs font-black text-emerald-500">{pote.percentual}%</span>
+                  </div>
+                ))}
+              </div>
 
-            <button onClick={() => navegarPara('confirmacao')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 md:py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
-              Concluir Plano Financeiro
-            </button>
+              <button onClick={() => navegarPara('confirmacao')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
+                Concluir Plano Financeiro
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
@@ -503,17 +563,17 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </main>
       )}
 
-      {/* MODAL DE % DO POTE */}
+      {/* MODAL CONFIGURAR POTE */}
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
         const totalContasFixas = contasFixasTemp.reduce((a, b) => a + b.valor, 0);
         const valorMapeadoPote = (rendaMensal * percentualPendente) / 100;
-        const pctContasFixas = valorMapeadoPote > 0 ? Math.min(100, (totalContasFixas / valorMapeadoPote) * 100) : 0;
+        const eDividas = potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida');
 
         return (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-md w-full text-center space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto`}>
+            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-lg w-full text-center space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto`}>
               <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400">
                 <X className="w-5 h-5" />
               </button>
@@ -524,7 +584,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
               <div>
                 <h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3>
-                <p className={`text-xs mt-0.5 ${textMuted}`}>Defina a porcentagem e especifique os compromissos</p>
+                <p className={`text-xs mt-0.5 ${textMuted}`}>
+                  {eDividas ? 'A porcentagem é calculada automaticamente pelas dívidas cadastradas' : 'Defina a porcentagem de alocação'}
+                </p>
               </div>
 
               <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
@@ -536,28 +598,41 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                 </div>
               </div>
 
-              <input
-                type="range"
-                min="1"
-                max={maxPermitido}
-                value={percentualPendente}
-                onChange={(e) => setPercentualPendente(Number(e.target.value))}
-                className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
+              {!eDividas && (
+                <input
+                  type="range"
+                  min="1"
+                  max={maxPermitido}
+                  value={percentualPendente}
+                  onChange={(e) => setPercentualPendente(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+              )}
 
-              {(potePendente.id === 'dividas' || potePendente.nome.toLowerCase().includes('dívida')) && (
+              {eDividas && (
                 <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-3 text-left">
                   <div className="flex justify-between items-center text-xs font-bold">
-                    <span className="flex items-center gap-1.5"><Receipt className="w-4 h-4 text-rose-500" /> Dívidas & Contas Fixas</span>
-                    <span className="text-rose-500 font-mono">{pctContasFixas.toFixed(0)}% do pote ({formatarGrana(totalContasFixas)})</span>
+                    <span className="flex items-center gap-1.5"><Receipt className="w-4 h-4 text-rose-500" /> Dívidas & Compromissos</span>
+                    <span className="text-rose-500 font-mono">Soma: {formatarGrana(totalContasFixas)}</span>
                   </div>
 
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                     {contasFixasTemp.map(c => (
-                      <div key={c.id} className={`flex justify-between items-center ${inputBg} p-2 rounded-xl text-xs`}>
-                        <span className="font-bold">{c.nome}</span>
+                      <div key={c.id} className={`flex justify-between items-center ${inputBg} p-2.5 rounded-xl text-xs border`}>
+                        <div className="space-y-0.5">
+                          <span className="font-bold block">{c.nome}</span>
+                          <span className={`text-[10px] flex items-center gap-1 ${textMuted}`}>
+                            {c.tipo === 'a_vista' ? (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-extrabold">À vista</span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-extrabold flex items-center gap-1">
+                                <Layers className="w-3 h-3" /> Parcela {c.parcelaAtual}/{c.totalParcelas}
+                              </span>
+                            )}
+                          </span>
+                        </div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-mono text-rose-500">{formatarGrana(c.valor)}</span>
+                          <span className="font-mono text-rose-500 font-bold">{formatarGrana(c.valor)}</span>
                           <button onClick={() => removerContaFixaTemp(c.id)} className="text-slate-400 hover:text-rose-500">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -566,24 +641,58 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                     ))}
                   </div>
 
-                  <div className="flex gap-2 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Nome da Conta/Dívida"
-                      value={novaContaNome}
-                      onChange={(e) => setNovaContaNome(e.target.value)}
-                      className={`${inputBg} p-2 rounded-xl text-xs flex-1 font-bold focus:outline-none`}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Valor R$"
-                      value={novaContaValor}
-                      onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))}
-                      className={`${inputBg} p-2 rounded-xl text-xs w-20 font-bold focus:outline-none font-mono`}
-                    />
-                    <button onClick={adicionarContaFixaTemp} className="bg-emerald-500 text-white px-3 py-2 rounded-xl font-bold text-xs">
-                      +
-                    </button>
+                  <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nome da Dívida/Conta"
+                        value={novaContaNome}
+                        onChange={(e) => setNovaContaNome(e.target.value)}
+                        className={`${inputBg} p-2.5 rounded-xl text-xs font-bold focus:outline-none border`}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Valor mensal R$"
+                        value={novaContaValor}
+                        onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))}
+                        className={`${inputBg} p-2.5 rounded-xl text-xs font-bold focus:outline-none font-mono border`}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={novaContaTipo}
+                        onChange={(e) => setNovaContaTipo(e.target.value as any)}
+                        className={`${inputBg} p-2 rounded-xl text-xs font-bold focus:outline-none border flex-1`}
+                      >
+                        <option value="a_vista">À Vista (Mês atual)</option>
+                        <option value="parcelado">Parcelado</option>
+                      </select>
+
+                      {novaContaTipo === 'parcelado' && (
+                        <div className="flex items-center gap-1 w-36">
+                          <input
+                            type="number"
+                            placeholder="Atual"
+                            value={novaContaParcelaAtual}
+                            onChange={(e) => setNovaContaParcelaAtual(e.target.value === '' ? '' : Number(e.target.value))}
+                            className={`${inputBg} p-2 rounded-xl text-xs w-16 font-mono text-center border`}
+                          />
+                          <span className="text-xs font-bold">/</span>
+                          <input
+                            type="number"
+                            placeholder="Total"
+                            value={novaContaTotalParcelas}
+                            onChange={(e) => setNovaContaTotalParcelas(e.target.value === '' ? '' : Number(e.target.value))}
+                            className={`${inputBg} p-2 rounded-xl text-xs w-16 font-mono text-center border`}
+                          />
+                        </div>
+                      )}
+
+                      <button onClick={adicionarContaFixaTemp} className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs shrink-0">
+                        + Add
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -599,9 +708,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         );
       })()}
 
-      {/* TELA 2: CONFIRMAÇÃO DO PLANO */}
+      {/* TELA 2: CONFIRMAÇÃO */}
       {telaAtiva === 'confirmacao' && (
-        <main className="max-w-sm mx-auto p-4 text-center space-y-5 my-auto">
+        <main className="max-w-md mx-auto p-4 text-center space-y-5 my-auto">
           <h2 className="text-xl md:text-2xl font-black">Seu plano está pronto!</h2>
           <div className="relative w-48 h-48 md:w-52 md:h-52 mx-auto flex items-center justify-center drop-shadow-xl">
             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
@@ -624,7 +733,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
             <button 
               onClick={() => navegarPara('dashboard')}
-              className={`w-full ${inputBg} font-bold py-3 rounded-2xl transition-all text-sm`}
+              className={`w-full ${inputBg} font-bold py-3 rounded-2xl transition-all text-sm border`}
             >
               Ainda não tenho entrada
             </button>
@@ -648,7 +757,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               placeholder="Valor R$"
               value={valorEntradaInicial}
               onChange={(e) => setValorEntradaInicial(e.target.value === '' ? '' : Number(e.target.value))}
-              className={`w-full ${inputBg} p-3 rounded-2xl text-center font-black text-lg focus:outline-none font-mono`}
+              className={`w-full ${inputBg} p-3 rounded-2xl text-center font-black text-lg focus:outline-none font-mono border`}
             />
 
             <button
@@ -661,66 +770,129 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </div>
       )}
 
-      {/* TELA 3: DASHBOARD PRINCIPAL */}
+      {/* ANIMAÇÃO VISUAL AO REGISTRAR ENTRADA */}
+      {animacaoEntrada && animacaoEntrada.ativo && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/40 animate-fade-in max-h-[90vh] overflow-y-auto`}>
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center animate-bounce">
+              <Sparkles className="w-8 h-8" />
+            </div>
+
+            <div>
+              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Distribuída!</span>
+              <h3 className="text-2xl font-black font-mono mt-1">{formatarGrana(animacaoEntrada.valorTotal)}</h3>
+            </div>
+
+            <div className="space-y-2 text-left">
+              {animacaoEntrada.detalhes.map((item, idx) => (
+                <div key={idx} className={`${inputBg} p-3 rounded-2xl border space-y-1`}>
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span>{item.icone} {item.nome} ({item.percentual}%)</span>
+                    <span className="font-mono text-emerald-500">{formatarGrana(item.valor)}</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
+                      style={{ width: `${item.percentual}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {animacaoEntrada.sobraLivre > 0 && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-2xl text-xs font-bold text-emerald-500 font-mono">
+                ✨ Sobra livre não alocada: {formatarGrana(animacaoEntrada.sobraLivre)}
+              </div>
+            )}
+
+            <button 
+              onClick={() => setAnimacaoEntrada(null)}
+              className="w-full bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 text-sm"
+            >
+              Ver Meu Painel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TELA 3: DASHBOARD PRINCIPAL (IGUAL À FOTO) */}
       {telaAtiva === 'dashboard' && (
-        <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+        <main className="max-w-5xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+          
+          {/* CARDS TOPO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`${cardClasse} rounded-3xl p-4 md:p-6 flex flex-col justify-between space-y-2`}>
+            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
-                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>Saldo Bruto em Caixa</span>
-                <div className="text-2xl md:text-3xl font-black text-emerald-500 mt-0.5">
+                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO EM CAIXA</span>
+                <div className="text-3xl md:text-4xl font-black text-emerald-500 mt-1 font-mono">
                   {formatarGrana(saldoCaixaBruto)}
                 </div>
               </div>
               <span className={`text-[11px] font-semibold ${textMuted}`}>Total de entradas diluídas menos gastos efetuados</span>
             </div>
 
-            <div className={`${cardClasse} rounded-3xl p-4 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
+            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
               <div>
                 <span className={`text-[11px] uppercase font-bold tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-                  <CreditCard className="w-4 h-4 text-rose-500" /> Saldo Líquido Livre em Conta
+                  <CreditCard className="w-4 h-4 text-rose-500" /> SALDO LÍQUIDO LIVRE EM CONTA
                 </span>
-                <div className={`text-2xl md:text-3xl font-black mt-0.5 font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <div className={`text-3xl md:text-4xl font-black mt-1 font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {formatarGrana(saldoLiquidoDisponivel)}
                 </div>
               </div>
-              <span className="text-[11px] text-rose-500 font-bold">
-                Descontado {formatarGrana(totalContasFixasEDividas)} em dívidas & contas fixas
+              <span className="text-[11px] font-bold text-slate-400">
+                <span className="text-rose-500">Descontado {formatarGrana(totalContasFixasEDividas)}</span> em dívidas & contas fixas
               </span>
             </div>
           </div>
 
+          {/* BARRA DE AÇÃO */}
           <div className="flex justify-between items-center pt-2">
-            <h3 className="text-base font-extrabold">Como você pode gastar:</h3>
-            <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 text-xs">
+            <h3 className="text-lg font-black">Como você pode gastar:</h3>
+            <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 text-xs md:text-sm">
               <Plus className="w-4 h-4" /> + Entrada / Gasto
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
+          {/* GRID DOS POTES */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
               const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
               const saldoRealPote = valorDiluidoNoPote - gastosPote;
 
               return (
-                <div key={pote.id} className={`${cardClasse} rounded-3xl p-4 md:p-6 flex flex-col items-center text-center space-y-3`}>
-                  <div className="flex items-center space-x-2 font-bold text-xs md:text-sm">
-                    <span className="text-xl md:text-2xl">{pote.iconeEmoji}</span>
+                <div key={pote.id} className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col items-center text-center space-y-4 relative overflow-hidden`}>
+                  {pote.retencaoAutomatica && (
+                    <span className="absolute top-3 right-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                      Retenção
+                    </span>
+                  )}
+
+                  <div className="flex items-center space-x-2 font-black text-sm md:text-base">
+                    <span className="text-2xl">{pote.iconeEmoji}</span>
                     <span>{pote.nome}</span>
                   </div>
 
-                  <div className="relative w-28 h-28 md:w-32 md:h-32 flex items-center justify-center drop-shadow-md">
-                    <div className={`w-24 h-24 md:w-28 md:h-28 rounded-full border-8 flex flex-col items-center justify-center ${saldoRealPote < 0 ? 'border-rose-500' : ''}`} style={{ borderColor: saldoRealPote < 0 ? '#EF4444' : pote.cor }}>
-                      <span className={`text-xs md:text-sm font-black ${saldoRealPote < 0 ? 'text-rose-500' : ''}`}>
+                  <div className="relative w-32 h-32 md:w-36 md:h-36 flex items-center justify-center drop-shadow-md">
+                    <div className={`w-28 h-28 md:w-32 md:h-32 rounded-full border-[10px] flex flex-col items-center justify-center ${saldoRealPote < 0 ? 'border-rose-500' : ''}`} style={{ borderColor: saldoRealPote < 0 ? '#EF4444' : pote.cor }}>
+                      <span className={`text-sm md:text-base font-black font-mono ${saldoRealPote < 0 ? 'text-rose-500' : ''}`}>
                         {formatarGrana(saldoRealPote)}
                       </span>
                     </div>
                   </div>
 
-                  <span className={`text-[11px] md:text-xs font-bold ${textMuted}`}>
-                    Alocado ({pote.percentual}%): {formatarGrana(valorDiluidoNoPote)}
-                  </span>
+                  <div className="space-y-0.5">
+                    <span className={`text-xs font-bold block ${textMuted}`}>
+                      Alocado ({pote.percentual}%): {formatarGrana(valorDiluidoNoPote)}
+                    </span>
+                    {!pote.retencaoAutomatica && (
+                      <span className="text-[10px] text-emerald-500 font-extrabold block">
+                        Teto livre para gastar: {formatarGrana(saldoRealPote)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -728,12 +900,52 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </main>
       )}
 
+      {/* DIAGNÓSTICO DE PERFIL */}
+      {telaAtiva === 'perfil' && (
+        <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+          <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
+            <BrainCircuit className="w-6 h-6 text-emerald-500" /> Diagnóstico de Perfil Financeiro
+          </h2>
+
+          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 space-y-4 border-l-4 border-l-emerald-500`}>
+            <div>
+              <span className={`text-xs font-bold uppercase ${textMuted}`}>Seu Perfil Atual</span>
+              <h3 className="text-xl font-black text-emerald-500 mt-0.5">
+                {pctPatrimonioTotal >= 30 ? '🛡️ Construtores de Império (Conservador/Acumulador)' : pctDividasTotal > 30 ? '⚠️ Alerta de Alavancagem (Alto Custo Fixo)' : '⚖️ Equilibrado'}
+              </h3>
+            </div>
+
+            <p className="text-xs md:text-sm font-semibold leading-relaxed">
+              {pctPatrimonioTotal >= 30 
+                ? 'Excelente! Vocês estão destinando mais de 30% de tudo o que entra para o patrimônio da família (Nosso Patrimônio + Manuela). Isso garante proteção acelerada.'
+                : pctDividasTotal > 30
+                ? 'Atenção ao custo fixo! As dívidas e compromissos estão consumindo mais de 30% da renda. O ideal é quitar dívidas parceladas para liberar caixa.'
+                : 'Seu plano está bem distribuído entre os potes de vida pessoal e investimentos. Continuem mantendo o teto de gastos rigoroso.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`${cardClasse} rounded-3xl p-4 md:p-5 space-y-2`}>
+              <span className={`text-xs font-bold uppercase ${textMuted}`}>Total em Patrimônio</span>
+              <div className="text-xl font-black text-emerald-500 font-mono">{pctPatrimonioTotal}% do Plano</div>
+              <p className={`text-[11px] ${textMuted}`}>Acumulando em Nosso Patrimônio e Manuela</p>
+            </div>
+
+            <div className={`${cardClasse} rounded-3xl p-4 md:p-5 space-y-2`}>
+              <span className={`text-xs font-bold uppercase ${textMuted}`}>Comprometido com Dívidas</span>
+              <div className="text-xl font-black text-rose-500 font-mono">{pctDividasTotal}% do Plano</div>
+              <p className={`text-[11px] ${textMuted}`}>Contas fixas e parcelamentos ativos</p>
+            </div>
+          </div>
+        </main>
+      )}
+
       {/* TELA DE PATRIMÔNIO */}
       {telaAtiva === 'patrimonio' && (
-        <main className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+        <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
-              <Vault className="w-6 h-6 text-emerald-500" /> Meu Patrimônio Acumulado
+              <Vault className="w-6 h-6 text-emerald-500" /> Patrimônio da Família
             </h2>
             <button onClick={() => setModalNovoPatrimonio(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold">
               + Adicionar
@@ -745,22 +957,35 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
             <div className="text-3xl md:text-4xl font-black text-emerald-500 font-mono">
               {formatarGrana(patrimonioTotalCalculado)}
             </div>
-            <p className={`text-[11px] ${textMuted}`}>Soma automática das entradas no Pote de Reserva + Investimentos e Aportes Manuais</p>
+            <p className={`text-[11px] ${textMuted}`}>Soma automática dos potes de Patrimônio + Investimentos Manuais</p>
           </div>
 
           <div className="space-y-3">
-            <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Composição do Patrimônio</h3>
+            <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Divisão do Patrimônio</h3>
 
             <div className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-emerald-500`}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl">🐷</span>
                 <div>
-                  <span className="font-bold block text-sm">Reserva Automática dos Potes</span>
-                  <span className={`text-[10px] ${textMuted}`}>{pctReserva}% de todas as entradas gerais</span>
+                  <span className="font-bold block text-sm">Nosso Patrimônio</span>
+                  <span className={`text-[10px] ${textMuted}`}>{pctNossoPatrimonio}% de todas as entradas</span>
                 </div>
               </div>
               <span className="font-mono font-black text-emerald-500 text-sm md:text-base">
-                {formatarGrana(saldoReservaAtual)}
+                {formatarGrana(saldoNossoPatrimonio)}
+              </span>
+            </div>
+
+            <div className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-cyan-500`}>
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">👶</span>
+                <div>
+                  <span className="font-bold block text-sm">Patrimônio Manuela</span>
+                  <span className={`text-[10px] ${textMuted}`}>{pctPatrimonioManuela}% de todas as entradas</span>
+                </div>
+              </div>
+              <span className="font-mono font-black text-cyan-500 text-sm md:text-base">
+                {formatarGrana(saldoPatrimonioManuela)}
               </span>
             </div>
 
@@ -785,7 +1010,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
         </main>
       )}
 
-      {/* MODAL ADICIONAR PATRIMÔNIO MANUAL */}
+      {/* MODAL ADICIONAR PATRIMÔNIO */}
       {modalNovoPatrimonio && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
@@ -800,14 +1025,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               placeholder="Nome (Ex: CDB, Imóvel, Poupança)"
               value={nomeNovoPatrimonio}
               onChange={(e) => setNomeNovoPatrimonio(e.target.value)}
-              className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`}
+              className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`}
             />
             <input
               type="number"
               placeholder="Valor Guardado R$"
               value={valorNovoPatrimonio}
               onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))}
-              className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono`}
+              className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`}
             />
 
             <button
@@ -835,15 +1060,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               </p>
             </div>
 
-            <div className={`${inputBg} p-3 rounded-2xl text-xs font-bold text-left space-y-1`}>
+            <div className={`${inputBg} p-3 rounded-2xl text-xs font-bold text-left space-y-1 border`}>
               <span className={`block font-mono ${textMuted}`}>Plano de Compensação:</span>
               <p className="text-emerald-500">
-                O valor excedente de {formatarGrana(alertaEstouro.valorEstourado)} será compensado no pote de Reserva para manter o equilíbrio.
+                O valor excedente de {formatarGrana(alertaEstouro.valorEstourado)} será compensado no pote de Nosso Patrimônio para manter o equilíbrio.
               </p>
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs`}>
+              <button onClick={() => setAlertaEstouro(null)} className={`flex-1 ${inputBg} font-bold py-3 rounded-2xl text-xs border`}>
                 Cancelar
               </button>
               <button onClick={confirmarCompensacaoEstouro} className="flex-1 bg-amber-500 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1">
@@ -890,10 +1115,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3`}>
             <h3 className={`text-xs font-extrabold uppercase ${textMuted}`}>Nova Meta</h3>
-            <input type="text" placeholder="Nome da Meta" value={novaMetaNome} onChange={(e) => setNovaMetaNome(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`} />
+            <input type="text" placeholder="Nome da Meta" value={novaMetaNome} onChange={(e) => setNovaMetaNome(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`} />
             <div className="grid grid-cols-2 gap-2">
-              <input type="number" placeholder="Valor R$" value={novaMetaValor} onChange={(e) => setNovaMetaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`} />
-              <input type="date" value={novaMetaDate} onChange={(e) => setNovaMetaDate(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none`} />
+              <input type="number" placeholder="Valor R$" value={novaMetaValor} onChange={(e) => setNovaMetaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`} />
+              <input type="date" value={novaMetaDate} onChange={(e) => setNovaMetaDate(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold focus:outline-none border`} />
             </div>
             <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-md text-xs md:text-sm">
               Adicionar Meta
@@ -934,22 +1159,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className={`${inputBg} p-2.5 rounded-2xl text-center`}>
+                    <div className={`${inputBg} p-2.5 rounded-2xl text-center border`}>
                       <span className={`block font-bold text-[10px] ${textMuted}`}>Guardar/Dia</span>
                       <span className="text-emerald-500 font-black">{formatarGrana(precisoPorDia)}</span>
                     </div>
-                    <div className={`${inputBg} p-2.5 rounded-2xl text-center`}>
+                    <div className={`${inputBg} p-2.5 rounded-2xl text-center border`}>
                       <span className={`block font-bold text-[10px] ${textMuted}`}>Guardar/Mês</span>
                       <span className="text-emerald-500 font-black">{formatarGrana(precisoPorMes)}</span>
                     </div>
                   </div>
-
-                  <button 
-                    onClick={() => setMetaAporteId(m.id)}
-                    className="w-full bg-emerald-500/10 text-emerald-500 font-bold py-2 rounded-2xl text-xs hover:bg-emerald-500/20 transition-colors"
-                  >
-                    + Guardar Valor nesta Meta
-                  </button>
                 </div>
               );
             })}
@@ -1015,7 +1233,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
 
             <h3 className="text-base md:text-lg font-black">Novo Lançamento</h3>
 
-            <div className={`flex ${inputBg} p-1 rounded-xl`}>
+            <div className={`flex ${inputBg} p-1 rounded-xl border`}>
               <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white' : textMuted}`}>
                 Gasto (Saída)
               </button>
@@ -1024,11 +1242,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               </button>
             </div>
 
-            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono`} />
-            <input type="text" placeholder="Descrição" value={descLancamento} onChange={(e) => setDescLancamento(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none`} />
+            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg focus:outline-none font-mono border`} />
+            <input type="text" placeholder="Descrição" value={descLancamento} onChange={(e) => setDescLancamento(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none border`} />
 
             {tipoLancamento === 'saida' && (
-              <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold`}>
+              <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
                 {potesAtivos.map(p => (
                   <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>
                 ))}
@@ -1059,8 +1277,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario }) => {
               <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
               </button>
+              <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                <BrainCircuit className="w-4 h-4 text-emerald-500" /> Diagnóstico de Perfil
+              </button>
               <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                <Vault className="w-4 h-4 text-emerald-500" /> Meu Patrimônio
+                <Vault className="w-4 h-4 text-emerald-500" /> Patrimônio da Família
               </button>
               <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                 <List className="w-4 h-4 text-emerald-500" /> Extrato Completo
