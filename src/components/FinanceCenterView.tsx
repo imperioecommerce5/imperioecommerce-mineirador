@@ -42,7 +42,6 @@ interface Pote {
   cor: string;
   iconeEmoji: string;
   retencaoAutomatica?: boolean;
-  contasFixas?: ContaFixa[];
 }
 
 interface Transacao {
@@ -96,6 +95,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     return salvo !== null ? Number(salvo) : '';
   });
 
+  const [contasFixasObrigatorias, setContasFixasObrigatorias] = useState<ContaFixa[]>(() => {
+    const salvo = localStorage.getItem('@meu_imperio_contas_fixas');
+    return salvo ? JSON.parse(salvo) : [];
+  });
+
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
@@ -110,7 +114,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     { id: 'transporte', nome: 'Transporte', percentual: 0, cor: '#3B82F6', iconeEmoji: '🚗' },
     { id: 'desfrute_ele', nome: 'Desfrute ele', percentual: 0, cor: '#8B5CF6', iconeEmoji: '🎮' },
     { id: 'desfrute_ela', nome: 'Desfrute ela', percentual: 0, cor: '#EC4899', iconeEmoji: '🛍️' },
-    { id: 'dividas_contas', nome: 'Dívidas & Contas Fixas', percentual: 0, cor: '#EF4444', iconeEmoji: '💳', retencaoAutomatica: true, contasFixas: [] },
     { id: 'dizimo', nome: 'Dízimo', percentual: 0, cor: '#84CC16', iconeEmoji: '✉️', retencaoAutomatica: true },
   ];
 
@@ -136,6 +139,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   useEffect(() => {
     localStorage.setItem('@meu_imperio_renda', rendaMensal.toString());
+    localStorage.setItem('@meu_imperio_contas_fixas', JSON.stringify(contasFixasObrigatorias));
     localStorage.setItem('@meu_imperio_potes', JSON.stringify(potesAtivos));
     localStorage.setItem('@meu_imperio_transacoes', JSON.stringify(transacoes));
     localStorage.setItem('@meu_imperio_patrimonio', JSON.stringify(itensPatrimonioManuais));
@@ -145,11 +149,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     } else {
       localStorage.removeItem('@meu_imperio_aporte_pendente');
     }
-  }, [rendaMensal, potesAtivos, transacoes, itensPatrimonioManuais, metas, aportePendenteValor]);
+  }, [rendaMensal, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, aportePendenteValor]);
 
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
-  const [contasFixasTemp, setContasFixasTemp] = useState<ContaFixa[]>([]);
+  
+  // Estados para adicionar nova conta fixa / dívida
   const [novaContaNome, setNovaContaNome] = useState('');
   const [novaContaValor, setNovaContaValor] = useState<number | ''>('');
   const [novaContaMeses, setNovaContaMeses] = useState<number | ''>('');
@@ -188,6 +193,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     if (window.confirm("Deseja realmente reiniciar o plano? Todos os dados e transações serão limpos.")) {
       localStorage.clear();
       setPotesAtivos([]);
+      setContasFixasObrigatorias([]);
       setTransacoes([]);
       setItensPatrimonioManuais([]);
       setMetas([]);
@@ -197,6 +203,10 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       setMenuAberto(false);
     }
   };
+
+  const totalContasFixasValor = contasFixasObrigatorias.reduce((acc, c) => acc + c.valor, 0);
+  const percentualComprometidoDividas = rendaMensal > 0 ? (totalContasFixasValor / rendaMensal) * 100 : 0;
+  const rendaRestanteAposDividas = Math.max(0, rendaMensal - totalContasFixasValor);
 
   const totalMapeado = potesAtivos.reduce((acc, p) => acc + p.percentual, 0);
   const disponivelGeral = Math.max(0, 100 - totalMapeado);
@@ -208,11 +218,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
-  const saldoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
+  const saldoNossoPatrimonio = (rendaRestanteAposDividas * pctNossoPatrimonio) / 100;
 
   const potePatrimonioManuela = potesAtivos.find(p => p.id === 'patrimonio_manuela');
   const pctPatrimonioManuela = potePatrimonioManuela ? potePatrimonioManuela.percentual : 0;
-  const saldoPatrimonioManuela = (totalEntradas * pctPatrimonioManuela) / 100;
+  const saldoPatrimonioManuela = (rendaRestanteAposDividas * pctPatrimonioManuela) / 100;
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalConsolidado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
@@ -221,13 +231,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     .filter(p => p.retencaoAutomatica)
     .reduce((acc, p) => acc + p.percentual, 0);
 
-  const valorRetidoAutomaticoTotal = (totalEntradas * percentualTotalRetencao) / 100;
-  const saldoLiquidoDisponivel = Math.max(0, saldoBrutoTotal - valorRetidoAutomaticoTotal);
+  const valorRetidoAutomaticoTotal = (rendaRestanteAposDividas * percentualTotalRetencao) / 100;
+  const saldoLiquidoDisponivel = Math.max(0, saldoBrutoTotal - valorRetidoAutomaticoTotal - totalContasFixasValor);
 
-  const adicionarContaFixaTemp = () => {
+  const adicionarContaFixaObrigatoria = () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
     const meses = Number(novaContaMeses);
-    setContasFixasTemp([...contasFixasTemp, {
+    setContasFixasObrigatorias([...contasFixasObrigatorias, {
       id: Date.now().toString(),
       nome: novaContaNome,
       valor: Number(novaContaValor),
@@ -239,19 +249,18 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     setNovaContaMeses('');
   };
 
-  const removerContaFixaTemp = (id: string) => {
-    setContasFixasTemp(contasFixasTemp.filter(c => c.id !== id));
+  const removerContaFixaObrigatoria = (id: string) => {
+    setContasFixasObrigatorias(contasFixasObrigatorias.filter(c => c.id !== id));
   };
 
   const solicitarAdicaoPote = (pote: Pote) => {
     if (!potesAtivos.some(p => p.id === pote.id)) {
       if (disponivelGeral <= 0) {
-        alert("100% do plano já foi mapeado! Reduza a porcentagem de outro pote primeiro.");
+        alert("100% do saldo restante já foi mapeado! Reduza a porcentagem de outro pote primeiro.");
         return;
       }
       setPotePendente(pote);
       setPercentualPendente(Math.min(10, disponivelGeral));
-      setContasFixasTemp(pote.contasFixas || []);
     }
   };
 
@@ -259,8 +268,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     if (potePendente) {
       const poteAtualizado = {
         ...potePendente,
-        percentual: percentualPendente,
-        contasFixas: contasFixasTemp
+        percentual: percentualPendente
       };
       const novoConjunto = [...potesAtivos.filter(p => p.id !== potePendente.id), poteAtualizado];
       const somaNova = novoConjunto.reduce((acc, p) => acc + p.percentual, 0);
@@ -270,7 +278,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       }
       setPotesAtivos(novoConjunto);
       setPotePendente(null);
-      setContasFixasTemp([]);
     }
   };
 
@@ -294,7 +301,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     const detalhes = potesAtivos.map(pote => ({
       nome: pote.nome,
       icone: pote.iconeEmoji,
-      valor: (valor * pote.percentual) / 100,
+      valor: (rendaRestanteAposDividas * pote.percentual) / 100,
       percentual: pote.percentual,
       cor: pote.cor
     }));
@@ -318,7 +325,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
       if (!poteAlvo) return;
 
-      const valorDiluidoNoPote = (totalEntradas * poteAlvo.percentual) / 100;
+      const valorDiluidoNoPote = (rendaRestanteAposDividas * poteAlvo.percentual) / 100;
       const gastosAtuaisPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
       const saldoDisponivelPote = valorDiluidoNoPote - gastosAtuaisPote;
 
@@ -463,7 +470,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
             <h1 className="text-xl md:text-2xl font-extrabold tracking-tight">
-              {potesAtivos.length > 0 ? 'Editar Plano Financeiro (100% Obrigatório)' : 'Montar seu Plano Financeiro'}
+              {potesAtivos.length > 0 ? 'Editar Plano Financeiro' : 'Montar seu Plano Financeiro'}
             </h1>
             <button onClick={reiniciarSistemaGeral} className="text-xs text-rose-400 hover:text-rose-500 font-bold underline cursor-pointer">
               Reiniciar Sistema Zera Tudo
@@ -474,7 +481,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <div className="flex justify-between items-center">
               <div>
                 <span className={`text-xs font-bold uppercase tracking-wider block ${textMuted}`}>Meta de Renda Mensal</span>
-                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Base para o cálculo automático</span>
+                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Ponto de partida dos cálculos</span>
               </div>
               <div className="flex items-center text-lg md:text-xl font-black">
                 <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
@@ -491,7 +498,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             <div className="flex justify-between items-center pt-3 border-t border-slate-800">
               <div>
                 <span className={`text-xs font-bold uppercase tracking-wider block ${textMuted}`}>Valor Inicial / Aporte em Caixa</span>
-                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Deixe 0 ou vazio se não quiser aportar agora</span>
+                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Deixe 0 se não houver aporte inicial</span>
               </div>
               <div className="flex items-center text-lg md:text-xl font-black">
                 <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
@@ -506,6 +513,72 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
           </div>
 
+          {/* PASSO 1: DÍVIDAS E CONTAS FIXAS OBRIGATÓRIAS EM R$ */}
+          <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-4 border-2 border-rose-500/20`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-black text-rose-400">Passo 1: Dívidas & Contas Fixas (Em R$)</h3>
+                <span className={`text-xs ${textMuted}`}>Insira os valores exatos para subtrair da renda primeiro.</span>
+              </div>
+              <span className="text-xs font-mono font-black text-rose-400">{formatarGrana(totalContasFixasValor)} ({percentualComprometidoDividas.toFixed(1)}% da renda)</span>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Nome da Dívida / Conta Fixa (Ex: Aluguel, Empréstimo)"
+                value={novaContaNome}
+                onChange={(e) => setNovaContaNome(e.target.value)}
+                className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border`}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  placeholder="Valor Mensal R$"
+                  value={novaContaValor}
+                  onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))}
+                  className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border font-mono`}
+                />
+                <input
+                  type="number"
+                  placeholder="Duração (Meses)"
+                  value={novaContaMeses}
+                  onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))}
+                  className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border font-mono`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={adicionarContaFixaObrigatoria}
+                className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Adicionar Dívida / Conta Fixa
+              </button>
+            </div>
+
+            {contasFixasObrigatorias.length > 0 && (
+              <div className="space-y-2 pt-2 max-h-48 overflow-y-auto">
+                {contasFixasObrigatorias.map(c => (
+                  <div key={c.id} className={`${inputBg} p-3 rounded-2xl flex justify-between items-center text-xs border`}>
+                    <div>
+                      <span className="font-black block">{c.nome}</span>
+                      <span className="text-[10px] text-slate-400">{formatarGrana(c.valor)}/mês • {c.mesesTotales} meses</span>
+                    </div>
+                    <button onClick={() => removerContaFixaObrigatoria(c.id)} className="text-rose-500 cursor-pointer">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex justify-between items-center text-xs font-bold">
+              <span>Renda Restante após Dívidas:</span>
+              <span className="font-mono font-black text-emerald-400 text-sm">{formatarGrana(rendaRestanteAposDividas)}</span>
+            </div>
+          </div>
+
+          {/* PASSO 2: DISTRIBUIÇÃO DO RESTANTE EM PORCENTAGEM */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-4 md:p-8 rounded-3xl bg-emerald-500/5 border border-emerald-500/10">
             <div className="relative w-48 h-48 md:w-64 md:h-64 flex items-center justify-center drop-shadow-xl shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
@@ -543,6 +616,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             </div>
 
             <div className="w-full space-y-4">
+              <h3 className="text-base font-black">Passo 2: Dividir o Restante ({formatarGrana(rendaRestanteAposDividas)})</h3>
+              
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5 w-full">
                 {potesAtivos.map(pote => (
                   <div 
@@ -550,7 +625,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                     onClick={() => {
                       setPotePendente(pote);
                       setPercentualPendente(pote.percentual);
-                      setContasFixasTemp(pote.contasFixas || []);
                     }}
                     className={`${cardClasse} p-3.5 rounded-2xl flex flex-col items-center text-center cursor-pointer relative group transition-all active:scale-95 hover:border-emerald-500/50`}
                   >
@@ -579,14 +653,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </button>
               ) : (
                 <div className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold py-3 px-4 rounded-2xl text-center">
-                  ⚠️ O plano precisa atingir exatamente 100% para salvar ({totalMapeado}% preenchido). Para aumentar em um pote, reduza outro.
+                  ⚠️ A soma dos potes do restante precisa atingir exatamente 100% ({totalMapeado}% preenchido).
                 </div>
               )}
             </div>
           </div>
 
           <div className="space-y-3 pt-2">
-            <p className={`text-xs font-bold text-center md:text-left ${textMuted}`}>Clique abaixo para adicionar ou configurar os potes:</p>
+            <p className={`text-xs font-bold text-center md:text-left ${textMuted}`}>Adicionar potes para dividir o restante:</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
               {todosPotesDisponiveis.map(pote => {
                 const selecionado = potesAtivos.some(p => p.id === pote.id);
@@ -610,16 +684,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </main>
       )}
 
-      {/* MODAL CONFIGURAR POTE / CONTAS FIXAS / DÍVIDAS / PORCENTAGEM */}
+      {/* MODAL CONFIGURAR POTE / PORCENTAGEM */}
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
-        const valorMapeadoPote = (rendaMensal * percentualPendente) / 100;
-        const eDividasOuContas = potePendente.id === 'dividas_contas' || potePendente.nome.toLowerCase().includes('dívida');
+        const valorMapeadoPote = (rendaRestanteAposDividas * percentualPendente) / 100;
 
         return (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-lg w-full text-center space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto`}>
+            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative`}>
               <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
@@ -630,7 +703,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
               <div>
                 <h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3>
-                <span className="text-xs text-slate-400">Ajuste a porcentagem (máximo disponível: {maxPermitido}%)</span>
+                <span className="text-xs text-slate-400">Porcentagem do saldo restante (Máx: {maxPermitido}%)</span>
               </div>
 
               <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
@@ -648,61 +721,6 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 onChange={(e) => setPercentualPendente(Number(e.target.value))}
                 className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
-
-              {eDividasOuContas && (
-                <div className="space-y-3 pt-2 text-left border-t border-slate-800">
-                  <span className="text-xs font-bold text-emerald-500 block">Adicionar Contas Fixas & Dívidas (Com Duração):</span>
-                  
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Nome (Ex: Luz, Água, Aluguel, Empréstimo)"
-                      value={novaContaNome}
-                      onChange={(e) => setNovaContaNome(e.target.value)}
-                      className={`w-full ${inputBg} p-2.5 rounded-xl text-xs font-bold border`}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        placeholder="Valor Mensal R$"
-                        value={novaContaValor}
-                        onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))}
-                        className={`w-full ${inputBg} p-2.5 rounded-xl text-xs font-bold border font-mono`}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Duração (Meses)"
-                        value={novaContaMeses}
-                        onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))}
-                        className={`w-full ${inputBg} p-2.5 rounded-xl text-xs font-bold border font-mono`}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={adicionarContaFixaTemp}
-                      className="w-full bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Adicionar na Lista
-                    </button>
-                  </div>
-
-                  {contasFixasTemp.length > 0 && (
-                    <div className="space-y-1.5 pt-2 max-h-36 overflow-y-auto">
-                      {contasFixasTemp.map(c => (
-                        <div key={c.id} className={`${inputBg} p-2.5 rounded-xl flex justify-between items-center text-xs border`}>
-                          <div>
-                            <span className="font-bold block">{c.nome}</span>
-                            <span className="text-[10px] text-slate-400">{formatarGrana(c.valor)}/mês • {c.mesesTotales} meses</span>
-                          </div>
-                          <button onClick={() => removerContaFixaTemp(c.id)} className="text-rose-500 cursor-pointer">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               <button
                 onClick={confirmarAdicionarPote}
@@ -771,12 +789,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
-                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO (CAIXA TOTAL)</span>
+                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO (CAIXA REAL)</span>
                 <div className="text-3xl md:text-4xl font-black text-emerald-500 mt-1 font-mono">
                   {formatarGrana(saldoBrutoTotal)}
                 </div>
               </div>
-              <span className={`text-[11px] font-semibold ${textMuted}`}>Total líquido em caixa (entradas menos saídas)</span>
+              <span className={`text-[11px] font-semibold ${textMuted}`}>Entradas menos saídas acumuladas</span>
             </div>
 
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
@@ -789,7 +807,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </div>
               </div>
               <span className="text-[11px] font-bold text-slate-400">
-                <span className="text-emerald-400">Protegido {formatarGrana(valorRetidoAutomaticoTotal)}</span> em potes de retenção
+                Comprometido com dívidas: <span className="text-rose-400">{formatarGrana(totalContasFixasValor)}</span>
               </span>
             </div>
           </div>
@@ -838,7 +856,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
           <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
             {potesAtivos.map(pote => {
-              const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
+              const valorDiluidoNoPote = (rendaRestanteAposDividas * pote.percentual) / 100;
               const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
               
               const saldoRealPote = pote.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
@@ -886,19 +904,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
                   <div className="space-y-0.5 w-full">
                     <span className={`text-xs font-bold block ${textMuted}`}>
-                      Alocado ({pote.percentual}%): {formatarGrana(valorDiluidoNoPote)}
+                      Alocado ({pote.percentual}% do restante): {formatarGrana(valorDiluidoNoPote)}
                     </span>
-                    {pote.contasFixas && pote.contasFixas.length > 0 && (
-                      <div className="pt-2 text-left space-y-1 border-t border-slate-800/60 mt-2">
-                        <span className="text-[10px] font-bold text-slate-400 block">Contas Fixas & Dívidas:</span>
-                        {pote.contasFixas.map(cf => (
-                          <div key={cf.id} className="flex justify-between text-[11px] font-semibold">
-                            <span className="truncate pr-2">{cf.nome}</span>
-                            <span className="font-mono text-rose-400">{formatarGrana(cf.valor)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -933,7 +940,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 <span className="text-2xl">🐷</span>
                 <div>
                   <span className="font-bold block text-sm">Nosso Patrimônio (Automático)</span>
-                  <span className={`text-[10px] ${textMuted}`}>{pctNossoPatrimonio}% de todas as entradas</span>
+                  <span className={`text-[10px] ${textMuted}`}>{pctNossoPatrimonio}% do saldo restante</span>
                 </div>
               </div>
               <span className="font-mono font-black text-emerald-500 text-sm md:text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
@@ -944,7 +951,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 <span className="text-2xl">👶</span>
                 <div>
                   <span className="font-bold block text-sm">Patrimônio Manuela (Automático)</span>
-                  <span className={`text-[10px] ${textMuted}`}>{pctPatrimonioManuela}% de todas as entradas</span>
+                  <span className={`text-[10px] ${textMuted}`}>{pctPatrimonioManuela}% do saldo restante</span>
                 </div>
               </div>
               <span className="font-mono font-black text-cyan-500 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
@@ -1302,7 +1309,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                   <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
                 </button>
                 <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                  <Sliders className="w-4 h-4 text-emerald-500" /> Editar / Ajustar Porcentagens
+                  <Sliders className="w-4 h-4 text-emerald-500" /> Editar / Ajustar Plano
                 </button>
                 <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras
