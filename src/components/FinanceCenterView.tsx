@@ -23,7 +23,8 @@ import {
   BrainCircuit,
   LayoutGrid,
   Columns2,
-  LogOut
+  LogOut,
+  Target
 } from 'lucide-react';
 
 interface ContaFixa {
@@ -55,6 +56,13 @@ interface Transacao {
   data: string;
 }
 
+interface Meta {
+  id: string;
+  nome: string;
+  valorAlvo: number;
+  meses: number;
+}
+
 interface ItemPatrimonio {
   id: string;
   nome: string;
@@ -68,7 +76,8 @@ interface Props {
 }
 
 export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'ajustes' | 'extrato' | 'patrimonio' | 'perfil'>('onboarding');
+  const [potesAtivosSalvos] = useState(() => localStorage.getItem('@meu_imperio_potes'));
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'perfil'>(potesAtivosSalvos ? 'dashboard' : 'onboarding');
 
   const [rendaMensal, setRendaMensal] = useState<number>(() => {
     const salvo = localStorage.getItem('@meu_imperio_renda');
@@ -105,12 +114,18 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
     return salvo ? JSON.parse(salvo) : [];
   });
 
+  const [metas, setMetas] = useState<Meta[]>(() => {
+    const salvo = localStorage.getItem('@meu_imperio_metas');
+    return salvo ? JSON.parse(salvo) : [];
+  });
+
   useEffect(() => {
     localStorage.setItem('@meu_imperio_renda', rendaMensal.toString());
     localStorage.setItem('@meu_imperio_potes', JSON.stringify(potesAtivos));
     localStorage.setItem('@meu_imperio_transacoes', JSON.stringify(transacoes));
     localStorage.setItem('@meu_imperio_patrimonio', JSON.stringify(itensPatrimonioManuais));
-  }, [rendaMensal, potesAtivos, transacoes, itensPatrimonioManuais]);
+    localStorage.setItem('@meu_imperio_metas', JSON.stringify(metas));
+  }, [rendaMensal, potesAtivos, transacoes, itensPatrimonioManuais, metas]);
 
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
@@ -130,6 +145,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const [modalNovoPatrimonio, setModalNovoPatrimonio] = useState<boolean>(false);
   const [nomeNovoPatrimonio, setNomeNovoPatrimonio] = useState('');
   const [valorNovoPatrimonio, setValorNovoPatrimonio] = useState<number | ''>('');
+
+  const [modalNovaMeta, setModalNovaMeta] = useState<boolean>(false);
+  const [nomeNovaMeta, setNomeNovaMeta] = useState('');
+  const [valorNovaMeta, setValorNovaMeta] = useState<number | ''>('');
+  const [mesesNovaMeta, setMesesNovaMeta] = useState<number | ''>('');
 
   const [animacaoEntrada, setAnimacaoEntrada] = useState<{
     ativo: boolean;
@@ -165,6 +185,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const saldoPatrimonioManuela = (totalEntradas * pctPatrimonioManuela) / 100;
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
+  
+  // PATRIMÔNIO TOTAL = Apenas Potes Automáticos de Patrimônio + Itens Manuais REAIS (sem fantasmas)
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
   const saldoBrutoTotal = caixaBrutoAtual + patrimonioTotalCalculado;
@@ -214,7 +236,13 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         percentual: percentualPendente,
         contasFixas: contasFixasTemp
       };
-      setPotesAtivos([...potesAtivos.filter(p => p.id !== potePendente.id), poteAtualizado]);
+      const novoConjunto = [...potesAtivos.filter(p => p.id !== potePendente.id), poteAtualizado];
+      const somaNova = novoConjunto.reduce((acc, p) => acc + p.percentual, 0);
+      if (somaNova > 100) {
+        alert("A soma dos potes não pode ultrapassar 100%!");
+        return;
+      }
+      setPotesAtivos(novoConjunto);
       setPotePendente(null);
       setContasFixasTemp([]);
     }
@@ -316,7 +344,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         descricao: `Compensação de estouro em ${poteAlvo.nome}`,
         valor: alertaEstouro.valorEstourado,
         tipo: 'saida',
-        poteId:alertaEstouro.poteCompensadorId,
+        poteId: alertaEstouro.poteCompensadorId,
         poteNome: 'Nosso Patrimônio (Compensação)',
         data: new Date().toLocaleDateString('pt-BR')
       };
@@ -338,6 +366,17 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
       tipo: 'manual'
     }]);
     setNomeNovoPatrimonio(''); setValorNovoPatrimonio(''); setModalNovoPatrimonio(false);
+  };
+
+  const adicionarMeta = () => {
+    if (!nomeNovaMeta || !valorNovaMeta || Number(valorNovaMeta) <= 0 || !mesesNovaMeta || Number(mesesNovaMeta) <= 0) return;
+    setMetas([...metas, {
+      id: Date.now().toString(),
+      nome: nomeNovaMeta,
+      valorAlvo: Number(valorNovaMeta),
+      meses: Number(mesesNovaMeta)
+    }]);
+    setNomeNovaMeta(''); setValorNovaMeta(''); setMesesNovaMeta(''); setModalNovaMeta(false);
   };
 
   const formatarGrana = (valor: number) => {
@@ -383,10 +422,12 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </div>
       </header>
 
-      {/* TELA 1: ONBOARDING */}
+      {/* TELA DE ONBOARDING / CONFIGURAÇÃO DE PLANO */}
       {telaAtiva === 'onboarding' && (
         <main className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
-          <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-center md:text-left">Montando seu plano financeiro</h1>
+          <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-center md:text-left">
+            {potesAtivos.length > 0 ? 'Editar Plano Financeiro (100% Obrigatório)' : 'Montar seu Plano Financeiro'}
+          </h1>
 
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-3`}>
             <div className="flex justify-between items-center">
@@ -467,11 +508,11 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
               {totalMapeado === 100 ? (
                 <button onClick={() => navegarPara('dashboard')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm md:text-base">
-                  Concluir Plano e Ir para o Painel
+                  Salvar Plano e Ir para o Painel
                 </button>
               ) : (
                 <div className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold py-3 px-4 rounded-2xl text-center">
-                  ⚠️ O plano precisa atingir exatamente 100% para prosseguir ({totalMapeado}% preenchido).
+                  ⚠️ O plano precisa atingir exatamente 100% para salvar ({totalMapeado}% preenchido). Para aumentar em um pote, reduza outro.
                 </div>
               )}
             </div>
@@ -479,7 +520,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
           {/* LISTA DE POTES DISPONÍVEIS PARA ADICIONAR */}
           <div className="space-y-3 pt-2">
-            <p className={`text-xs font-bold text-center md:text-left ${textMuted}`}>Clique abaixo para adicionar e configurar os potes:</p>
+            <p className={`text-xs font-bold text-center md:text-left ${textMuted}`}>Clique abaixo para adicionar ou configurar os potes:</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
               {todosPotesDisponiveis.map(pote => {
                 const selecionado = potesAtivos.some(p => p.id === pote.id);
@@ -503,7 +544,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </main>
       )}
 
-      {/* MODAL CONFIGURAR POTE / CONTAS FIXAS / DÍVIDAS */}
+      {/* MODAL CONFIGURAR POTE / CONTAS FIXAS / DÍVIDAS / PORCENTAGEM */}
       {potePendente && (() => {
         const outrosPotesSoma = potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0);
         const maxPermitido = 100 - outrosPotesSoma;
@@ -523,6 +564,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
               <div>
                 <h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3>
+                <span className="text-xs text-slate-400">Ajuste a porcentagem (máximo disponível: {maxPermitido}%)</span>
               </div>
 
               <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
@@ -532,16 +574,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 </div>
               </div>
 
-              {!eDividasOuContas && (
-                <input
-                  type="range"
-                  min="1"
-                  max={maxPermitido}
-                  value={percentualPendente}
-                  onChange={(e) => setPercentualPendente(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
-              )}
+              <input
+                type="range"
+                min="0"
+                max={maxPermitido}
+                value={percentualPendente}
+                onChange={(e) => setPercentualPendente(Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              />
 
               {eDividasOuContas && (
                 <div className="space-y-3 pt-2 text-left border-t border-slate-800">
@@ -602,7 +642,7 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
                 onClick={confirmarAdicionarPote}
                 className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm"
               >
-                <Check className="w-4 h-4" /> Confirmar e Salvar
+                <Check className="w-4 h-4" /> Confirmar Porcentagem
               </button>
             </div>
           </div>
@@ -826,6 +866,77 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               </div>
               <span className="font-mono font-black text-cyan-500 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
             </div>
+
+            {itensPatrimonioManuais.map(item => (
+              <div key={item.id} className={`${cardClasse} rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-amber-500`}>
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">💎</span>
+                  <div>
+                    <span className="font-bold block text-sm">{item.nome} (Manual)</span>
+                    <span className={`text-[10px] ${textMuted}`}>Item cadastrado</span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="font-mono font-black text-amber-500 text-sm md:text-base">{formatarGrana(item.valor)}</span>
+                  <button onClick={() => setItensPatrimonioManuais(itensPatrimonioManuais.filter(x => x.id !== item.id))} className="text-slate-400 hover:text-rose-500">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {/* TELA DE METAS */}
+      {telaAtiva === 'metas' && (
+        <main className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
+              <Target className="w-6 h-6 text-emerald-500" /> Metas Financeiras
+            </h2>
+            <button onClick={() => setModalNovaMeta(true)} className="bg-emerald-500 text-white px-3.5 py-2 rounded-2xl text-xs font-bold">
+              + Nova Meta
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {metas.length === 0 ? (
+              <p className={`text-center text-xs py-10 ${textMuted}`}>Nenhuma meta cadastrada ainda. Clique em "+ Nova Meta" para começar.</p>
+            ) : (
+              metas.map(meta => {
+                const valorMensalNecessario = meta.valorAlvo / meta.meses;
+                return (
+                  <div key={meta.id} className={`${cardClasse} rounded-3xl p-5 space-y-3 border border-emerald-500/20`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-2xl">🎯</span>
+                        <span className="font-black text-base">{meta.nome}</span>
+                      </div>
+                      <button onClick={() => setMetas(metas.filter(m => m.id !== meta.id))} className="text-slate-400 hover:text-rose-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                      <div>
+                        <span className={`text-[10px] uppercase font-bold block ${textMuted}`}>Valor Alvo</span>
+                        <span className="font-mono font-black text-emerald-500 text-sm">{formatarGrana(meta.valorAlvo)}</span>
+                      </div>
+                      <div>
+                        <span className={`text-[10px] uppercase font-bold block ${textMuted}`}>Prazo</span>
+                        <span className="font-mono font-black text-sm">{meta.meses} meses</span>
+                      </div>
+                    </div>
+
+                    <div className={`${inputBg} p-3 rounded-2xl flex justify-between items-center border`}>
+                      <span className="text-xs font-bold">Necessário guardar por mês:</span>
+                      <span className="font-mono font-black text-emerald-400 text-sm">{formatarGrana(valorMensalNecessario)}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </main>
       )}
@@ -903,6 +1014,42 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         </div>
       )}
 
+      {/* MODAL NOVA META */}
+      {modalNovaMeta && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl`}>
+            <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-base md:text-lg font-black">Nova Meta Financeira</h3>
+            <input
+              type="text"
+              placeholder="Nome da Meta (Ex: Viagem, Carro Novo)"
+              value={nomeNovaMeta}
+              onChange={(e) => setNomeNovaMeta(e.target.value)}
+              className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold focus:outline-none border`}
+            />
+            <input
+              type="number"
+              placeholder="Valor Alvo R$"
+              value={valorNovaMeta}
+              onChange={(e) => setValorNovaMeta(e.target.value === '' ? '' : Number(e.target.value))}
+              className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
+            />
+            <input
+              type="number"
+              placeholder="Tempo de Conclusão (Meses)"
+              value={mesesNovaMeta}
+              onChange={(e) => setMesesNovaMeta(e.target.value === '' ? '' : Number(e.target.value))}
+              className={`w-full ${inputBg} p-3 rounded-2xl font-black text-base focus:outline-none font-mono border`}
+            />
+            <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg text-sm">
+              Salvar Meta
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MODAL ALERTA DE ESTOURO */}
       {alertaEstouro && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -939,8 +1086,8 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
         <button onClick={() => setModalLancamento(true)} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 -mt-5 active:scale-95 transition-transform">
           <Plus className="w-5 h-5" />
         </button>
-        <button onClick={() => navegarPara('patrimonio')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
-          <Vault className="w-5 h-5 text-emerald-500" /> Patrimônio
+        <button onClick={() => navegarPara('metas')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
+          <Target className="w-5 h-5 text-emerald-500" /> Metas
         </button>
         <button onClick={() => setMenuAberto(!menuAberto)} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100">
           <MoreHorizontal className="w-5 h-5 text-emerald-500" /> Mais
@@ -1024,14 +1171,14 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
               <h3 className="text-lg font-black text-emerald-500">MEU IMPÉRIO</h3>
 
               <div className="space-y-1.5 text-xs md:text-sm font-bold">
-                <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                  <Sliders className="w-4 h-4 text-emerald-500" /> Montar / Refazer Plano
-                </button>
                 <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard
                 </button>
-                <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
-                  <BrainCircuit className="w-4 h-4 text-emerald-500" /> Diagnóstico de Perfil
+                <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <Sliders className="w-4 h-4 text-emerald-500" /> Editar / Ajustar Porcentagens
+                </button>
+                <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
+                  <Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras
                 </button>
                 <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} flex items-center gap-2.5`}>
                   <Vault className="w-4 h-4 text-emerald-500" /> Patrimônio da Família
