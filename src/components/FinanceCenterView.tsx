@@ -23,8 +23,7 @@ import {
   BrainCircuit,
   LayoutGrid,
   Columns2,
-  LogOut,
-  FileText
+  LogOut
 } from 'lucide-react';
 
 interface ContaFixa {
@@ -56,14 +55,6 @@ interface Transacao {
   data: string;
 }
 
-interface Meta {
-  id: string;
-  nome: string;
-  valorAlvo: number;
-  valorAtual: number;
-  dataLimite: string;
-}
-
 interface ItemPatrimonio {
   id: string;
   nome: string;
@@ -77,7 +68,7 @@ interface Props {
 }
 
 export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) => {
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'metas' | 'patrimonio' | 'perfil'>('onboarding');
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'confirmacao' | 'dashboard' | 'ajustes' | 'extrato' | 'patrimonio' | 'perfil'>('onboarding');
 
   const [rendaMensal, setRendaMensal] = useState<number>(() => {
     const salvo = localStorage.getItem('@meu_imperio_renda');
@@ -167,13 +158,9 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  const saldoCaixaBruto = totalEntradas - totalSaidas;
+  const caixaBrutoAtual = totalEntradas - totalSaidas;
 
-  const poteDividasObj = potesAtivos.find(p => p.id === 'dividas_contas' || p.nome.toLowerCase().includes('dívida'));
-  const totalContasFixasEDividas = poteDividasObj?.contasFixas?.reduce((acc, c) => acc + c.valor, 0) || 0;
-
-  const saldoLiquidoDisponivel = Math.max(0, saldoCaixaBruto - totalContasFixasEDividas);
-
+  // Cálculo de Patrimônios Integrados (Automáticos)
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
   const saldoNossoPatrimonio = (totalEntradas * pctNossoPatrimonio) / 100;
@@ -184,6 +171,20 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalCalculado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
+
+  // SALDO BRUTO = Caixa em Conta + Patrimônios Integrados e Manuais
+  const saldoBrutoTotal = caixaBrutoAtual + patrimonioTotalCalculado;
+
+  // Soma de todos os percentuais de retenção automática cadastrados no plano
+  const percentualTotalRetencao = potesAtivos
+    .filter(p => p.retencaoAutomatica)
+    .reduce((acc, p) => acc + p.percentual, 0);
+
+  // Valor total reservado/subtraído automaticamente para retenções com base nas entradas
+  const valorRetidoAutomaticoTotal = (totalEntradas * percentualTotalRetencao) / 100;
+
+  // SALDO LÍQUIDO LIVRE EM CONTA = Caixa Bruto menos as retenções automáticas e saídas de consumo
+  const saldoLiquidoDisponivel = Math.max(0, caixaBrutoAtual - valorRetidoAutomaticoTotal);
 
   const adicionarContaFixaTemp = () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
@@ -721,25 +722,25 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 flex flex-col justify-between space-y-2`}>
               <div>
-                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO EM CAIXA</span>
+                <span className={`text-[11px] uppercase font-bold tracking-wider ${textMuted}`}>SALDO BRUTO (CAIXA + PATRIMÔNIOS)</span>
                 <div className="text-3xl md:text-4xl font-black text-emerald-500 mt-1 font-mono">
-                  {formatarGrana(saldoCaixaBruto)}
+                  {formatarGrana(saldoBrutoTotal)}
                 </div>
               </div>
-              <span className={`text-[11px] font-semibold ${textMuted}`}>Total de entradas diluídas menos gastos efetuados</span>
+              <span className={`text-[11px] font-semibold ${textMuted}`}>Total em caixa somado com todos os patrimônios guardados</span>
             </div>
 
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 border-l-4 border-l-rose-500 flex flex-col justify-between space-y-2`}>
               <div>
                 <span className={`text-[11px] uppercase font-bold tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-                  <CreditCard className="w-4 h-4 text-rose-500" /> SALDO LÍQUIDO LIVRE EM CONTA
+                  <CreditCard className="w-4 h-4 text-rose-500" /> SALDO LÍQUIDO DISPONÍVEL PARA GASTOS
                 </span>
                 <div className={`text-3xl md:text-4xl font-black mt-1 font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {formatarGrana(saldoLiquidoDisponivel)}
                 </div>
               </div>
               <span className="text-[11px] font-bold text-slate-400">
-                <span className="text-rose-500">Descontado {formatarGrana(totalContasFixasEDividas)}</span> em contas fixas & dívidas
+                <span className="text-emerald-400">Protegido {formatarGrana(valorRetidoAutomaticoTotal)}</span> em potes de retenção
               </span>
             </div>
           </div>
@@ -792,9 +793,15 @@ export const FinanceCenterView: React.FC<Props> = ({ emailUsuario, onLogout }) =
             {potesAtivos.map(pote => {
               const valorDiluidoNoPote = (totalEntradas * pote.percentual) / 100;
               const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
+              
+              // Para potes de retenção automática, o saldo exibido no gráfico é exatamente o valor diluído acumulado
               const saldoRealPote = pote.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
 
-              const percentualProgresso = valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100;
+              // Círculo SVG preenchendo proporcionalmente
+              const percentualProgresso = pote.retencaoAutomatica 
+                ? pote.percentual // No pote de retenção, preenche a fatia correspondente ao seu percentual no plano geral
+                : (valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100);
+              
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
 
               return (
