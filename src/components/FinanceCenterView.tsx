@@ -240,8 +240,17 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0) + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  // Saldo Único Real da Conta
-  const saldoUnicoReal = totalEntradas - totalSaidas;
+  // Percentual total de retenções automáticas ativas
+  const percentualRetencaoTotal = potesAtivos
+    .filter(p => p.retencaoAutomatica)
+    .reduce((acc, p) => acc + p.percentual, 0);
+
+  // Valor total retido automaticamente com base em todas as entradas registradas
+  const valorTotalEntradasBrutas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
+  const valorRetidoAutomaticoAcumulado = (valorTotalEntradasBrutas * percentualRetencaoTotal) / 100;
+
+  // Saldo Real Disponível desconta as saídas manuais e as retenções automáticas de poupança/patrimônio/dízimo
+  const saldoUnicoReal = (totalEntradas - valorRetidoAutomaticoAcumulado) - totalSaidas;
 
   const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
@@ -862,7 +871,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <Sparkles className="w-8 h-8" />
             </div>
             <div>
-              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada no Sistema!</span>
+              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada e Retenções Descontadas!</span>
               <h3 className="text-2xl font-black font-mono mt-1">{formatarGrana(animacaoEntrada.valorTotal)}</h3>
             </div>
             <div className="space-y-2 text-left">
@@ -915,7 +924,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
             <span className={`text-xs font-semibold ${textMuted}`}>
-              Entradas menos despesas, contas fixas pagas, poupança e saídas realizadas
+              Entradas menos retenções automáticas (poupança, dízimo, patrimônio), saídas e gastos realizados
             </span>
           </div>
 
