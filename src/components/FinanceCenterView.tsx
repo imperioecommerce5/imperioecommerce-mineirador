@@ -239,28 +239,26 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const valorAporteNumerico = aportePendenteValor !== '' ? Number(aportePendenteValor) : 0;
   const totalEntradasTransacoes = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
   
-  // Total de dinheiro bruto que entrou (Transações de entrada + Aporte inicial em caixa)
   const totalEntradasGeral = totalEntradasTransacoes + valorAporteNumerico;
   const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
   
-  // Percentual total de retenções automáticas ativas
   const percentualRetencaoTotal = potesAtivos
     .filter(p => p.retencaoAutomatica)
     .reduce((acc, p) => acc + p.percentual, 0);
 
-  // O valor retido automático agora considera tanto as entradas quanto o aporte inicial em caixa
   const valorRetidoAutomaticoAcumulado = (totalEntradasGeral * percentualRetencaoTotal) / 100;
 
-  // Saldo Real Disponível desconta o que foi retido automaticamente para poupança/patrimônio/dízimo e saídas manuais
+  // Saldo Real Disponível desconta as retenções automáticas e as saídas manuais
   const saldoUnicoReal = (totalEntradasGeral - valorRetidoAutomaticoAcumulado) - totalSaidas;
 
-  const poteNossoPatrimonio = potesAtivos.find(p => p.id === 'nosso_patrimonio');
-  const pctNossoPatrimonio = poteNossoPatrimonio ? poteNossoPatrimonio.percentual : 0;
-  const saldoNossoPatrimonio = (rendaRestanteAposDividas * pctNossoPatrimonio) / 100;
+  // Acumulado real dos potes de retenção com base no total de entradas/aportes reais
+  const poteNossoPatrimonioObj = potesAtivos.find(p => p.id === 'nosso_patrimonio');
+  const pctNossoPatrimonio = poteNossoPatrimonioObj ? poteNossoPatrimonioObj.percentual : 0;
+  const saldoNossoPatrimonio = (totalEntradasGeral * pctNossoPatrimonio) / 100;
 
-  const potePatrimonioManuela = potesAtivos.find(p => p.id === 'patrimonio_manuela');
-  const pctPatrimonioManuela = potePatrimonioManuela ? potePatrimonioManuela.percentual : 0;
-  const saldoPatrimonioManuela = (rendaRestanteAposDividas * pctPatrimonioManuela) / 100;
+  const potePatrimonioManuelaObj = potesAtivos.find(p => p.id === 'patrimonio_manuela');
+  const pctPatrimonioManuela = potePatrimonioManuelaObj ? potePatrimonioManuelaObj.percentual : 0;
+  const saldoPatrimonioManuela = (totalEntradasGeral * pctPatrimonioManuela) / 100;
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalConsolidado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
@@ -374,7 +372,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     const detalhes = potesAtivos.map(pote => ({
       nome: pote.nome,
       icone: pote.iconeEmoji,
-      valor: (rendaRestanteAposDividas * pote.percentual) / 100,
+      valor: (valor * pote.percentual) / 100,
       percentual: pote.percentual,
       cor: pote.cor
     }));
@@ -400,7 +398,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       if (poteSelecionadoId !== 'divida_fixa') {
         const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
         if (poteAlvo) {
-          const valorDiluidoNoPote = (rendaRestanteAposDividas * poteAlvo.percentual) / 100;
+          const valorDiluidoNoPote = (totalEntradasGeral * poteAlvo.percentual) / 100;
           const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
           const saldoDisponivelNoPote = poteAlvo.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
 
@@ -873,7 +871,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <Sparkles className="w-8 h-8" />
             </div>
             <div>
-              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada e Retenções Descontadas!</span>
+              <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada e Patrimônio Atualizado!</span>
               <h3 className="text-2xl font-black font-mono mt-1">{formatarGrana(animacaoEntrada.valorTotal)}</h3>
             </div>
             <div className="space-y-2 text-left">
@@ -926,7 +924,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
             <span className={`text-xs font-semibold ${textMuted}`}>
-              Aporte inicial e entradas menos retenções automáticas (poupança, dízimo, patrimônio), saídas e gastos realizados
+              Valores destinados a patrimônio, poupança da filha e dízimo já foram descontados e somados ao patrimônio
             </span>
           </div>
 
@@ -1058,7 +1056,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 <span className="text-2xl">🐷</span>
                 <div>
                   <span className="font-bold block text-sm">Nosso Patrimônio (Automático)</span>
-                  <span className={`text-[10px] ${textMuted}`}>{pctNossoPatrimonio}% do saldo restante</span>
+                  <span className={`text-[10px] ${textMuted}`}>Alimentado automaticamente pelas entradas e aportes</span>
                 </div>
               </div>
               <span className="font-mono font-black text-emerald-500 text-sm md:text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
@@ -1069,7 +1067,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 <span className="text-2xl">👶</span>
                 <div>
                   <span className="font-bold block text-sm">Poupança Manuela (Futuro da Filha)</span>
-                  <span className={`text-[10px] text-cyan-400 font-bold`}>🔒 Valor guardado intocável ({pctPatrimonioManuela}%)</span>
+                  <span className={`text-[10px] text-cyan-400 font-bold`}>🔒 Valor guardado intocável</span>
                 </div>
               </div>
               <span className="font-mono font-black text-cyan-500 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
