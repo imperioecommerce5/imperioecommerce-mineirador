@@ -533,7 +533,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         
         .neon-border-glow {
           position: relative;
-          border-radius: 9999px;
+          border-radius: 36px;
           background: ${corTemaImperial === 'dourado' ? 'linear-gradient(135deg, #F59E0B, #FBBF24, #F59E0B)' : corTemaImperial === 'azul' ? 'linear-gradient(135deg, #3B82F6, #60A5FA, #3B82F6)' : corTemaImperial === 'rosa' ? 'linear-gradient(135deg, #EC4899, #F472B6, #EC4899)' : 'linear-gradient(135deg, #10B981, #34D399, #10B981)'};
           background-size: 300% 300%;
           animation: rotateGradient 5s ease infinite;
@@ -659,7 +659,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
 
             <div className="neon-border-glow">
-              <div className={`${cardClasse} rounded-[32px] p-6 md:p-10 text-center relative overflow-hidden`}>
+              <div className={`${cardClasse} rounded-[33px] p-6 md:p-10 text-center relative overflow-hidden`}>
                 <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
                 <div className="text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl">
                   {formatarGrana(patrimonioTotalConsolidado)}
@@ -925,7 +925,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           )}
 
           <div className="neon-border-glow">
-            <div className={`${cardClasse} rounded-[32px] p-6 md:p-8 flex flex-col justify-between space-y-4 relative overflow-hidden`}>
+            <div className={`${cardClasse} rounded-[33px] p-6 md:p-8 flex flex-col justify-between space-y-4 relative overflow-hidden`}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
               <div>
                 <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><span className="text-base animate-heartbeat">💰</span> SALDO REAL DISPONÍVEL NA CONTA</span>
@@ -978,20 +978,20 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </button>
           </div>
 
-          <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
+          <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
             {potesAtivos.map((pote, idx) => {
               const saldoRealPote = getSaldoDisponivelPorPote(pote.id);
               const valorDiluidoNoPote = (totalEntradasGeral * pote.percentual) / 100;
 
               if (modoVisualizacaoPotes === 'grid') {
                 return (
-                  <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-[32px] p-5 flex flex-col items-center text-center space-y-2 relative overflow-hidden animate-pop-in`}>
+                  <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-full aspect-square p-5 flex flex-col items-center justify-center text-center space-y-1.5 relative overflow-hidden animate-pop-in shadow-xl`}>
                     {pote.retencaoAutomatica && (
-                      <span className={`absolute top-3 right-3 text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}>Auto</span>
+                      <span className={`absolute top-4 right-6 text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}>Auto</span>
                     )}
                     <span className="text-3xl">{pote.iconeEmoji}</span>
-                    <span className="text-xs font-bold truncate w-full">{pote.nome}</span>
-                    <div className="w-full pt-1 border-t border-slate-200 dark:border-slate-800/80">
+                    <span className="text-xs font-bold truncate px-4 w-full">{pote.nome}</span>
+                    <div className="w-full pt-1">
                       <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : configCorAtual.text}`}>{formatarGrana(saldoRealPote)}</span>
                       <span className="text-[9px] text-slate-400 font-bold uppercase">Disponível</span>
                     </div>
@@ -1043,7 +1043,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <button onClick={() => setModalAporteSobra(true)} className={`w-full md:hidden bg-emerald-500/10 ${configCorAtual.text} px-4 py-3 rounded-full text-xs font-bold cursor-pointer border border-emerald-500/30 flex items-center justify-center gap-2 btn-magic`}><Vault className="w-4 h-4" /> + Aportar Sobra Aqui</button>
           
           <div className="neon-border-glow">
-            <div className={`${cardClasse} rounded-[32px] p-6 text-center space-y-2`}>
+            <div className={`${cardClasse} rounded-[33px] p-6 text-center space-y-2`}>
               <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Consolidado</span>
               <div className={`text-3xl md:text-4xl font-black ${configCorAtual.text} font-mono drop-shadow-md`}>{formatarGrana(patrimonioTotalConsolidado)}</div>
             </div>
@@ -1077,7 +1077,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><CreditCard className="w-6 h-6 text-rose-500" /> Dívidas</h2>
             <button onClick={() => navegarPara('onboarding')} className="bg-slate-900 text-white border border-slate-800 px-4 py-2 rounded-full text-xs font-bold cursor-pointer btn-magic">+ Ajustar</button>
           </div>
-          <div className={`${cardClasse} card-layered rounded-[32px] p-6 text-center space-y-2 border-2 border-rose-500/30`}>
+          <div className={`${cardClasse} card-layered rounded-[33px] p-6 text-center space-y-2 border-2 border-rose-500/30`}>
             <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Comprometido Mensalmente</span>
             <div className="text-3xl md:text-4xl font-black text-rose-500 font-mono drop-shadow-md">{formatarGrana(totalContasFixasValor)}</div>
           </div>
