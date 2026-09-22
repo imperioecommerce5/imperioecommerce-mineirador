@@ -99,10 +99,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
 
   const temasCores = {
-    esmeralda: { primary: '#10B981', secondary: '#34D399', border: 'border-emerald-500/30', text: 'text-emerald-500', bgBtn: 'bg-emerald-500 text-slate-950' },
-    dourado: { primary: '#F59E0B', secondary: '#FBBF24', border: 'border-amber-500/30', text: 'text-amber-500', bgBtn: 'bg-amber-500 text-slate-950' },
-    azul: { primary: '#3B82F6', secondary: '#60A5FA', border: 'border-blue-500/30', text: 'text-blue-500', bgBtn: 'bg-blue-500 text-slate-950' },
-    rosa: { primary: '#EC4899', secondary: '#F472B6', border: 'border-pink-500/30', text: 'text-pink-500', bgBtn: 'bg-pink-500 text-white' }
+    esmeralda: { primary: '#10B981', secondary: '#34D399', border: 'border-emerald-500/30', text: 'text-emerald-500', bgBtn: 'bg-emerald-500 text-slate-950', gradient: 'from-emerald-600 to-emerald-400' },
+    dourado: { primary: '#F59E0B', secondary: '#FBBF24', border: 'border-amber-500/30', text: 'text-amber-500', bgBtn: 'bg-amber-500 text-slate-950', gradient: 'from-amber-600 to-amber-400' },
+    azul: { primary: '#3B82F6', secondary: '#60A5FA', border: 'border-blue-500/30', text: 'text-blue-500', bgBtn: 'bg-blue-500 text-slate-950', gradient: 'from-blue-600 to-blue-400' },
+    rosa: { primary: '#EC4899', secondary: '#F472B6', border: 'border-pink-500/30', text: 'text-pink-500', bgBtn: 'bg-pink-500 text-white', gradient: 'from-pink-600 to-pink-400' }
   };
 
   const configCorAtual = temasCores[corTemaImperial];
@@ -519,17 +519,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           40% { transform: scale(1); }
           60% { transform: scale(1.04); }
         }
-        @keyframes floatSparkle {
-          0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
-          50% { transform: translateY(-10px) scale(1.2); opacity: 1; }
-        }
         
         .animate-slide-up { animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-float { animation: floatY 3s ease-in-out infinite; }
         .animate-wobble { animation: wobble 0.4s ease-in-out; }
         .animate-heartbeat { animation: heartbeat 2.5s ease-in-out infinite; }
-        .sparkle-particle { animation: floatSparkle 3s ease-in-out infinite; }
         
         .neon-border-glow {
           position: relative;
@@ -565,11 +560,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
       `}</style>
 
-      {/* Partículas flutuantes seguras dentro do limite do ecrã */}
-      <div className="absolute top-12 left-6 text-emerald-500/20 sparkle-particle pointer-events-none text-xl">✨</div>
-      <div className="absolute top-48 right-6 text-cyan-500/20 sparkle-particle pointer-events-none text-lg" style={{animationDelay: '1s'}}>👑</div>
-      <div className="absolute bottom-32 left-8 text-emerald-500/15 sparkle-particle pointer-events-none text-xl" style={{animationDelay: '2s'}}>✨</div>
-
       {erroFirebase && (
         <div className="bg-rose-500 text-white text-[10px] md:text-xs font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse shadow-md">
           <AlertTriangle className="w-4 h-4" /> Firebase bloqueado (Regras). Dados salvos apenas localmente!
@@ -578,7 +568,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-500 ${isDark ? 'border-slate-800/80 bg-[#070A10]/85 backdrop-blur-xl' : 'border-slate-200/80 bg-white/90 backdrop-blur-xl'}`}>
         <div className="flex items-center space-x-2.5 cursor-pointer group" onClick={() => navegarPara('dashboard')}>
-          <div className={`w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform animate-heartbeat ${corTemaImperial === 'dourado' ? 'from-amber-600 to-amber-400' : corTemaImperial === 'azul' ? 'from-blue-600 to-blue-400' : corTemaImperial === 'rosa' ? 'from-pink-600 to-pink-400' : ''}`}>
+          <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${configCorAtual.gradient} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform animate-heartbeat`}>
             <span className="text-base">👑</span>
           </div>
           <span className={`text-xl md:text-2xl font-black ${configCorAtual.text} tracking-tight`}>MEU IMPÉRIO</span>
@@ -887,13 +877,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           {aportePendenteValor !== '' && Number(aportePendenteValor) > 0 && (
             <div className={`${cardClasse} card-layered rounded-full px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 ${configCorAtual.text} animate-slide-up border border-emerald-500/30`}>
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20 animate-heartbeat"><span className="text-xl">👑</span></div>
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${configCorAtual.gradient} flex items-center justify-center shrink-0 border border-emerald-500/20 animate-heartbeat text-white shadow-md`}>
+                  <span className="text-xl">👑</span>
+                </div>
                 <div>
                   <span className="font-black text-sm block">Aporte / Caixa Inicial Ativo</span>
                   <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Considerado no saldo real: {formatarGrana(Number(aportePendenteValor))}</span>
                 </div>
               </div>
-              <button onClick={() => setModalAportePendente(true)} className={`bg-emerald-500 text-slate-950 font-black px-5 py-2 rounded-full text-xs btn-magic shrink-0 shadow-md ${configCorAtual.bgBtn}`}>Ajustar Valor</button>
+              <button onClick={() => setModalAportePendente(true)} className={`font-black px-5 py-2 rounded-full text-xs btn-magic shrink-0 shadow-md ${configCorAtual.bgBtn}`}>Ajustar Valor</button>
             </div>
           )}
 
