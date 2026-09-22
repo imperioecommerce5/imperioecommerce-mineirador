@@ -26,7 +26,6 @@ import {
   AlertTriangle,
   User,
   Award,
-  Zap,
   ShieldCheck
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
@@ -91,7 +90,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     { id: 'desfrute_dela', nome: 'Desfrute Dela', percentual: 0, cor: '#EC4899', iconeEmoji: '👩' },
   ];
 
-  // Sincronização Automática
   const salvarDadosNaNuvem = async (novosDados: Partial<{ rendaMensal: number; aportePendenteValor: number | ''; contasFixasObrigatorias: ContaFixa[]; potesAtivos: Pote[]; transacoes: Transacao[]; itensPatrimonioManuais: ItemPatrimonio[]; metas: Meta[]; }>) => {
     const backupCompleto = { rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, ...novosDados };
     localStorage.setItem('meu_imperio_backup', JSON.stringify(backupCompleto));
@@ -103,7 +101,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       console.error("ERRO FIREBASE:", error);
       setErroFirebase(true);
       if (!window.firebaseErrorShown) {
-        alert("⚠️ ATENÇÃO: Salvo localmente, mas bloqueado no Firebase. Libere as regras no Firestore Database.");
+        alert("⚠️ ATENÇÃO: Salvo localmente, mas bloqueado no Firebase. Verifique as regras no Firestore.");
         window.firebaseErrorShown = true;
       }
     }
@@ -169,7 +167,9 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [tipoLancamento, setTipoLancamento] = useState<'saida' | 'entrada'>('saida');
   const [valorLancamento, setValorLancamento] = useState<number | ''>('');
   const [origemEntradaModal, setOrigemEntradaModal] = useState<'CLT' | 'Mercado Livre'>('Mercado Livre');
-  const [categoriaSaidaSelecionada, setCategoriaSaidaSelecionada] = useState<string>('Supermercado / Compras');
+  
+  // Novo estado para a descrição livre da saída
+  const [descricaoSaidaManual, setDescricaoSaidaManual] = useState<string>('');
   const [poteSelecionadoId, setPoteSelecionadoId] = useState<string>('divida_fixa');
 
   const [filtroExtrato, setFiltroExtrato] = useState<'todos' | 'entradas' | 'saidas'>('todos');
@@ -233,7 +233,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalConsolidado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
-  // Filtro do Extrato Consertado
   const transacoesFiltradas = transacoes.filter(t => {
     if (filtroExtrato === 'entradas') return t.tipo === 'entrada';
     if (filtroExtrato === 'saidas') return t.tipo === 'saida';
@@ -326,9 +325,23 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
       }
       const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
-      const novaSaida: Transacao = { id: Date.now().toString(), descricao: categoriaSaidaSelecionada, valor: valorGasto, tipo: 'saida', poteId: poteSelecionadoId, poteNome: poteAlvo ? poteAlvo.nome : 'Gasto Geral', data: new Date().toLocaleDateString('pt-BR') };
+      const descFinal = descricaoSaidaManual.trim() !== '' ? descricaoSaidaManual.trim() : 'Gasto Geral';
+      
+      const novaSaida: Transacao = { 
+        id: Date.now().toString(), 
+        descricao: descFinal, 
+        valor: valorGasto, 
+        tipo: 'saida', 
+        poteId: poteSelecionadoId, 
+        poteNome: poteAlvo ? poteAlvo.nome : 'Saldo Real', 
+        data: new Date().toLocaleDateString('pt-BR') 
+      };
+      
       const novasTransacoes = [novaSaida, ...transacoes];
-      setTransacoes(novasTransacoes); setValorLancamento(''); setModalLancamento(false);
+      setTransacoes(novasTransacoes); 
+      setValorLancamento(''); 
+      setDescricaoSaidaManual('');
+      setModalLancamento(false);
       await salvarDadosNaNuvem({ transacoes: novasTransacoes });
     }
   };
@@ -414,7 +427,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative overflow-x-hidden`}>
       
-      {/* Estilos CSS Avançados para Gamificação */}
       <style>{`
         @keyframes slideInUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
@@ -444,7 +456,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       {erroFirebase && (
         <div className="bg-rose-500 text-white text-[10px] md:text-xs font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse">
-          <AlertTriangle className="w-4 h-4" /> Firebase bloqueado (Regras). Dados salvos apenas localmente no navegador!
+          <AlertTriangle className="w-4 h-4" /> Firebase bloqueado (Regras). Dados salvos apenas localmente!
         </div>
       )}
 
@@ -469,7 +481,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       <main className="w-full flex-grow animate-slide-up" key={telaAtiva}>
         
       {telaAtiva === 'perfil' && (() => {
-        // Cálculos de Gamificação
         let nivelTexto = "Iniciante Aprendiz";
         let nivelCor = "text-slate-400";
         if (patrimonioTotalConsolidado > 5000) { nivelTexto = "Poupador Focado"; nivelCor = "text-cyan-400"; }
@@ -480,7 +491,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         const totalGuardadoMetas = metas.reduce((acc, m) => acc + m.valorGuardado, 0);
         const totalAlvoMetas = metas.reduce((acc, m) => acc + m.valorAlvo, 0);
         const progressoMetasGeral = totalAlvoMetas > 0 ? (totalGuardadoMetas / totalAlvoMetas) * 100 : 0;
-        
         const saudeDividas = 100 - percentualComprometidoDividas;
         const saudeCor = saudeDividas > 70 ? 'text-emerald-500' : saudeDividas > 40 ? 'text-amber-500' : 'text-rose-500';
 
@@ -503,19 +513,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
 
-            {/* Card Principal - Ouro/Patrimônio */}
             <div className={`${cardClasse} rounded-3xl p-6 md:p-10 text-center relative overflow-hidden card-magic border-2 border-emerald-500/30`}>
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500"></div>
-              <div className="absolute -top-20 -right-20 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
               <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
               <div className="text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl">
                 {formatarGrana(patrimonioTotalConsolidado)}
               </div>
-              <p className={`text-xs mt-3 ${textMuted}`}>Este é o tamanho do seu império hoje. Continue aportando para subir de nível!</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Card Metas */}
               <div className={`${cardClasse} rounded-3xl p-6 flex flex-col justify-between card-magic space-y-4`}>
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-500"><Target className="w-6 h-6"/></div>
@@ -535,13 +541,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
               </div>
 
-              {/* Card Saúde Financeira */}
               <div className={`${cardClasse} rounded-3xl p-6 flex flex-col justify-between card-magic space-y-4`}>
                 <div className="flex items-center gap-3">
                   <div className={`p-3 rounded-2xl bg-opacity-10 ${saudeDividas > 70 ? 'bg-emerald-500 text-emerald-500' : saudeDividas > 40 ? 'bg-amber-500 text-amber-500' : 'bg-rose-500 text-rose-500'}`}><ShieldCheck className="w-6 h-6"/></div>
                   <div>
                     <span className="font-black text-base block">Escudo Financeiro</span>
-                    <span className={`text-[10px] uppercase font-bold ${textMuted}`}>Livre de Dívidas / Contas Fixas</span>
+                    <span className={`text-[10px] uppercase font-bold ${textMuted}`}>Livre de Dívidas</span>
                   </div>
                 </div>
                 <div>
@@ -557,7 +562,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
 
-            {/* Conquistas Rápidas */}
             <div className="pt-4 space-y-3">
               <h3 className="font-black text-sm uppercase tracking-wider pl-2 border-l-4 border-emerald-500">Mural de Troféus</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -600,37 +604,33 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <div className="flex justify-between items-center">
               <div>
                 <span className={`text-xs font-bold uppercase tracking-wider block ${textMuted}`}>Meta de Renda Mensal</span>
-                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Ponto de partida</span>
               </div>
               <div className="flex items-center text-lg md:text-xl font-black">
                 <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
-                <input type="number" value={rendaMensal === 0 ? '' : rendaMensal} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setRendaMensal(val); await salvarDadosNaNuvem({ rendaMensal: val }); }} className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black transition-all focus:border-b-4" />
+                <input type="number" value={rendaMensal === 0 ? '' : rendaMensal} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setRendaMensal(val); await salvarDadosNaNuvem({ rendaMensal: val }); }} className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black" />
               </div>
             </div>
             <div className="flex justify-between items-center pt-3 border-t border-slate-800">
               <div>
                 <span className={`text-xs font-bold uppercase tracking-wider block ${textMuted}`}>Valor Inicial / Aporte Caixa</span>
-                <span className={`text-[10px] md:text-[11px] ${textMuted}`}>Saldo inicial existente</span>
               </div>
               <div className="flex items-center text-lg md:text-xl font-black">
                 <span className={`text-xs md:text-sm mr-1 ${textMuted}`}>R$</span>
-                <input type="number" value={aportePendenteValor === 0 ? '' : aportePendenteValor} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? '' : Number(e.target.value); setAportePendenteValor(val); await salvarDadosNaNuvem({ aportePendenteValor: val }); }} className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black transition-all focus:border-b-4" />
+                <input type="number" value={aportePendenteValor === 0 ? '' : aportePendenteValor} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? '' : Number(e.target.value); setAportePendenteValor(val); await salvarDadosNaNuvem({ aportePendenteValor: val }); }} className="w-24 md:w-32 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black" />
               </div>
             </div>
           </div>
 
           <div className={`${cardClasse} rounded-3xl p-4 md:p-6 space-y-4 border-2 border-rose-500/20 card-magic`}>
             <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-black text-rose-400">Passo 1: Dívidas & Contas (R$)</h3>
-              </div>
+              <h3 className="text-base font-black text-rose-400">Passo 1: Dívidas & Contas (R$)</h3>
               <span className="text-xs font-mono font-black text-rose-400">{formatarGrana(totalContasFixasValor)}</span>
             </div>
             <div className="space-y-2">
-              <input type="text" placeholder="Nome (Ex: Aluguel)" value={novaContaNome} onChange={(e) => setNovaContaNome(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border transition-colors focus:border-emerald-500`} />
+              <input type="text" placeholder="Nome (Ex: Aluguel)" value={novaContaNome} onChange={(e) => setNovaContaNome(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border`} />
               <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder="Mensal R$" value={novaContaValor} onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border font-mono focus:border-emerald-500`} />
-                <input type="number" placeholder="Duração (Meses)" value={novaContaMeses} onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border font-mono focus:border-emerald-500`} />
+                <input type="number" placeholder="Mensal R$" value={novaContaValor} onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border font-mono`} />
+                <input type="number" placeholder="Duração (Meses)" value={novaContaMeses} onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border font-mono`} />
               </div>
               <button type="button" onClick={adicionarContaFixaObrigatoria} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer btn-magic">
                 <Plus className="w-4 h-4" /> Adicionar Dívida / Conta Fixa
@@ -639,7 +639,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             {contasFixasObrigatorias.length > 0 && (
               <div className="space-y-2 pt-2 max-h-48 overflow-y-auto pr-1">
                 {contasFixasObrigatorias.map(c => (
-                  <div key={c.id} className={`${inputBg} p-3 rounded-2xl flex justify-between items-center text-xs border animate-pop-in hover:border-rose-500/50 transition-colors`}>
+                  <div key={c.id} className={`${inputBg} p-3 rounded-2xl flex justify-between items-center text-xs border animate-pop-in`}>
                     <div><span className="font-black block">{c.nome}</span><span className="text-[10px] text-slate-400">{formatarGrana(c.valor)}/mês • {c.mesesTotales}x</span></div>
                     <button onClick={() => removerContaFixaObrigatoria(c.id)} className="text-rose-500 cursor-pointer hover:scale-125 transition-transform"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -928,7 +928,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <div className={`p-2 rounded-full ${t.tipo==='entrada'?'bg-emerald-500/10 text-emerald-500':'bg-rose-500/10 text-rose-500'}`}>
                     {t.tipo === 'entrada' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                   </div>
-                  <div><span className="font-bold block">{t.descricao}</span><span className={`text-[10px] font-semibold text-emerald-500 block`}>{t.tipo === 'entrada' ? `Origem: ${t.origemEntrada}` : `De: ${t.poteNome}`}</span><span className={`text-[9px] ${textMuted}`}>{t.data}</span></div>
+                  <div>
+                    <span className="font-bold block">{t.descricao}</span>
+                    <span className={`text-[10px] font-semibold text-emerald-500 block`}>
+                      {t.tipo === 'entrada' ? `Origem: ${t.origemEntrada}` : `Saiu de: ${t.poteNome}`}
+                    </span>
+                    <span className={`text-[9px] ${textMuted}`}>{t.data}</span>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2.5">
                   <span className={`font-black font-mono ${t.tipo === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}`}>{t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}</span>
@@ -942,34 +948,18 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       </main>
 
-      {/* MODAIS (Manter o código enxuto mas completo) */}
-      {potePendente && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative animate-pop-in border border-emerald-500/20`}>
-            <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 flex items-center justify-center text-2xl">{potePendente.iconeEmoji}</div>
-            <div><h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3><span className="text-xs text-slate-400">Arraste a porcentagem</span></div>
-            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-              <div className={`w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'} shadow-inner`}>
-                <span className="text-xl font-black">{percentualPendente}%</span>
-                <span className="text-[9px] font-bold text-emerald-500">{formatarGrana((rendaRestanteAposDividas * percentualPendente) / 100)}</span>
-              </div>
-            </div>
-            <input type="range" min="0" max={100 - potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0)} value={percentualPendente} onChange={(e) => setPercentualPendente(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-            <button onClick={confirmarAdicionarPote} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Confirmar</button>
-          </div>
-        </div>
-      )}
-
+      {/* MODAL DE LANÇAMENTO ATUALIZADO COM CAIXA DE DESCRIÇÃO LIVRE */}
       {modalLancamento && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalLancamento(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
             <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Sparkles className="w-5 h-5 text-emerald-500"/> Novo Lançamento</h3>
+            
             <div className={`flex ${inputBg} p-1 rounded-xl border`}>
               <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white shadow-md' : textMuted}`}>Gasto (Saída)</button>
               <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>Renda (Entrada)</button>
             </div>
+
             {tipoLancamento === 'entrada' ? (
               <div className="space-y-3 animate-in slide-in-from-right-4 duration-300">
                 <label className={`text-xs font-bold block ${textMuted}`}>Origem da Entrada:</label>
@@ -980,16 +970,17 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             ) : (
               <div className="space-y-3 animate-in slide-in-from-left-4 duration-300">
-                <label className={`text-xs font-bold block ${textMuted}`}>Categoria da Saída:</label>
-                <select value={categoriaSaidaSelecionada} onChange={(e) => setCategoriaSaidaSelecionada(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
-                  <option value="Supermercado / Compras">🛒 Supermercado / Compras</option>
-                  <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
-                  <option value="Desfrute Família">🎮 Desfrute Família</option>
-                  <option value="Desfrute Dele">🧔‍♂️ Desfrute Dele</option>
-                  <option value="Desfrute Dela">👩 Desfrute Dela</option>
-                  <option value="Pagamento de Dívida / Conta Fixa">💳 Pagamento Dívida / Conta</option>
-                  <option value="Outros Gastos">📦 Outros Gastos</option>
-                </select>
+                <div className="space-y-1">
+                  <label className={`text-xs font-bold block ${textMuted}`}>Descrição do Gasto:</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Jantar, Uber, Supermercado..." 
+                    value={descricaoSaidaManual} 
+                    onChange={(e) => setDescricaoSaidaManual(e.target.value)} 
+                    className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`} 
+                  />
+                </div>
+
                 <div className="space-y-1">
                   <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
                   <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
@@ -1004,8 +995,28 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
               </div>
             )}
+
             <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg font-mono border focus:border-emerald-500 transition-colors text-center`} />
             <button onClick={salvarLancamento} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-5 h-5"/> Registrar Lançamento</button>
+          </div>
+        </div>
+      )}
+
+      {/* OUTROS MODAIS */}
+      {potePendente && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 flex items-center justify-center text-2xl">{potePendente.iconeEmoji}</div>
+            <div><h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3><span className="text-xs text-slate-400">Arraste a porcentagem</span></div>
+            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+              <div className={`w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'} shadow-inner`}>
+                <span className="text-xl font-black">{percentualPendente}%</span>
+                <span className="text-[9px] font-bold text-emerald-500">{formatarGrana((rendaRestanteAposDividas * percentualPendente) / 100)}</span>
+              </div>
+            </div>
+            <input type="range" min="0" max={100 - potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0)} value={percentualPendente} onChange={(e) => setPercentualPendente(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+            <button onClick={confirmarAdicionarPote} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Confirmar</button>
           </div>
         </div>
       )}
