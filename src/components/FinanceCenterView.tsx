@@ -565,7 +565,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
       `}</style>
 
-      {/* Partículas flutuantes seguras dentro do limite do ecran */}
+      {/* Partículas flutuantes seguras dentro do limite do ecrã */}
       <div className="absolute top-12 left-6 text-emerald-500/20 sparkle-particle pointer-events-none text-xl">✨</div>
       <div className="absolute top-48 right-6 text-cyan-500/20 sparkle-particle pointer-events-none text-lg" style={{animationDelay: '1s'}}>👑</div>
       <div className="absolute bottom-32 left-8 text-emerald-500/15 sparkle-particle pointer-events-none text-xl" style={{animationDelay: '2s'}}>✨</div>
@@ -985,12 +985,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
               if (modoVisualizacaoPotes === 'grid') {
                 return (
-                  <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-full aspect-square p-5 flex flex-col items-center justify-center text-center space-y-1.5 relative overflow-hidden animate-pop-in shadow-xl`}>
+                  <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-full aspect-square p-5 flex flex-col items-center justify-center text-center space-y-1 relative overflow-hidden animate-pop-in shadow-xl`}>
                     {pote.retencaoAutomatica && (
-                      <span className={`absolute top-4 right-6 text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}>Auto</span>
+                      <span className={`absolute top-7 right-8 text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}>Auto</span>
                     )}
-                    <span className="text-3xl">{pote.iconeEmoji}</span>
-                    <span className="text-xs font-bold truncate px-4 w-full">{pote.nome}</span>
+                    <span className="text-3xl mb-1">{pote.iconeEmoji}</span>
+                    <span className="text-xs font-bold truncate px-6 w-full">{pote.nome}</span>
                     <div className="w-full pt-1">
                       <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : configCorAtual.text}`}>{formatarGrana(saldoRealPote)}</span>
                       <span className="text-[9px] text-slate-400 font-bold uppercase">Disponível</span>
