@@ -818,10 +818,27 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </button>
           </div>
 
-          <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
+          <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
             {potesAtivos.map((pote, idx) => {
               const saldoRealPote = getSaldoDisponivelPorPote(pote.id);
               const valorDiluidoNoPote = (totalEntradasGeral * pote.percentual) / 100;
+
+              if (modoVisualizacaoPotes === 'grid') {
+                return (
+                  <div key={pote.id} style={{animationDelay: `${idx * 100}ms`}} className={`${cardClasse} card-layered rounded-2xl p-4 flex flex-col items-center text-center space-y-2 relative overflow-hidden animate-pop-in`}>
+                    {pote.retencaoAutomatica && (
+                      <span className="absolute top-2 right-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Auto</span>
+                    )}
+                    <span className="text-3xl">{pote.iconeEmoji}</span>
+                    <span className="text-xs font-bold truncate w-full">{pote.nome}</span>
+                    <div className="w-full pt-1 border-t border-slate-200 dark:border-slate-800/80">
+                      <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatarGrana(saldoRealPote)}</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase">Disponível</span>
+                    </div>
+                  </div>
+                );
+              }
+
               const percentualProgresso = pote.retencaoAutomatica ? pote.percentual : (valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100);
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
 
