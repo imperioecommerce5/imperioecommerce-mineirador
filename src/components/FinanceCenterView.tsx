@@ -63,6 +63,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
   const [erroFirebase, setErroFirebase] = useState<boolean>(false);
   const [animandoErro, setAnimandoErro] = useState<boolean>(false);
+  const [insightVisivel, setInsightVisivel] = useState<boolean>(true);
 
   const dispararTremorErro = () => {
     setAnimandoErro(true);
@@ -84,7 +85,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [metas, setMetas] = useState<Meta[]>([]);
 
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
-  const [corTemaImperial, setCorTemaImperial] = useState<'esmeralda' | 'dourado' | 'azul' | 'roxo'>('esmeralda');
+  const [corTemaImperial, setCorTemaImperial] = useState<'esmeralda' | 'dourado' | 'azul' | 'rosa'>(() => {
+    return (localStorage.getItem('meu_imperio_tema_dispositivo') as any) || 'esmeralda';
+  });
+
+  const alterarTemaImperial = (novoTema: 'esmeralda' | 'dourado' | 'azul' | 'rosa') => {
+    setCorTemaImperial(novoTema);
+    localStorage.setItem('meu_imperio_tema_dispositivo', novoTema);
+  };
+
   const [tamparValores, setTamparValores] = useState<boolean>(false);
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
@@ -93,7 +102,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     esmeralda: { primary: '#10B981', secondary: '#34D399', border: 'border-emerald-500/30', text: 'text-emerald-500', bgBtn: 'bg-emerald-500 text-slate-950' },
     dourado: { primary: '#F59E0B', secondary: '#FBBF24', border: 'border-amber-500/30', text: 'text-amber-500', bgBtn: 'bg-amber-500 text-slate-950' },
     azul: { primary: '#3B82F6', secondary: '#60A5FA', border: 'border-blue-500/30', text: 'text-blue-500', bgBtn: 'bg-blue-500 text-slate-950' },
-    roxo: { primary: '#8B5CF6', secondary: '#A78BFA', border: 'border-purple-500/30', text: 'text-purple-500', bgBtn: 'bg-purple-500 text-slate-950' }
+    rosa: { primary: '#EC4899', secondary: '#F472B6', border: 'border-pink-500/30', text: 'text-pink-500', bgBtn: 'bg-pink-500 text-white' }
   };
 
   const configCorAtual = temasCores[corTemaImperial];
@@ -108,8 +117,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     { id: 'desfrute_dela', nome: 'Desfrute Dela', percentual: 0, cor: '#EC4899', iconeEmoji: '👩' },
   ];
 
-  const salvarDadosNaNuvem = async (novosDados: Partial<{ rendaMensal: number; aportePendenteValor: number | ''; contasFixasObrigatorias: ContaFixa[]; potesAtivos: Pote[]; transacoes: Transacao[]; itensPatrimonioManuais: ItemPatrimonio[]; metas: Meta[]; corTemaImperial: 'esmeralda' | 'dourado' | 'azul' | 'roxo'; }>) => {
-    const backupCompleto = { rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, corTemaImperial, ...novosDados };
+  const salvarDadosNaNuvem = async (novosDados: Partial<{ rendaMensal: number; aportePendenteValor: number | ''; contasFixasObrigatorias: ContaFixa[]; potesAtivos: Pote[]; transacoes: Transacao[]; itensPatrimonioManuais: ItemPatrimonio[]; metas: Meta[]; }>) => {
+    const backupCompleto = { rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, ...novosDados };
     localStorage.setItem('meu_imperio_backup', JSON.stringify(backupCompleto));
     try {
       const docRef = doc(db, 'imperio_finance', docId);
@@ -137,7 +146,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         setTransacoes(dados.transacoes ?? []);
         setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
         setMetas(dados.metas ?? []);
-        if (dados.corTemaImperial) setCorTemaImperial(dados.corTemaImperial);
         if (!dados.potesAtivos || dados.potesAtivos.length === 0) setTelaAtiva('onboarding');
       } else {
         const localBackup = localStorage.getItem('meu_imperio_backup');
@@ -150,7 +158,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           setTransacoes(dados.transacoes ?? []);
           setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
           setMetas(dados.metas ?? []);
-          if (dados.corTemaImperial) setCorTemaImperial(dados.corTemaImperial);
           setDoc(docRef, dados, { merge: true }).catch(() => setErroFirebase(true));
         } else {
           setTelaAtiva('onboarding');
@@ -527,7 +534,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         .neon-border-glow {
           position: relative;
           border-radius: 2rem;
-          background: ${corTemaImperial === 'dourado' ? 'linear-gradient(135deg, #F59E0B, #FBBF24, #F59E0B)' : corTemaImperial === 'azul' ? 'linear-gradient(135deg, #3B82F6, #60A5FA, #3B82F6)' : corTemaImperial === 'roxo' ? 'linear-gradient(135deg, #8B5CF6, #A78BFA, #8B5CF6)' : 'linear-gradient(135deg, #10B981, #34D399, #10B981)'};
+          background: ${corTemaImperial === 'dourado' ? 'linear-gradient(135deg, #F59E0B, #FBBF24, #F59E0B)' : corTemaImperial === 'azul' ? 'linear-gradient(135deg, #3B82F6, #60A5FA, #3B82F6)' : corTemaImperial === 'rosa' ? 'linear-gradient(135deg, #EC4899, #F472B6, #EC4899)' : 'linear-gradient(135deg, #10B981, #34D399, #10B981)'};
           background-size: 300% 300%;
           animation: rotateGradient 5s ease infinite;
           padding: 2px;
@@ -549,7 +556,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
         
         .text-shimmer {
-          background: ${corTemaImperial === 'dourado' ? 'linear-gradient(to right, #F59E0B 20%, #FBBF24 40%, #FBBF24 60%, #F59E0B 80%)' : corTemaImperial === 'azul' ? 'linear-gradient(to right, #3B82F6 20%, #60A5FA 40%, #60A5FA 60%, #3B82F6 80%)' : corTemaImperial === 'roxo' ? 'linear-gradient(to right, #8B5CF6 20%, #A78BFA 40%, #A78BFA 60%, #8B5CF6 80%)' : 'linear-gradient(to right, #10B981 20%, #34D399 40%, #34D399 60%, #10B981 80%)'};
+          background: ${corTemaImperial === 'dourado' ? 'linear-gradient(to right, #F59E0B 20%, #FBBF24 40%, #FBBF24 60%, #F59E0B 80%)' : corTemaImperial === 'azul' ? 'linear-gradient(to right, #3B82F6 20%, #60A5FA 40%, #60A5FA 60%, #3B82F6 80%)' : corTemaImperial === 'rosa' ? 'linear-gradient(to right, #EC4899 20%, #F472B6 40%, #F472B6 60%, #EC4899 80%)' : 'linear-gradient(to right, #10B981 20%, #34D399 40%, #34D399 60%, #10B981 80%)'};
           background-size: 200% auto;
           color: transparent;
           -webkit-background-clip: text;
@@ -558,9 +565,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
       `}</style>
 
-      <div className="absolute top-12 left-6 text-emerald-500/30 sparkle-particle pointer-events-none text-xl">✨</div>
-      <div className="absolute top-48 right-8 text-cyan-500/30 sparkle-particle pointer-events-none text-lg" style={{animationDelay: '1s'}}>👑</div>
-      <div className="absolute bottom-32 left-12 text-emerald-500/20 sparkle-particle pointer-events-none text-xl" style={{animationDelay: '2s'}}>✨</div>
+      {/* Partículas flutuantes seguras dentro do limite do ecran */}
+      <div className="absolute top-12 left-6 text-emerald-500/20 sparkle-particle pointer-events-none text-xl">✨</div>
+      <div className="absolute top-48 right-6 text-cyan-500/20 sparkle-particle pointer-events-none text-lg" style={{animationDelay: '1s'}}>👑</div>
+      <div className="absolute bottom-32 left-8 text-emerald-500/15 sparkle-particle pointer-events-none text-xl" style={{animationDelay: '2s'}}>✨</div>
 
       {erroFirebase && (
         <div className="bg-rose-500 text-white text-[10px] md:text-xs font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse shadow-md">
@@ -570,7 +578,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-500 ${isDark ? 'border-slate-800/80 bg-[#070A10]/85 backdrop-blur-xl' : 'border-slate-200/80 bg-white/90 backdrop-blur-xl'}`}>
         <div className="flex items-center space-x-2.5 cursor-pointer group" onClick={() => navegarPara('dashboard')}>
-          <div className={`w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform animate-heartbeat ${corTemaImperial === 'dourado' ? 'from-amber-600 to-amber-400' : corTemaImperial === 'azul' ? 'from-blue-600 to-blue-400' : corTemaImperial === 'roxo' ? 'from-purple-600 to-purple-400' : ''}`}>
+          <div className={`w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform animate-heartbeat ${corTemaImperial === 'dourado' ? 'from-amber-600 to-amber-400' : corTemaImperial === 'azul' ? 'from-blue-600 to-blue-400' : corTemaImperial === 'rosa' ? 'from-pink-600 to-pink-400' : ''}`}>
             <span className="text-base">👑</span>
           </div>
           <span className={`text-xl md:text-2xl font-black ${configCorAtual.text} tracking-tight`}>MEU IMPÉRIO</span>
@@ -608,7 +616,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className="max-w-3xl mx-auto p-4 md:p-8 w-full space-y-6">
             <div className="flex flex-col items-center text-center space-y-3 pt-4">
               <div className="relative animate-float">
-                <div className={`w-24 h-24 rounded-3xl bg-gradient-to-tr ${corTemaImperial === 'dourado' ? 'from-amber-500 to-orange-500' : corTemaImperial === 'azul' ? 'from-blue-500 to-cyan-500' : corTemaImperial === 'roxo' ? 'from-purple-500 to-pink-500' : 'from-emerald-500 to-cyan-500'} p-1 shadow-xl`}>
+                <div className={`w-24 h-24 rounded-3xl bg-gradient-to-tr ${corTemaImperial === 'dourado' ? 'from-amber-500 to-orange-500' : corTemaImperial === 'azul' ? 'from-blue-500 to-cyan-500' : corTemaImperial === 'rosa' ? 'from-pink-500 to-rose-400' : 'from-emerald-500 to-cyan-500'} p-1 shadow-xl`}>
                   <div className={`w-full h-full rounded-[22px] ${isDark ? 'bg-[#0B0F17]' : 'bg-white'} flex items-center justify-center`}>
                     <span className="text-4xl animate-heartbeat">👑</span>
                   </div>
@@ -623,22 +631,25 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
 
-            {/* SELETOR DE TEMA DE CORES */}
+            {/* SELETOR DE TEMA DE CORES (SALVO LOCALMENTE POR APARELHO) */}
             <div className={`${cardClasse} card-layered rounded-3xl p-5 space-y-3`}>
               <div className="flex items-center gap-2">
                 <Palette className={`w-5 h-5 ${configCorAtual.text}`} />
-                <span className="font-black text-sm uppercase tracking-wider">Estética & Cor do Império</span>
+                <div>
+                  <span className="font-black text-sm uppercase tracking-wider block">Aparência & Cores do Aparelho</span>
+                  <span className={`text-[10px] ${textMuted}`}>Ajuste exclusivo para este ecrã/telemóvel</span>
+                </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {[
                   { id: 'esmeralda', nome: 'Esmeralda', emoji: '🟢' },
                   { id: 'dourado', nome: 'Dourado', emoji: '🟡' },
                   { id: 'azul', nome: 'Ciberazul', emoji: '🔵' },
-                  { id: 'roxo', nome: 'Roxo Real', emoji: '🟣' }
+                  { id: 'rosa', nome: 'Rosa Real', emoji: '🌸' }
                 ].map((item) => (
                   <button 
                     key={item.id} 
-                    onClick={async () => { setCorTemaImperial(item.id as any); await salvarDadosNaNuvem({ corTemaImperial: item.id as any }); }}
+                    onClick={() => alterarTemaImperial(item.id as any)}
                     className={`p-3 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer btn-magic ${corTemaImperial === item.id ? 'border-2 bg-emerald-500/10 ' + configCorAtual.text : 'border-slate-700 opacity-70'}`}
                   >
                     <span>{item.emoji}</span> {item.nome}
@@ -885,16 +896,21 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       {telaAtiva === 'dashboard' && (
         <div className="max-w-5xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           
-          {/* INSIGHTS INTELIGENTES NO PAINEL */}
-          <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center space-x-3 border-l-4 ${corTemaImperial === 'dourado' ? 'border-l-amber-500' : corTemaImperial === 'azul' ? 'border-l-blue-500' : corTemaImperial === 'roxo' ? 'border-l-purple-500' : 'border-l-emerald-500'} animate-slide-up`}>
-            <div className={`p-2.5 rounded-2xl bg-emerald-500/10 ${configCorAtual.text} shrink-0`}><Zap className="w-5 h-5"/></div>
-            <div className="text-xs">
-              <span className="font-black block text-sm">💡 Insight do Império</span>
-              <span className={textMuted}>
-                {percentualComprometidoDividas > 40 ? '⚠️ Atenção: Suas dívidas consomem mais de 40% da renda. Foque em quitá-las!' : patrimonioTotalConsolidado > 10000 ? '🚀 Seu patrimônio está em forte expansão! Continue aportando todos os meses.' : '✨ Seu cofre está equilibrado. Lembre-se de registrar cada gasto para manter a precisão absoluta.'}
-              </span>
+          {/* INSIGHTS INTELIGENTES NO PAINEL COM BOTÃO FECHAR (X) */}
+          {insightVisivel && (
+            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center justify-between border-l-4 ${corTemaImperial === 'dourado' ? 'border-l-amber-500' : corTemaImperial === 'azul' ? 'border-l-blue-500' : corTemaImperial === 'rosa' ? 'border-l-pink-500' : 'border-l-emerald-500'} animate-slide-up`}>
+              <div className="flex items-center space-x-3">
+                <div className={`p-2.5 rounded-2xl bg-emerald-500/10 ${configCorAtual.text} shrink-0`}><Zap className="w-5 h-5"/></div>
+                <div className="text-xs">
+                  <span className="font-black block text-sm">💡 Insight do Império</span>
+                  <span className={textMuted}>
+                    {percentualComprometidoDividas > 40 ? '⚠️ Atenção: Suas dívidas consomem mais de 40% da renda. Foque em quitá-las!' : patrimonioTotalConsolidado > 10000 ? '🚀 Seu patrimônio está em forte expansão! Continue aportando todos os meses.' : '✨ Seu cofre está equilibrado. Lembre-se de registrar cada gasto para manter a precisão absoluta.'}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setInsightVisivel(false)} className="text-slate-400 hover:text-slate-200 p-1.5 cursor-pointer"><X className="w-4 h-4" /></button>
             </div>
-          </div>
+          )}
 
           {aportePendenteValor !== '' && Number(aportePendenteValor) > 0 && (
             <div className={`${cardClasse} card-layered rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 ${configCorAtual.text} animate-slide-up border border-emerald-500/30`}>
