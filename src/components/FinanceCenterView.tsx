@@ -23,7 +23,11 @@ import {
   LogOut,
   Target,
   ArrowUpRight,
-  AlertTriangle
+  AlertTriangle,
+  User,
+  Award,
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -40,7 +44,6 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
-// Adicionando uma flag global para o TypeScript não reclamar no Window
 declare global {
   interface Window { firebaseErrorShown?: boolean; }
 }
@@ -55,11 +58,11 @@ interface FinanceCenterViewProps { emailUsuario?: string; onLogout?: () => void;
 export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }) => {
   const docId = 'familia_imperio';
 
-  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas'>('dashboard');
+  const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil'>('dashboard');
   const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
   const [erroFirebase, setErroFirebase] = useState<boolean>(false);
 
-  const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas') => {
+  const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil') => {
     setTelaAtiva(tela);
     setMenuAberto(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -88,24 +91,19 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     { id: 'desfrute_dela', nome: 'Desfrute Dela', percentual: 0, cor: '#EC4899', iconeEmoji: '👩' },
   ];
 
-  // FUNÇÃO BLINDADA DE SALVAMENTO (NUVEM + LOCALSTORAGE)
+  // Sincronização Automática
   const salvarDadosNaNuvem = async (novosDados: Partial<{ rendaMensal: number; aportePendenteValor: number | ''; contasFixasObrigatorias: ContaFixa[]; potesAtivos: Pote[]; transacoes: Transacao[]; itensPatrimonioManuais: ItemPatrimonio[]; metas: Meta[]; }>) => {
-    // 1. Salva Local Imediatamente (Garante que o F5 nunca perca os dados da sessão)
-    const backupCompleto = {
-      rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, ...novosDados
-    };
+    const backupCompleto = { rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, ...novosDados };
     localStorage.setItem('meu_imperio_backup', JSON.stringify(backupCompleto));
-
-    // 2. Tenta Salvar na Nuvem (Firebase)
     try {
       const docRef = doc(db, 'imperio_finance', docId);
       await setDoc(docRef, backupCompleto, { merge: true });
       setErroFirebase(false);
     } catch (error) {
-      console.error("ERRO DE PERMISSÃO NO FIREBASE:", error);
+      console.error("ERRO FIREBASE:", error);
       setErroFirebase(true);
       if (!window.firebaseErrorShown) {
-        alert("⚠️ ATENÇÃO: Seus dados foram salvos LOCALMENTE e não vão sumir se recarregar a página, mas o Firebase bloqueou a sincronização. Verifique a aba 'Regras' (Rules) no Firestore e coloque 'allow read, write: if true;'");
+        alert("⚠️ ATENÇÃO: Salvo localmente, mas bloqueado no Firebase. Libere as regras no Firestore Database.");
         window.firebaseErrorShown = true;
       }
     }
@@ -123,10 +121,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         setTransacoes(dados.transacoes ?? []);
         setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
         setMetas(dados.metas ?? []);
-        
         if (!dados.potesAtivos || dados.potesAtivos.length === 0) setTelaAtiva('onboarding');
       } else {
-        // Se a nuvem estiver vazia, tenta resgatar do Backup Local
         const localBackup = localStorage.getItem('meu_imperio_backup');
         if (localBackup) {
           const dados = JSON.parse(localBackup);
@@ -137,7 +133,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           setTransacoes(dados.transacoes ?? []);
           setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
           setMetas(dados.metas ?? []);
-          // Tenta subir esse backup pra nuvem
           setDoc(docRef, dados, { merge: true }).catch(() => setErroFirebase(true));
         } else {
           setTelaAtiva('onboarding');
@@ -145,9 +140,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       }
       setCarregandoNuvem(false);
     }, (error) => {
-      console.error("Erro Snapshot Firebase:", error);
+      console.error("Erro Snapshot:", error);
       setErroFirebase(true);
-      // Carrega local forçado
       const localBackup = localStorage.getItem('meu_imperio_backup');
       if (localBackup) {
         const dados = JSON.parse(localBackup);
@@ -161,11 +155,9 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       }
       setCarregandoNuvem(false);
     });
-
     return () => unsubscribe();
   }, [docId]);
 
-  // Estados de UI e Modais
   const [potePendente, setPotePendente] = useState<Pote | null>(null);
   const [percentualPendente, setPercentualPendente] = useState<number>(10);
   const [novaContaNome, setNovaContaNome] = useState('');
@@ -213,7 +205,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     }
   };
 
-  // Cálculos Base
   const totalContasFixasValor = contasFixasObrigatorias.reduce((acc, c) => acc + c.valor, 0);
   const percentualComprometidoDividas = rendaMensal > 0 ? (totalContasFixasValor / rendaMensal) * 100 : 0;
   const rendaRestanteAposDividas = Math.max(0, rendaMensal - totalContasFixasValor);
@@ -242,6 +233,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalConsolidado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
 
+  // Filtro do Extrato Consertado
+  const transacoesFiltradas = transacoes.filter(t => {
+    if (filtroExtrato === 'entradas') return t.tipo === 'entrada';
+    if (filtroExtrato === 'saidas') return t.tipo === 'saida';
+    return true;
+  });
+
   const getSaldoDisponivelPorPote = (pId: string) => {
     if (pId === 'divida_fixa') return saldoUnicoReal;
     if (pId === 'nosso_patrimonio') return saldoNossoPatrimonio;
@@ -269,9 +267,9 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const pagarParcelaDivida = async (idConta: string) => {
     const conta = contasFixasObrigatorias.find(c => c.id === idConta);
     if (!conta || conta.mesesRestantes <= 0) return;
-    if (window.confirm(`Registrar pagamento de ${formatarGrana(conta.valor)} para "${conta.nome}"? O valor sairá do saldo e abaterá 1 mês.`)) {
+    if (window.confirm(`Registrar pagamento de ${formatarGrana(conta.valor)} para "${conta.nome}"? O valor sairá do saldo.`)) {
       const novasContas = contasFixasObrigatorias.map(c => c.id === idConta ? { ...c, mesesRestantes: Math.max(0, c.mesesRestantes - 1) } : c);
-      const novaSaida: Transacao = { id: Date.now().toString(), descricao: `Pagamento Dívida: ${conta.nome}`, valor: conta.valor, tipo: 'saida', poteId: 'divida_fixa', poteNome: 'Direto do Saldo', data: new Date().toLocaleDateString('pt-BR') };
+      const novaSaida: Transacao = { id: Date.now().toString(), descricao: `Pagamento: ${conta.nome}`, valor: conta.valor, tipo: 'saida', poteId: 'divida_fixa', poteNome: 'Saldo Real', data: new Date().toLocaleDateString('pt-BR') };
       const novasTransacoes = [novaSaida, ...transacoes];
       setContasFixasObrigatorias(novasContas); setTransacoes(novasTransacoes);
       await salvarDadosNaNuvem({ contasFixasObrigatorias: novasContas, transacoes: novasTransacoes });
@@ -280,7 +278,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const solicitarAdicaoPote = (pote: Pote) => {
     if (!potesAtivos.some(p => p.id === pote.id)) {
-      if (disponivelGeral <= 0) { alert("100% do saldo já foi mapeado! Reduza a porcentagem de outro pote primeiro."); return; }
+      if (disponivelGeral <= 0) { alert("100% do saldo já foi mapeado! Reduza outro pote primeiro."); return; }
       setPotePendente(pote); setPercentualPendente(Math.min(10, disponivelGeral));
     }
   };
@@ -338,7 +336,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const efetivarAporteSobraPatrimonio = async () => {
     if (!valorAporteSobra || Number(valorAporteSobra) <= 0) return;
     const valorTransf = Number(valorAporteSobra);
-    if (valorTransf > saldoUnicoReal) { alert("O valor escolhido é maior que o seu Saldo Real atual!"); return; }
+    if (valorTransf > saldoUnicoReal) { alert("Valor escolhido maior que o Saldo Real atual!"); return; }
     const novaSaida: Transacao = { id: Date.now().toString(), descricao: `Aporte Extra em Patrimônio`, valor: valorTransf, tipo: 'saida', poteId: destinoAporteSobra === 'nosso_patrimonio' ? 'aporte_extra_nosso_patrimonio' : 'aporte_extra_patrimonio_manuela', poteNome: destinoAporteSobra === 'nosso_patrimonio' ? 'Nosso Patrimônio (Aporte)' : 'Poupança Manuela (Aporte)', data: new Date().toLocaleDateString('pt-BR') };
     const novasTransacoes = [novaSaida, ...transacoes];
     setTransacoes(novasTransacoes); setValorAporteSobra(''); setModalAporteSobra(false);
@@ -414,25 +412,39 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse text-emerald-500`}><Sparkles className="w-8 h-8 mr-2 animate-spin" /> Sincronizando Cofre...</div>;
 
   return (
-    <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative`}>
+    <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative overflow-x-hidden`}>
       
-      {/* Estilos e Animações Injetadas */}
+      {/* Estilos CSS Avançados para Gamificação */}
       <style>{`
         @keyframes slideInUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes pulseSoft { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+        @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+        @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        
         .animate-slide-up { animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-pop-in { animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-float { animation: floatY 3s ease-in-out infinite; }
+        
         .btn-magic { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .btn-magic:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4); }
         .btn-magic:active { transform: translateY(1px) scale(0.98); }
+        
         .card-magic { transition: all 0.4s ease; }
         .card-magic:hover { transform: translateY(-4px); border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.3); }
+        
+        .text-shimmer {
+          background: linear-gradient(to right, #10B981 20%, #34D399 40%, #34D399 60%, #10B981 80%);
+          background-size: 200% auto;
+          color: transparent;
+          -webkit-background-clip: text;
+          background-clip: text;
+          animation: shimmer 3s linear infinite;
+        }
       `}</style>
 
       {erroFirebase && (
         <div className="bg-rose-500 text-white text-[10px] md:text-xs font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse">
-          <AlertTriangle className="w-4 h-4" /> Firebase bloqueado (Regras). Dados salvos apenas localmente!
+          <AlertTriangle className="w-4 h-4" /> Firebase bloqueado (Regras). Dados salvos apenas localmente no navegador!
         </div>
       )}
 
@@ -441,7 +453,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <Sparkles className="w-6 h-6 text-emerald-500 group-hover:animate-spin transition-all" />
           <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</span>
         </div>
-
         <div className="flex items-center space-x-2">
           <button onClick={() => setTamparValores(!tamparValores)} className={`p-2 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all cursor-pointer hover:rotate-12`}>
             {tamparValores ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -449,7 +460,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2 rounded-2xl border ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'} hover:text-emerald-500 transition-all cursor-pointer hover:-rotate-12`}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button onClick={() => setMenuAberto(!menuAberto)} className="p-2 rounded-2xl bg-emerald-500 text-slate-950 btn-magic cursor-pointer">
+          <button onClick={() => setMenuAberto(!menuAberto)} className="p-2 rounded-2xl bg-emerald-500 text-slate-950 btn-magic cursor-pointer shadow-emerald-500/30">
             <Menu className="w-4 h-4 text-white" />
           </button>
         </div>
@@ -457,6 +468,125 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       <main className="w-full flex-grow animate-slide-up" key={telaAtiva}>
         
+      {telaAtiva === 'perfil' && (() => {
+        // Cálculos de Gamificação
+        let nivelTexto = "Iniciante Aprendiz";
+        let nivelCor = "text-slate-400";
+        if (patrimonioTotalConsolidado > 5000) { nivelTexto = "Poupador Focado"; nivelCor = "text-cyan-400"; }
+        if (patrimonioTotalConsolidado > 20000) { nivelTexto = "Construtor de Riqueza"; nivelCor = "text-emerald-400"; }
+        if (patrimonioTotalConsolidado > 100000) { nivelTexto = "Mestre do Patrimônio"; nivelCor = "text-amber-400"; }
+        if (patrimonioTotalConsolidado > 500000) { nivelTexto = "Imperador Financeiro"; nivelCor = "text-purple-400"; }
+
+        const totalGuardadoMetas = metas.reduce((acc, m) => acc + m.valorGuardado, 0);
+        const totalAlvoMetas = metas.reduce((acc, m) => acc + m.valorAlvo, 0);
+        const progressoMetasGeral = totalAlvoMetas > 0 ? (totalGuardadoMetas / totalAlvoMetas) * 100 : 0;
+        
+        const saudeDividas = 100 - percentualComprometidoDividas;
+        const saudeCor = saudeDividas > 70 ? 'text-emerald-500' : saudeDividas > 40 ? 'text-amber-500' : 'text-rose-500';
+
+        return (
+          <div className="max-w-3xl mx-auto p-4 md:p-8 w-full space-y-6">
+            <div className="flex flex-col items-center text-center space-y-3 pt-4">
+              <div className="relative animate-float">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 p-1 shadow-lg shadow-emerald-500/40">
+                  <div className={`w-full h-full rounded-full ${isDark ? 'bg-slate-900' : 'bg-white'} flex items-center justify-center`}>
+                    <User className="w-10 h-10 text-emerald-500" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-2 -right-2 bg-slate-800 text-white p-2 rounded-full border-2 border-emerald-500">
+                  <Award className={`w-5 h-5 ${nivelCor}`} />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-black">Meu Império</h2>
+                <span className={`text-sm font-extrabold tracking-widest uppercase ${nivelCor}`}>{nivelTexto}</span>
+              </div>
+            </div>
+
+            {/* Card Principal - Ouro/Patrimônio */}
+            <div className={`${cardClasse} rounded-3xl p-6 md:p-10 text-center relative overflow-hidden card-magic border-2 border-emerald-500/30`}>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500"></div>
+              <div className="absolute -top-20 -right-20 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
+              <div className="text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl">
+                {formatarGrana(patrimonioTotalConsolidado)}
+              </div>
+              <p className={`text-xs mt-3 ${textMuted}`}>Este é o tamanho do seu império hoje. Continue aportando para subir de nível!</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Card Metas */}
+              <div className={`${cardClasse} rounded-3xl p-6 flex flex-col justify-between card-magic space-y-4`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-500"><Target className="w-6 h-6"/></div>
+                  <div>
+                    <span className="font-black text-base block">Poder de Realização</span>
+                    <span className={`text-[10px] uppercase font-bold ${textMuted}`}>Progresso de todas as metas</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm font-black mb-1">
+                    <span>{progressoMetasGeral.toFixed(1)}%</span>
+                    <span className="text-cyan-500">{formatarGrana(totalGuardadoMetas)}</span>
+                  </div>
+                  <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                    <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-1000" style={{ width: `${progressoMetasGeral}%` }}></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Saúde Financeira */}
+              <div className={`${cardClasse} rounded-3xl p-6 flex flex-col justify-between card-magic space-y-4`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-2xl bg-opacity-10 ${saudeDividas > 70 ? 'bg-emerald-500 text-emerald-500' : saudeDividas > 40 ? 'bg-amber-500 text-amber-500' : 'bg-rose-500 text-rose-500'}`}><ShieldCheck className="w-6 h-6"/></div>
+                  <div>
+                    <span className="font-black text-base block">Escudo Financeiro</span>
+                    <span className={`text-[10px] uppercase font-bold ${textMuted}`}>Livre de Dívidas / Contas Fixas</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm font-black mb-1">
+                    <span className={saudeCor}>{saudeDividas.toFixed(1)}% Livre</span>
+                    <span className="text-rose-400">{percentualComprometidoDividas.toFixed(1)}% Preso</span>
+                  </div>
+                  <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-1000" style={{ width: `${saudeDividas}%` }}></div>
+                    <div className="h-full bg-rose-500/50 transition-all duration-1000" style={{ width: `${percentualComprometidoDividas}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Conquistas Rápidas */}
+            <div className="pt-4 space-y-3">
+              <h3 className="font-black text-sm uppercase tracking-wider pl-2 border-l-4 border-emerald-500">Mural de Troféus</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className={`${cardClasse} p-4 rounded-2xl flex flex-col items-center text-center gap-2 card-magic ${saldoNossoPatrimonio > 0 ? 'border-emerald-500/30' : 'opacity-50 grayscale'}`}>
+                  <span className="text-3xl">🐷</span>
+                  <span className="text-[10px] font-bold">Investidor Base</span>
+                </div>
+                <div className={`${cardClasse} p-4 rounded-2xl flex flex-col items-center text-center gap-2 card-magic ${saldoPatrimonioManuela > 0 ? 'border-cyan-500/30' : 'opacity-50 grayscale'}`}>
+                  <span className="text-3xl">👶</span>
+                  <span className="text-[10px] font-bold">Guardião do Futuro</span>
+                </div>
+                <div className={`${cardClasse} p-4 rounded-2xl flex flex-col items-center text-center gap-2 card-magic ${metas.length > 0 ? 'border-amber-500/30' : 'opacity-50 grayscale'}`}>
+                  <span className="text-3xl">🎯</span>
+                  <span className="text-[10px] font-bold">Visionário</span>
+                </div>
+                <div className={`${cardClasse} p-4 rounded-2xl flex flex-col items-center text-center gap-2 card-magic ${percentualComprometidoDividas === 0 && rendaMensal > 0 ? 'border-purple-500/30' : 'opacity-50 grayscale'}`}>
+                  <span className="text-3xl">👑</span>
+                  <span className="text-[10px] font-bold">Zero Dívidas</span>
+                </div>
+              </div>
+            </div>
+            
+            <button onClick={() => navegarPara('onboarding')} className="w-full mt-6 bg-slate-800 hover:bg-slate-700 text-white font-bold p-4 rounded-3xl flex items-center justify-center gap-2 text-sm transition-colors card-magic">
+              <Sliders className="w-4 h-4" /> Ajustar Renda e Plano Base
+            </button>
+          </div>
+        );
+      })()}
+
       {telaAtiva === 'onboarding' && (
         <div className="max-w-4xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           <div className="flex justify-between items-center">
@@ -614,7 +744,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className={`${cardClasse} rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-emerald-500 card-magic hover:pl-5 transition-all`}>
+            <div className={`${cardClasse} rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-emerald-500 card-magic hover:pl-5 transition-all cursor-pointer`} onClick={() => navegarPara('patrimonio')}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl drop-shadow-md">🐷</span>
                 <div>
@@ -624,7 +754,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
               <span className="font-mono font-black text-emerald-500 text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
-            <div className={`${cardClasse} rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500 card-magic hover:pl-5 transition-all`}>
+            <div className={`${cardClasse} rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500 card-magic hover:pl-5 transition-all cursor-pointer`} onClick={() => navegarPara('patrimonio')}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl drop-shadow-md">👶</span>
                 <div>
@@ -791,6 +921,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
           </div>
           <div className="space-y-2">
+            {transacoesFiltradas.length === 0 && <p className="text-center text-xs py-8 text-slate-500">Nenhuma transação.</p>}
             {transacoesFiltradas.map((t, idx) => (
               <div key={t.id} className={`${cardClasse} rounded-2xl p-3.5 flex justify-between items-center text-xs md:text-sm animate-pop-in hover:-translate-y-0.5 transition-transform`} style={{animationDelay: `${Math.min(idx*50, 500)}ms`}}>
                 <div className="flex items-center space-x-2.5">
@@ -811,240 +942,200 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       </main>
 
-      {/* --- MODAIS COM ANIMAÇÃO --- */}
-      {modalPendente(potePendente, percentualPendente, maxPermitidoParaPendente(potePendente), rendaRestanteAposDividas)}
-      {modalEntradaAnimada()}
-      {modalAjustarAporte()}
-      {modalAportarSobra()}
-      {modalNovoPatrimonioManual()}
-      {modalCriarMeta()}
-      {modalDepositarMeta()}
-      {modalRegistrarLancamento()}
-      {modalMenuLateral()}
+      {/* MODAIS (Manter o código enxuto mas completo) */}
+      {potePendente && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 flex items-center justify-center text-2xl">{potePendente.iconeEmoji}</div>
+            <div><h3 className="text-base md:text-lg font-black">{potePendente.nome}</h3><span className="text-xs text-slate-400">Arraste a porcentagem</span></div>
+            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+              <div className={`w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'} shadow-inner`}>
+                <span className="text-xl font-black">{percentualPendente}%</span>
+                <span className="text-[9px] font-bold text-emerald-500">{formatarGrana((rendaRestanteAposDividas * percentualPendente) / 100)}</span>
+              </div>
+            </div>
+            <input type="range" min="0" max={100 - potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0)} value={percentualPendente} onChange={(e) => setPercentualPendente(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+            <button onClick={confirmarAdicionarPote} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Confirmar</button>
+          </div>
+        </div>
+      )}
+
+      {modalLancamento && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setModalLancamento(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Sparkles className="w-5 h-5 text-emerald-500"/> Novo Lançamento</h3>
+            <div className={`flex ${inputBg} p-1 rounded-xl border`}>
+              <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white shadow-md' : textMuted}`}>Gasto (Saída)</button>
+              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>Renda (Entrada)</button>
+            </div>
+            {tipoLancamento === 'entrada' ? (
+              <div className="space-y-3 animate-in slide-in-from-right-4 duration-300">
+                <label className={`text-xs font-bold block ${textMuted}`}>Origem da Entrada:</label>
+                <div className={`flex ${inputBg} p-1 rounded-xl border`}>
+                  <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'Mercado Livre' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>Mercado Livre</button>
+                  <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'CLT' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>CLT</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 animate-in slide-in-from-left-4 duration-300">
+                <label className={`text-xs font-bold block ${textMuted}`}>Categoria da Saída:</label>
+                <select value={categoriaSaidaSelecionada} onChange={(e) => setCategoriaSaidaSelecionada(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
+                  <option value="Supermercado / Compras">🛒 Supermercado / Compras</option>
+                  <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
+                  <option value="Desfrute Família">🎮 Desfrute Família</option>
+                  <option value="Desfrute Dele">🧔‍♂️ Desfrute Dele</option>
+                  <option value="Desfrute Dela">👩 Desfrute Dela</option>
+                  <option value="Pagamento de Dívida / Conta Fixa">💳 Pagamento Dívida / Conta</option>
+                  <option value="Outros Gastos">📦 Outros Gastos</option>
+                </select>
+                <div className="space-y-1">
+                  <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
+                  <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
+                    <option value="divida_fixa">💳 Direto do Saldo Livre (Disp: {formatarGrana(getSaldoDisponivelPorPote('divida_fixa'))})</option>
+                    {potesAtivos.map(p => (
+                      <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome} (Disp: {formatarGrana(getSaldoDisponivelPorPote(p.id))})</option>
+                    ))}
+                  </select>
+                  <div className={`text-[10px] text-right font-black pt-1 ${getSaldoDisponivelPorPote(poteSelecionadoId) < 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}`}>
+                    Disponível neste pote: {formatarGrana(getSaldoDisponivelPorPote(poteSelecionadoId))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg font-mono border focus:border-emerald-500 transition-colors text-center`} />
+            <button onClick={salvarLancamento} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-5 h-5"/> Registrar Lançamento</button>
+          </div>
+        </div>
+      )}
+
+      {animacaoEntrada && animacaoEntrada.ativo && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/50 animate-pop-in max-h-[90vh] overflow-y-auto`}>
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(16,185,129,0.3)]"><Sparkles className="w-8 h-8" /></div>
+            <div><span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada! Dinheiro Distribuído</span><h3 className="text-3xl font-black font-mono mt-2 drop-shadow-md">{formatarGrana(animacaoEntrada.valorTotal)}</h3></div>
+            <div className="space-y-2 text-left">
+              {animacaoEntrada.detalhes.map((item, idx) => (
+                <div key={idx} style={{animationDelay: `${idx*100}ms`}} className={`${inputBg} p-3 rounded-2xl border flex justify-between items-center text-xs font-bold animate-slide-up`}>
+                  <span>{item.icone} {item.nome} ({item.percentual}%)</span><span className="font-mono text-emerald-500">{formatarGrana(item.valor)}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setAnimacaoEntrada(null)} className="w-full bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg btn-magic mt-4">Concluir</button>
+          </div>
+        </div>
+      )}
+
+      {modalAporteSobra && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setModalAporteSobra(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <h3 className="text-base md:text-lg font-black text-emerald-500 flex items-center gap-2"><Vault className="w-5 h-5" /> Aportar Sobra</h3>
+            <div className="space-y-3">
+              <select value={destinoAporteSobra} onChange={(e) => setDestinoAporteSobra(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`}>
+                <option value="nosso_patrimonio">🐷 Nosso Patrimônio</option>
+                <option value="patrimonio_manuela">👶 Poupança Manuela</option>
+              </select>
+              <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Máximo disponível: {formatarGrana(saldoUnicoReal)}</label>
+              <input type="number" placeholder="Valor R$" value={valorAporteSobra} onChange={(e) => setValorAporteSobra(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
+            </div>
+            <button onClick={efetivarAporteSobraPatrimonio} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Confirmar Aporte</button>
+          </div>
+        </div>
+      )}
+
+      {modalAportePendente && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setModalAportePendente(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <h3 className="text-base md:text-lg font-black">Ajustar Saldo em Caixa</h3>
+            <input type="number" placeholder="Valor R$" value={aportePendenteValor} onChange={(e) => setAportePendenteValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
+            <button onClick={async () => { await salvarDadosNaNuvem({ aportePendenteValor }); setModalAportePendente(false); }} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic">Salvar Alteração</button>
+          </div>
+        </div>
+      )}
+
+      {modalNovoPatrimonio && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2">💎 Item de Patrimônio</h3>
+            <input type="text" placeholder="Nome (Ex: Casa, Carro)" value={nomeNovoPatrimonio} onChange={(e) => setNomeNovoPatrimonio(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`} />
+            <input type="number" placeholder="Valor Atualizado R$" value={valorNovoPatrimonio} onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
+            <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Adicionar</button>
+          </div>
+        </div>
+      )}
+
+      {modalNovaMeta && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500"/> Criar Meta</h3>
+            <input type="text" placeholder="Nome (Ex: Viagem)" value={nomeNovaMeta} onChange={(e) => setNomeNovaMeta(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500`} />
+            <input type="number" placeholder="Valor Alvo Total R$" value={valorNovaMeta} onChange={(e) => setValorNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
+            <div className="space-y-1">
+              <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Puxar do Saldo Livre (Máx: {formatarGrana(saldoUnicoReal)})</label>
+              <input type="number" placeholder="Aporte Inicial R$ (Opcional)" value={guardadoNovaMeta} onChange={(e) => setGuardadoNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
+            </div>
+            <input type="number" placeholder="Prazo Estimado (Meses)" value={mesesNovaMeta} onChange={(e) => setMesesNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
+            <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Salvar Meta</button>
+          </div>
+        </div>
+      )}
+
+      {modalDepositoMeta && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
+            <button onClick={() => setModalDepositoMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><ArrowUpRight className="w-5 h-5 text-emerald-500"/> Depositar na Meta</h3>
+            <div className="space-y-3">
+              <select value={origemDepositoMeta} onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`}>
+                <option value="disponivel">💳 Tirar do Saldo Real ({formatarGrana(saldoUnicoReal)})</option>
+                <option value="nosso_patrimonio">🐷 Resgatar Nosso Patrimônio ({formatarGrana(saldoNossoPatrimonio)})</option>
+                <option value="patrimonio_manuela">👶 Resgatar Poup. Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
+              </select>
+              <input type="number" placeholder="Valor do Depósito R$" value={valorDepositoMeta} onChange={(e) => setValorDepositoMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
+            </div>
+            <button onClick={efetivarTransferenciaMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Efetivar Depósito</button>
+          </div>
+        </div>
+      )}
+
+      {menuAberto && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex justify-end animate-in fade-in duration-200" onClick={() => setMenuAberto(false)}>
+          <div className={`${cardClasse} w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between animate-in slide-in-from-right duration-300 shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+            <div className="space-y-5">
+              <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-black text-emerald-500 flex items-center gap-2"><Sparkles className="w-5 h-5"/> MEU IMPÉRIO</h3>
+              <div className="space-y-1.5 text-xs md:text-sm font-bold">
+                <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'bg-slate-800' : 'bg-slate-100'} text-emerald-500 border border-emerald-500/20`}><User className="w-4 h-4" /> Ver Meu Perfil Gamificado</button>
+                <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard</button>
+                <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} text-amber-500`}><Sliders className="w-4 h-4" /> Editar Configurações</button>
+                <button onClick={() => navegarPara('dividas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><CreditCard className="w-4 h-4 text-rose-500" /> Controle de Dívidas</button>
+                <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras</button>
+                <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><Vault className="w-4 h-4 text-emerald-500" /> Patrimônio Geral</button>
+                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><List className="w-4 h-4 text-emerald-500" /> Extrato de Lançamentos</button>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-slate-800 space-y-2">
+              <button onClick={reiniciarSistemaGeral} className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"><Trash2 className="w-4 h-4" /> Reiniciar (Zerar Tudo)</button>
+              {onLogout && <button onClick={onLogout} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"><LogOut className="w-4 h-4" /> Sair da Conta</button>}
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className={`fixed bottom-0 inset-x-0 border-t p-1.5 flex justify-around items-center z-40 transition-colors duration-500 ${isDark ? 'bg-slate-950/95 border-slate-800' : 'bg-white/95 border-slate-200'} backdrop-blur-lg`}>
-        <button onClick={() => navegarPara('dashboard')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer hover:-translate-y-1 transition-transform"><Home className="w-5 h-5 text-emerald-500" /> Início</button>
-        <button onClick={() => navegarPara('extrato')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer hover:-translate-y-1 transition-transform"><List className="w-5 h-5 text-emerald-500" /> Extrato</button>
+        <button onClick={() => navegarPara('dashboard')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'dashboard' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><Home className="w-5 h-5" /> Início</button>
+        <button onClick={() => navegarPara('extrato')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'extrato' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><List className="w-5 h-5" /> Extrato</button>
         <button onClick={() => setModalLancamento(true)} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/40 -mt-6 btn-magic"><Plus className="w-5 h-5" /></button>
-        <button onClick={() => navegarPara('metas')} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer hover:-translate-y-1 transition-transform"><Target className="w-5 h-5 text-emerald-500" /> Metas</button>
-        <button onClick={() => setMenuAberto(!menuAberto)} className="flex flex-col items-center p-1.5 text-[10px] font-bold opacity-80 hover:opacity-100 cursor-pointer hover:-translate-y-1 transition-transform"><MoreHorizontal className="w-5 h-5 text-emerald-500" /> Mais</button>
+        <button onClick={() => navegarPara('metas')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'metas' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><Target className="w-5 h-5" /> Metas</button>
+        <button onClick={() => navegarPara('perfil')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'perfil' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><User className="w-5 h-5" /> Perfil</button>
       </nav>
     </div>
   );
-
-  // === FUNÇÕES AUXILIARES DE RENDERIZAÇÃO DE MODAIS (Para manter limpo) === //
-  function maxPermitidoParaPendente(pote: Pote | null) {
-    if(!pote) return 0;
-    return 100 - potesAtivos.filter(p => p.id !== pote.id).reduce((acc, p) => acc + p.percentual, 0);
-  }
-
-  function modalPendente(pote: Pote|null, pct: number, max: number, rendaBase: number) {
-    if(!pote) return null;
-    const valorMapeadoPote = (rendaBase * pct) / 100;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setPotePendente(null)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 flex items-center justify-center text-2xl">{pote.iconeEmoji}</div>
-          <div><h3 className="text-base md:text-lg font-black">{pote.nome}</h3><span className="text-xs text-slate-400">Arraste a porcentagem (Máx: {max}%)</span></div>
-          <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-            <div className={`w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-slate-100'} shadow-inner`}>
-              <span className="text-xl font-black">{pct}%</span>
-              <span className="text-[9px] font-bold text-emerald-500">{formatarGrana(valorMapeadoPote)}</span>
-            </div>
-          </div>
-          <input type="range" min="0" max={max} value={pct} onChange={(e) => setPercentualPendente(Number(e.target.value))} className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-          <button onClick={confirmarAdicionarPote} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Confirmar</button>
-        </div>
-      </div>
-    );
-  }
-
-  function modalRegistrarLancamento() {
-    if(!modalLancamento) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setModalLancamento(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Sparkles className="w-5 h-5 text-emerald-500"/> Novo Lançamento</h3>
-          
-          <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-            <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-500 text-white shadow-md' : textMuted}`}>Gasto (Saída)</button>
-            <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>Renda (Entrada)</button>
-          </div>
-
-          {tipoLancamento === 'entrada' ? (
-            <div className="space-y-3 animate-in slide-in-from-right-4 duration-300">
-              <label className={`text-xs font-bold block ${textMuted}`}>Origem da Entrada:</label>
-              <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-                <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'Mercado Livre' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>Mercado Livre</button>
-                <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'CLT' ? 'bg-emerald-500 text-white shadow-md' : textMuted}`}>CLT</button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3 animate-in slide-in-from-left-4 duration-300">
-              <label className={`text-xs font-bold block ${textMuted}`}>Categoria da Saída:</label>
-              <select value={categoriaSaidaSelecionada} onChange={(e) => setCategoriaSaidaSelecionada(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
-                <option value="Supermercado / Compras">🛒 Supermercado / Compras</option>
-                <option value="Combustível / Transporte">🚗 Combustível / Transporte</option>
-                <option value="Desfrute Família">🎮 Desfrute Família</option>
-                <option value="Desfrute Dele">🧔‍♂️ Desfrute Dele</option>
-                <option value="Desfrute Dela">👩 Desfrute Dela</option>
-                <option value="Pagamento de Dívida / Conta Fixa">💳 Pagamento Dívida / Conta</option>
-                <option value="Outros Gastos">📦 Outros Gastos</option>
-              </select>
-
-              <div className="space-y-1">
-                <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
-                <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
-                  <option value="divida_fixa">💳 Direto do Saldo Livre (Disp: {formatarGrana(getSaldoDisponivelPorPote('divida_fixa'))})</option>
-                  {potesAtivos.map(p => (
-                    <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome} (Disp: {formatarGrana(getSaldoDisponivelPorPote(p.id))})</option>
-                  ))}
-                </select>
-                <div className={`text-[10px] text-right font-black pt-1 ${getSaldoDisponivelPorPote(poteSelecionadoId) < 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}`}>
-                  Disponível neste pote: {formatarGrana(getSaldoDisponivelPorPote(poteSelecionadoId))}
-                </div>
-              </div>
-            </div>
-          )}
-          <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg font-mono border focus:border-emerald-500 transition-colors text-center`} />
-          <button onClick={salvarLancamento} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-5 h-5"/> Registrar Lançamento</button>
-        </div>
-      </div>
-    )}
-
-  function modalEntradaAnimada() {
-    if(!animacaoEntrada || !animacaoEntrada.ativo) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/50 animate-pop-in max-h-[90vh] overflow-y-auto`}>
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(16,185,129,0.3)]"><Sparkles className="w-8 h-8" /></div>
-          <div><span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">Entrada Registrada! Dinheiro Distribuído</span><h3 className="text-3xl font-black font-mono mt-2 drop-shadow-md">{formatarGrana(animacaoEntrada.valorTotal)}</h3></div>
-          <div className="space-y-2 text-left">
-            {animacaoEntrada.detalhes.map((item, idx) => (
-              <div key={idx} style={{animationDelay: `${idx*100}ms`}} className={`${inputBg} p-3 rounded-2xl border flex justify-between items-center text-xs font-bold animate-slide-up`}>
-                <span>{item.icone} {item.nome} ({item.percentual}%)</span><span className="font-mono text-emerald-500">{formatarGrana(item.valor)}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => setAnimacaoEntrada(null)} className="w-full bg-emerald-500 text-white font-black py-3.5 rounded-2xl shadow-lg btn-magic mt-4">Concluir</button>
-        </div>
-      </div>
-    )}
-
-  function modalAjustarAporte() {
-    if(!modalAportePendente) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setModalAportePendente(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <h3 className="text-base md:text-lg font-black">Ajustar Saldo em Caixa</h3>
-          <input type="number" placeholder="Valor R$" value={aportePendenteValor} onChange={(e) => setAportePendenteValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
-          <button onClick={async () => { await salvarDadosNaNuvem({ aportePendenteValor }); setModalAportePendente(false); }} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic">Salvar Alteração</button>
-        </div>
-      </div>
-    )}
-
-  function modalAportarSobra() {
-    if(!modalAporteSobra) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setModalAporteSobra(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <h3 className="text-base md:text-lg font-black text-emerald-500 flex items-center gap-2"><Vault className="w-5 h-5" /> Aportar Sobra</h3>
-          <p className={`text-xs ${textMuted}`}>Guarde um dinheiro que sobrou do Saldo Livre para aumentar o patrimônio.</p>
-          <div className="space-y-3">
-            <select value={destinoAporteSobra} onChange={(e) => setDestinoAporteSobra(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`}>
-              <option value="nosso_patrimonio">🐷 Nosso Patrimônio</option>
-              <option value="patrimonio_manuela">👶 Poupança Manuela</option>
-            </select>
-            <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Máximo disponível: {formatarGrana(saldoUnicoReal)}</label>
-            <input type="number" placeholder="Valor R$" value={valorAporteSobra} onChange={(e) => setValorAporteSobra(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
-          </div>
-          <button onClick={efetivarAporteSobraPatrimonio} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Confirmar Aporte</button>
-        </div>
-      </div>
-    )}
-
-  function modalNovoPatrimonioManual() {
-    if(!modalNovoPatrimonio) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <h3 className="text-base md:text-lg font-black flex items-center gap-2">💎 Item de Patrimônio</h3>
-          <input type="text" placeholder="Nome (Ex: Casa, Carro)" value={nomeNovoPatrimonio} onChange={(e) => setNomeNovoPatrimonio(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`} />
-          <input type="number" placeholder="Valor Atualizado R$" value={valorNovoPatrimonio} onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
-          <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Adicionar</button>
-        </div>
-      </div>
-    )}
-
-  function modalCriarMeta() {
-    if(!modalNovaMeta) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500"/> Criar Meta</h3>
-          <input type="text" placeholder="Nome (Ex: Viagem)" value={nomeNovaMeta} onChange={(e) => setNomeNovaMeta(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500`} />
-          <input type="number" placeholder="Valor Alvo Total R$" value={valorNovaMeta} onChange={(e) => setValorNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
-          <div className="space-y-1">
-            <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Puxar do Saldo Livre (Máx: {formatarGrana(saldoUnicoReal)})</label>
-            <input type="number" placeholder="Aporte Inicial R$ (Opcional)" value={guardadoNovaMeta} onChange={(e) => setGuardadoNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
-          </div>
-          <input type="number" placeholder="Prazo Estimado (Meses)" value={mesesNovaMeta} onChange={(e) => setMesesNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
-          <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Salvar Meta</button>
-        </div>
-      </div>
-    )}
-
-  function modalDepositarMeta() {
-    if(!modalDepositoMeta) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className={`${cardClasse} rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
-          <button onClick={() => setModalDepositoMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-          <h3 className="text-base md:text-lg font-black flex items-center gap-2"><ArrowUpRight className="w-5 h-5 text-emerald-500"/> Depositar na Meta</h3>
-          <div className="space-y-3">
-            <select value={origemDepositoMeta} onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`}>
-              <option value="disponivel">💳 Tirar do Saldo Real ({formatarGrana(saldoUnicoReal)})</option>
-              <option value="nosso_patrimonio">🐷 Resgatar Nosso Patrimônio ({formatarGrana(saldoNossoPatrimonio)})</option>
-              <option value="patrimonio_manuela">👶 Resgatar Poup. Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
-            </select>
-            <input type="number" placeholder="Valor do Depósito R$" value={valorDepositoMeta} onChange={(e) => setValorDepositoMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
-          </div>
-          <button onClick={efetivarTransferenciaMeta} className="w-full bg-emerald-500 text-white font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Efetivar Depósito</button>
-        </div>
-      </div>
-    )}
-
-  function modalMenuLateral() {
-    if(!menuAberto) return null;
-    return (
-      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex justify-end animate-in fade-in duration-200" onClick={() => setMenuAberto(false)}>
-        <div className={`${cardClasse} w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between animate-in slide-in-from-right duration-300 shadow-2xl`} onClick={(e) => e.stopPropagation()}>
-          <div className="space-y-5">
-            <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-            <h3 className="text-lg font-black text-emerald-500 flex items-center gap-2"><Sparkles className="w-5 h-5"/> MEU IMPÉRIO</h3>
-            <div className="space-y-1.5 text-xs md:text-sm font-bold">
-              <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard</button>
-              <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'} text-amber-500`}><Sliders className="w-4 h-4" /> Editar Configurações</button>
-              <button onClick={() => navegarPara('dividas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><CreditCard className="w-4 h-4 text-rose-500" /> Controle de Dívidas</button>
-              <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras</button>
-              <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><Vault className="w-4 h-4 text-emerald-500" /> Patrimônio Geral</button>
-              <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}><List className="w-4 h-4 text-emerald-500" /> Extrato de Lançamentos</button>
-            </div>
-          </div>
-          <div className="pt-4 border-t border-slate-800 space-y-2">
-            <button onClick={reiniciarSistemaGeral} className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"><Trash2 className="w-4 h-4" /> Reiniciar (Zerar Tudo)</button>
-            {onLogout && <button onClick={onLogout} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"><LogOut className="w-4 h-4" /> Sair da Conta</button>}
-          </div>
-        </div>
-      </div>
-    )}
-
 };
 
 export default FinanceCenterView;
