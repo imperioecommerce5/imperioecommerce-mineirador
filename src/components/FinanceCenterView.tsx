@@ -433,13 +433,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const formatarGrana = (valor: number) => tamparValores ? 'R$ •••••' : `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const isDark = tema === 'escuro';
-  // Paleta de cores corporativa/fintech moderna, com alta profundidade visual e menos tom lúdico
   const bgClasse = isDark ? 'bg-[#07090E] text-slate-100' : 'bg-[#F2F4F7] text-slate-900';
-  const cardClasse = isDark ? 'bg-[#0F141D] border-slate-800/90 shadow-xl shadow-black/40 text-slate-100 backdrop-blur-xl' : 'bg-white border-slate-200/90 shadow-lg text-slate-900 backdrop-blur-xl';
+  const cardClasse = isDark ? 'bg-[#0F141D] border-slate-800/95 shadow-xl shadow-black/40 text-slate-100 backdrop-blur-xl' : 'bg-white border-slate-200/95 shadow-lg text-slate-900 backdrop-blur-xl';
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
   const inputBg = isDark ? 'bg-[#090C12] text-slate-100 border-slate-800' : 'bg-slate-50 text-slate-900 border-slate-300';
 
-  if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse text-emerald-400`}><Sparkles className="w-8 h-8 mr-2 animate-spin" /> Carregando Império...</div>;
+  if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse text-emerald-400`}><Sparkles className="w-8 h-8 mr-2 animate-spin" /> A carregar Império...</div>;
 
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative overflow-x-hidden`}>
@@ -715,14 +714,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
           <div className="space-y-3 pt-2">
             <p className={`text-xs font-bold uppercase tracking-wider text-center md:text-left ${textMuted}`}>Adicionar Componentes ao Portfólio:</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {/* CORREÇÃO DO LAYOUT: Grelha ajustada para evitar esmagamento e quebras excessivas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {todosPotesDisponiveis.map((pote, idx) => {
                 const selecionado = potesAtivos.some(p => p.id === pote.id);
                 return (
-                  <button key={pote.id} disabled={selecionado} onClick={() => solicitarAdicaoPote(pote)} style={{animationDelay: `${idx * 40}ms`}} className={`p-3 rounded-2xl border text-center flex flex-col items-center space-y-1.5 transition-all animate-pop-in ${selecionado ? 'opacity-30 border-slate-800 cursor-not-allowed bg-slate-900/40' : `${cardClasse} hover:border-emerald-500 active:scale-95 cursor-pointer`}`}>
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">{renderizarIconePote(pote.iconeTipo, "w-4 h-4")}</div>
-                    <span className="text-[11px] font-bold truncate w-full">{pote.nome}</span>
-                    <span className="text-[10px] font-extrabold text-emerald-400">{selecionado ? 'Ativo' : '+ Adicionar'}</span>
+                  <button key={pote.id} disabled={selecionado} onClick={() => solicitarAdicaoPote(pote)} style={{animationDelay: `${idx * 40}ms`}} className={`p-4 rounded-2xl border text-center flex flex-col items-center space-y-2 transition-all animate-pop-in ${selecionado ? 'opacity-30 border-slate-800 cursor-not-allowed bg-slate-900/40' : `${cardClasse} hover:border-emerald-500 active:scale-95 cursor-pointer`}`}>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">{renderizarIconePote(pote.iconeTipo, "w-5 h-5")}</div>
+                    <span className="text-xs font-bold w-full leading-tight">{pote.nome}</span>
+                    <span className={`text-[10px] font-extrabold ${selecionado ? 'text-slate-500' : 'text-emerald-400'}`}>{selecionado ? 'Ativo no Portfólio' : '+ Adicionar Componente'}</span>
                   </button>
                 );
               })}
@@ -750,7 +750,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className={`${cardClasse} rounded-3xl p-6 md:p-8 flex flex-col justify-between space-y-4 border border-emerald-500/30 relative overflow-hidden card-magic shadow-2xl`}>
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
             <div>
-              <span className={`text-[11px] uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><Vault className="w-4 h-4 text-emerald-400"/> SALDO REAL LÍVIDO DISPONÍVEL</span>
+              <span className={`text-[11px] uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><Vault className="w-4 h-4 text-emerald-400"/> SALDO REAL LÍQUIDO DISPONÍVEL</span>
               <div className="text-4xl md:text-5xl font-black text-emerald-400 mt-2 font-mono tracking-tight drop-shadow-md">
                 {formatarGrana(saldoUnicoReal)}
               </div>
@@ -941,7 +941,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
           </div>
           <div className="space-y-2">
-            {transacoesFiltradas.length === 0 && <p className="text-center text-xs py-10 text-slate-500 font-semibold">Nenhuma transação registrada até o momento.</p>}
+            {transacoesFiltradas.length === 0 && <p className="text-center text-xs py-10 text-slate-500 font-semibold">Nenhuma transação registada até ao momento.</p>}
             {transacoesFiltradas.map((t, idx) => (
               <div key={t.id} className={`${cardClasse} rounded-2xl p-3.5 flex justify-between items-center text-xs md:text-sm animate-pop-in border border-slate-800`} style={{animationDelay: `${Math.min(idx*40, 400)}ms`}}>
                 <div className="flex items-center space-x-3">
@@ -1013,7 +1013,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             )}
 
             <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-xl font-black text-lg font-mono border focus:border-emerald-500 text-center`} />
-            <button onClick={salvarLancamento} className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4"/> Efetivar Registro</button>
+            <button onClick={salvarLancamento} className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4"/> Efetivar Registo</button>
           </div>
         </div>
       )}
@@ -1067,7 +1067,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Disponível: {formatarGrana(saldoUnicoReal)}</label>
               <input type="number" placeholder="Valor R$" value={valorAporteSobra} onChange={(e) => setValorAporteSobra(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-xl font-black text-lg text-center font-mono border`} />
             </div>
-            <button onClick={efetivarAporteSobraPatrimonio} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-xl btn-magic">Efetificar Aporte</button>
+            <button onClick={efetivarAporteSobraPatrimonio} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-xl btn-magic">Efetivar Aporte</button>
           </div>
         </div>
       )}
