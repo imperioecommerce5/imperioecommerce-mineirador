@@ -483,7 +483,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     await salvarDadosNaNuvem({ transacoes: novasTransacoes });
   };
 
-  const formatarGrana = (valor: number) => tamparValores ? 'R$ •••••' : `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatarGrana = (valor: number) => tamparValores ? 'R$\u00A0•••••' : `R$\u00A0${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const isDark = tema === 'escuro';
   const bgClasse = isDark ? 'bg-[#070A10] text-slate-100' : 'bg-[#F4F7FB] text-slate-800';
@@ -661,7 +661,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <div className="neon-border-glow">
               <div className={`${cardClasse} rounded-[33px] p-6 md:p-10 text-center relative overflow-hidden`}>
                 <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
-                <div className="text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl">
+                <div className="text-4xl sm:text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl whitespace-nowrap">
                   {formatarGrana(patrimonioTotalConsolidado)}
                 </div>
               </div>
@@ -929,7 +929,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
               <div>
                 <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><span className="text-base animate-heartbeat">💰</span> SALDO REAL DISPONÍVEL NA CONTA</span>
-                <div className={`text-4xl md:text-5xl font-black ${configCorAtual.text} mt-2 font-mono tracking-tight drop-shadow-md`}>
+                <div className={`text-3xl sm:text-4xl md:text-5xl font-black ${configCorAtual.text} mt-2 font-mono tracking-tight drop-shadow-md whitespace-nowrap`}>
                   {formatarGrana(saldoUnicoReal)}
                 </div>
               </div>
@@ -951,7 +951,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <span className="font-black text-sm block">Nosso Patrimônio ({pctNossoPatrimonio}%)</span>
                 </div>
               </div>
-              <span className={`font-mono font-black ${configCorAtual.text} text-base`}>{formatarGrana(saldoNossoPatrimonio)}</span>
+              <span className={`font-mono font-black ${configCorAtual.text} text-base whitespace-nowrap`}>{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
             <div className={`${cardClasse} card-layered rounded-full px-6 py-4 flex items-center justify-between border-l-4 border-l-cyan-500 transition-all cursor-pointer animate-slide-up`} style={{animationDelay: '200ms'}} onClick={() => navegarPara('patrimonio')}>
               <div className="flex items-center space-x-3">
@@ -961,7 +961,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <span className="font-black text-sm block">Poupança Manuela ({pctPatrimonioManuela}%)</span>
                 </div>
               </div>
-              <span className="font-mono font-black text-cyan-500 dark:text-cyan-400 text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
+              <span className="font-mono font-black text-cyan-500 dark:text-cyan-400 text-base whitespace-nowrap">{formatarGrana(saldoPatrimonioManuela)}</span>
             </div>
           </div>
 
@@ -992,7 +992,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                     <span className="text-3xl mb-1">{pote.iconeEmoji}</span>
                     <span className="text-xs font-bold truncate px-6 w-full">{pote.nome}</span>
                     <div className="w-full pt-1">
-                      <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : configCorAtual.text}`}>{formatarGrana(saldoRealPote)}</span>
+                      <span className={`text-xs font-black font-mono block whitespace-nowrap ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : configCorAtual.text}`}>{formatarGrana(saldoRealPote)}</span>
                       <span className="text-[9px] text-slate-400 font-bold uppercase">Disponível</span>
                     </div>
                   </div>
@@ -1017,12 +1017,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                       <circle cx="50" cy="50" r="40" fill="transparent" stroke={saldoRealPote < 0 ? '#EF4444' : pote.cor} strokeWidth="10" strokeDasharray="251.327" strokeDashoffset={dashOffset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
                     </svg>
                     <div className="flex flex-col items-center justify-center z-10 group-hover:scale-110 transition-transform duration-300">
-                      <span className={`text-sm md:text-base font-black font-mono ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : ''}`}>{formatarGrana(saldoRealPote)}</span>
+                      <span className={`text-sm md:text-base font-black font-mono whitespace-nowrap ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : ''}`}>{formatarGrana(saldoRealPote)}</span>
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Disponível</span>
                     </div>
                   </div>
                   <div className="space-y-0.5 w-full bg-slate-100 dark:bg-slate-800/40 p-3 rounded-full border border-slate-200 dark:border-slate-800/80">
-                    <span className={`text-[11px] font-bold block ${textMuted}`}>Alocado: {formatarGrana(valorDiluidoNoPote)}</span>
+                    <span className={`text-[11px] font-bold block whitespace-nowrap ${textMuted}`}>Alocado: {formatarGrana(valorDiluidoNoPote)}</span>
                   </div>
                 </div>
               );
@@ -1045,24 +1045,24 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className="neon-border-glow">
             <div className={`${cardClasse} rounded-[33px] p-6 text-center space-y-2`}>
               <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Consolidado</span>
-              <div className={`text-3xl md:text-4xl font-black ${configCorAtual.text} font-mono drop-shadow-md`}>{formatarGrana(patrimonioTotalConsolidado)}</div>
+              <div className={`text-3xl md:text-4xl font-black ${configCorAtual.text} font-mono drop-shadow-md whitespace-nowrap`}>{formatarGrana(patrimonioTotalConsolidado)}</div>
             </div>
           </div>
 
           <div className="space-y-3">
             <div className={`${cardClasse} card-layered rounded-full px-6 py-4 flex justify-between items-center border-l-4 border-l-emerald-500 animate-pop-in`} style={{animationDelay: '100ms'}}>
               <div className="flex items-center space-x-3"><span className="text-2xl">🐷</span><div><span className="font-bold block text-sm">Nosso Patrimônio (Pote)</span></div></div>
-              <span className={`font-mono font-black ${configCorAtual.text} text-sm md:text-base`}>{formatarGrana(saldoNossoPatrimonio)}</span>
+              <span className={`font-mono font-black ${configCorAtual.text} text-sm md:text-base whitespace-nowrap`}>{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
             <div className={`${cardClasse} card-layered rounded-full px-6 py-4 flex justify-between items-center border-l-4 border-l-cyan-500 animate-pop-in`} style={{animationDelay: '200ms'}}>
               <div className="flex items-center space-x-3"><span className="text-2xl">👶</span><div><span className="font-bold block text-sm">Poupança Manuela</span></div></div>
-              <span className="font-mono font-black text-cyan-500 dark:text-cyan-400 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
+              <span className="font-mono font-black text-cyan-500 dark:text-cyan-400 text-sm md:text-base whitespace-nowrap">{formatarGrana(saldoPatrimonioManuela)}</span>
             </div>
             {itensPatrimonioManuais.map((item, idx) => (
               <div key={item.id} className={`${cardClasse} card-layered rounded-full px-6 py-4 flex justify-between items-center border-l-4 border-l-amber-500 animate-pop-in`} style={{animationDelay: `${(idx+3)*70}ms`}}>
                 <div className="flex items-center space-x-3"><span className="text-2xl">💎</span><div><span className="font-bold block text-sm">{item.nome}</span></div></div>
                 <div className="flex items-center space-x-3">
-                  <span className="font-mono font-black text-amber-500 dark:text-amber-400 text-sm md:text-base">{formatarGrana(item.valor)}</span>
+                  <span className="font-mono font-black text-amber-500 dark:text-amber-400 text-sm md:text-base whitespace-nowrap">{formatarGrana(item.valor)}</span>
                   <button onClick={() => removerPatrimonioManual(item.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer hover:scale-125 transition-transform"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
@@ -1079,7 +1079,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           </div>
           <div className={`${cardClasse} card-layered rounded-[33px] p-6 text-center space-y-2 border-2 border-rose-500/30`}>
             <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Comprometido Mensalmente</span>
-            <div className="text-3xl md:text-4xl font-black text-rose-500 font-mono drop-shadow-md">{formatarGrana(totalContasFixasValor)}</div>
+            <div className="text-3xl md:text-4xl font-black text-rose-500 font-mono drop-shadow-md whitespace-nowrap">{formatarGrana(totalContasFixasValor)}</div>
           </div>
           <div className="space-y-3">
             {contasFixasObrigatorias.map((c, idx) => {
@@ -1120,7 +1120,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold"><span className={textMuted}>{progressoPct.toFixed(1)}%</span><span className={`font-mono ${configCorAtual.text}`}>{formatarGrana(meta.valorGuardado)} / {formatarGrana(meta.valorAlvo)}</span></div>
+                    <div className="flex justify-between text-xs font-bold"><span className={textMuted}>{progressoPct.toFixed(1)}%</span><span className={`font-mono ${configCorAtual.text} whitespace-nowrap`}>{formatarGrana(meta.valorGuardado)} / {formatarGrana(meta.valorAlvo)}</span></div>
                     <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000" style={{ width: `${progressoPct}%` }}></div></div>
                   </div>
                 </div>
@@ -1157,7 +1157,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   </div>
                 </div>
                 <div className="flex items-center space-x-2.5">
-                  <span className={`font-black font-mono ${t.tipo === 'entrada' ? configCorAtual.text : 'text-rose-500'}`}>{t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}</span>
+                  <span className={`font-black font-mono whitespace-nowrap ${t.tipo === 'entrada' ? configCorAtual.text : 'text-rose-500'}`}>{t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}</span>
                   <button onClick={() => removerTransacao(t.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer hover:scale-125 transition-transform"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
