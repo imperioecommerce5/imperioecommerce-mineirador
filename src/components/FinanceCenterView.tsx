@@ -59,6 +59,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [telaAtiva, setTelaAtiva] = useState<'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil'>('dashboard');
   const [carregandoNuvem, setCarregandoNuvem] = useState<boolean>(true);
   const [erroFirebase, setErroFirebase] = useState<boolean>(false);
+  const [animandoErro, setAnimandoErro] = useState<boolean>(false);
+
+  const dispararTremorErro = () => {
+    setAnimandoErro(true);
+    setTimeout(() => setAnimandoErro(false), 500);
+  };
 
   const navegarPara = (tela: 'onboarding' | 'dashboard' | 'extrato' | 'patrimonio' | 'metas' | 'dividas' | 'perfil') => {
     setTelaAtiva(tela);
@@ -249,7 +255,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   };
 
   const adicionarContaFixaObrigatoria = async () => {
-    if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
+    if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) {
+      dispararTremorErro();
+      return;
+    }
     const novasContas = [...contasFixasObrigatorias, { id: Date.now().toString(), nome: novaContaNome, valor: Number(novaContaValor), mesesTotales: Number(novaContaMeses), mesesRestantes: Number(novaContaMeses) }];
     setContasFixasObrigatorias(novasContas); setNovaContaNome(''); setNovaContaValor(''); setNovaContaMeses('');
     await salvarDadosNaNuvem({ contasFixasObrigatorias: novasContas });
@@ -275,7 +284,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const solicitarAdicaoPote = (pote: Pote) => {
     if (!potesAtivos.some(p => p.id === pote.id)) {
-      if (disponivelGeral <= 0) { alert("100% do saldo já foi mapeado! Reduza outro pote primeiro."); return; }
+      if (disponivelGeral <= 0) { 
+        dispararTremorErro();
+        alert("100% do saldo já foi mapeado! Reduza outro pote primeiro."); 
+        return; 
+      }
       setPotePendente(pote); setPercentualPendente(Math.min(10, disponivelGeral));
     }
   };
@@ -284,7 +297,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     if (potePendente) {
       const poteAtualizado = { ...potePendente, percentual: percentualPendente };
       const novoConjunto = [...potesAtivos.filter(p => p.id !== potePendente.id), poteAtualizado];
-      if (novoConjunto.reduce((acc, p) => acc + p.percentual, 0) > 100) { alert("A soma dos potes ultrapassa 100%!"); return; }
+      if (novoConjunto.reduce((acc, p) => acc + p.percentual, 0) > 100) { 
+        dispararTremorErro();
+        alert("A soma dos potes ultrapassa 100%!"); 
+        return; 
+      }
       setPotesAtivos(novoConjunto); setPotePendente(null);
       await salvarDadosNaNuvem({ potesAtivos: novoConjunto });
     }
@@ -306,7 +323,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   };
 
   const salvarLancamento = async () => {
-    if (!valorLancamento || Number(valorLancamento) <= 0) return;
+    if (!valorLancamento || Number(valorLancamento) <= 0) {
+      dispararTremorErro();
+      return;
+    }
     const valorGasto = Number(valorLancamento);
     if (tipoLancamento === 'entrada') {
       await processarEntradaComAnimacao(valorGasto, origemEntradaModal);
@@ -317,6 +337,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         if (poteAlvo) {
           const saldoDisp = getSaldoDisponivelPorPote(poteAlvo.id);
           if (!poteAlvo.retencaoAutomatica && valorGasto > saldoDisp) {
+            dispararTremorErro();
             alert(`⚠️ Trava de Segurança!\n\nO gasto (${formatarGrana(valorGasto)}) é maior que o saldo disponível no pote "${poteAlvo.nome}" (${formatarGrana(saldoDisp)}).`);
             return;
           }
@@ -345,9 +366,16 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   };
 
   const efetivarAporteSobraPatrimonio = async () => {
-    if (!valorAporteSobra || Number(valorAporteSobra) <= 0) return;
+    if (!valorAporteSobra || Number(valorAporteSobra) <= 0) {
+      dispararTremorErro();
+      return;
+    }
     const valorTransf = Number(valorAporteSobra);
-    if (valorTransf > saldoUnicoReal) { alert("Valor escolhido maior que o Saldo Real atual!"); return; }
+    if (valorTransf > saldoUnicoReal) { 
+      dispararTremorErro();
+      alert("Valor escolhido maior que o Saldo Real atual!"); 
+      return; 
+    }
     const novaSaida: Transacao = { id: Date.now().toString(), descricao: `Aporte Extra em Patrimônio`, valor: valorTransf, tipo: 'saida', poteId: destinoAporteSobra === 'nosso_patrimonio' ? 'aporte_extra_nosso_patrimonio' : 'aporte_extra_patrimonio_manuela', poteNome: destinoAporteSobra === 'nosso_patrimonio' ? 'Nosso Patrimônio (Aporte)' : 'Poupança Manuela (Aporte)', data: new Date().toLocaleDateString('pt-BR') };
     const novasTransacoes = [novaSaida, ...transacoes];
     setTransacoes(novasTransacoes); setValorAporteSobra(''); setModalAporteSobra(false);
@@ -355,7 +383,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   };
 
   const adicionarPatrimonioManual = async () => {
-    if (!nomeNovoPatrimonio || !valorNovoPatrimonio || Number(valorNovoPatrimonio) <= 0) return;
+    if (!nomeNovoPatrimonio || !valorNovoPatrimonio || Number(valorNovoPatrimonio) <= 0) {
+      dispararTremorErro();
+      return;
+    }
     const novosItens = [...itensPatrimonioManuais, { id: Date.now().toString(), nome: nomeNovoPatrimonio, valor: Number(valorNovoPatrimonio), tipo: 'manual' as const }];
     setItensPatrimonioManuais(novosItens); setNomeNovoPatrimonio(''); setValorNovoPatrimonio(''); setModalNovoPatrimonio(false);
     await salvarDadosNaNuvem({ itensPatrimonioManuais: novosItens });
@@ -368,11 +399,18 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   };
 
   const adicionarMeta = async () => {
-    if (!nomeNovaMeta || !valorNovaMeta || Number(valorNovaMeta) <= 0 || !mesesNovaMeta || Number(mesesNovaMeta) <= 0) return;
+    if (!nomeNovaMeta || !valorNovaMeta || Number(valorNovaMeta) <= 0 || !mesesNovaMeta || Number(mesesNovaMeta) <= 0) {
+      dispararTremorErro();
+      return;
+    }
     const valorIni = guardadoNovaMeta !== '' ? Number(guardadoNovaMeta) : 0;
     let novasTransacoes = [...transacoes];
     if (valorIni > 0) {
-      if (valorIni > saldoUnicoReal) { alert("Valor inicial maior que o Saldo Real disponível!"); return; }
+      if (valorIni > saldoUnicoReal) { 
+        dispararTremorErro();
+        alert("Valor inicial maior que o Saldo Real disponível!"); 
+        return; 
+      }
       novasTransacoes = [{ id: Date.now().toString(), descricao: `Aporte inicial Meta: ${nomeNovaMeta}`, valor: valorIni, tipo: 'saida', poteId: 'meta_aporte', poteNome: `Meta: ${nomeNovaMeta}`, data: new Date().toLocaleDateString('pt-BR') }, ...novasTransacoes];
       setTransacoes(novasTransacoes);
     }
@@ -388,16 +426,27 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   };
 
   const efetivarTransferenciaMeta = async () => {
-    if (!metaSelecionadaId || valorDepositoMeta === '' || Number(valorDepositoMeta) <= 0) return;
+    if (!metaSelecionadaId || valorDepositoMeta === '' || Number(valorDepositoMeta) <= 0) {
+      dispararTremorErro();
+      return;
+    }
     const valorTransf = Number(valorDepositoMeta);
     let novasTransacoes = [...transacoes];
     if (origemDepositoMeta === 'disponivel') {
-      if (valorTransf > saldoUnicoReal) { alert("Valor superior ao Saldo Real disponível!"); return; }
+      if (valorTransf > saldoUnicoReal) { 
+        dispararTremorErro();
+        alert("Valor superior ao Saldo Real disponível!"); 
+        return; 
+      }
       novasTransacoes = [{ id: Date.now().toString(), descricao: `Transferência para Meta`, valor: valorTransf, tipo: 'saida', poteId: 'meta_transf', poteNome: 'Depósito Meta', data: new Date().toLocaleDateString('pt-BR') }, ...novasTransacoes];
     } else {
       const nomeOrigemPatri = origemDepositoMeta === 'nosso_patrimonio' ? 'Nosso Patrimônio' : 'Poupança Manuela';
       const saldoMaxPatri = origemDepositoMeta === 'nosso_patrimonio' ? saldoNossoPatrimonio : saldoPatrimonioManuela;
-      if (valorTransf > saldoMaxPatri) { alert(`Valor superior ao disponível em ${nomeOrigemPatri}!`); return; }
+      if (valorTransf > saldoMaxPatri) { 
+        dispararTremorErro();
+        alert(`Valor superior ao disponível em ${nomeOrigemPatri}!`); 
+        return; 
+      }
       novasTransacoes = [{ id: Date.now().toString(), descricao: `Resgate de ${nomeOrigemPatri} para Meta`, valor: valorTransf, tipo: 'saida', poteId: origemDepositoMeta, poteNome: nomeOrigemPatri, data: new Date().toLocaleDateString('pt-BR') }, ...novasTransacoes];
     }
     setTransacoes(novasTransacoes);
@@ -422,32 +471,67 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
   const inputBg = isDark ? 'bg-[#090D16] text-slate-100 border-slate-800' : 'bg-slate-100/70 text-slate-900 border-slate-200';
 
-  if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse text-emerald-500`}><span className="text-2xl mr-2">👑</span> Sincronizando Cofre...</div>;
+  if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse text-emerald-500`}><span className="text-2xl mr-2 animate-heartbeat">👑</span> Sincronizando Cofre...</div>;
 
   return (
-    <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative overflow-x-hidden`}>
+    <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative overflow-x-hidden ${animandoErro ? 'animate-wobble' : ''}`}>
       
       <style>{`
         @keyframes slideInUp { from { transform: translateY(35px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
         @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes rotateGradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes wobble {
+          0%, 100% { transform: translateX(0); }
+          15%, 45%, 75% { transform: translateX(-6px); }
+          30%, 60%, 90% { transform: translateX(6px); }
+        }
+        @keyframes heartbeat {
+          0%, 100% { transform: scale(1); }
+          25% { transform: scale(1.08); }
+          40% { transform: scale(1); }
+          60% { transform: scale(1.04); }
+        }
+        @keyframes floatSparkle {
+          0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
+          50% { transform: translateY(-10px) scale(1.2); opacity: 1; }
+        }
         
         .animate-slide-up { animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-float { animation: floatY 3s ease-in-out infinite; }
+        .animate-wobble { animation: wobble 0.4s ease-in-out; }
+        .animate-heartbeat { animation: heartbeat 2.5s ease-in-out infinite; }
+        .sparkle-particle { animation: floatSparkle 3s ease-in-out infinite; }
         
+        .neon-border-glow {
+          position: relative;
+          border-radius: 2rem;
+          background: linear-gradient(135deg, #10B981, #06B6D4, #34D399, #10B981);
+          background-size: 300% 300%;
+          animation: rotateGradient 5s ease infinite;
+          padding: 2px;
+        }
+
         .btn-magic { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .btn-magic:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 30px -5px rgba(16, 185, 129, 0.4); }
         .btn-magic:active { transform: translateY(1px) scale(0.98); }
         
         .card-layered {
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           box-shadow: ${isDark ? '0 15px 35px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.05)' : '0 12px 30px -8px rgba(0, 0, 0, 0.05), 0 0 1px 1px rgba(0, 0, 0, 0.03)'};
         }
         .card-layered:hover {
-          transform: translateY(-5px);
+          transform: translateY(-4px);
           box-shadow: ${isDark ? '0 25px 50px -12px rgba(16, 185, 129, 0.2), 0 0 1px 1px rgba(16, 185, 129, 0.3)' : '0 20px 40px -10px rgba(16, 185, 129, 0.12), 0 0 1px 1px rgba(16, 185, 129, 0.15)'};
+        }
+        .card-layered:active {
+          transform: scale(0.98) translateY(1px);
         }
         
         .text-shimmer {
@@ -460,6 +544,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
       `}</style>
 
+      {/* Partículas Flutuantes decorativas no fundo */}
+      <div className="absolute top-12 left-6 text-emerald-500/30 sparkle-particle pointer-events-none text-xl">✨</div>
+      <div className="absolute top-48 right-8 text-cyan-500/30 sparkle-particle pointer-events-none text-lg" style={{animationDelay: '1s'}}>👑</div>
+      <div className="absolute bottom-32 left-12 text-emerald-500/20 sparkle-particle pointer-events-none text-xl" style={{animationDelay: '2s'}}>✨</div>
+
       {erroFirebase && (
         <div className="bg-rose-500 text-white text-[10px] md:text-xs font-bold p-2 text-center flex items-center justify-center gap-2 animate-pulse shadow-md">
           <AlertTriangle className="w-4 h-4" /> Firebase bloqueado (Regras). Dados salvos apenas localmente!
@@ -468,7 +557,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-500 ${isDark ? 'border-slate-800/80 bg-[#070A10]/85 backdrop-blur-xl' : 'border-slate-200/80 bg-white/90 backdrop-blur-xl'}`}>
         <div className="flex items-center space-x-2.5 cursor-pointer group" onClick={() => navegarPara('dashboard')}>
-          <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
+          <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform animate-heartbeat">
             <span className="text-base">👑</span>
           </div>
           <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</span>
@@ -508,7 +597,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <div className="relative animate-float">
                 <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-1 shadow-xl shadow-emerald-500/20">
                   <div className={`w-full h-full rounded-[22px] ${isDark ? 'bg-[#0B0F17]' : 'bg-white'} flex items-center justify-center`}>
-                    <span className="text-4xl">👑</span>
+                    <span className="text-4xl animate-heartbeat">👑</span>
                   </div>
                 </div>
                 <div className="absolute -bottom-2 -right-2 bg-[#101726] text-white p-2 rounded-2xl border border-emerald-500/40 shadow-lg">
@@ -521,16 +610,17 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
 
-            <div className={`${cardClasse} card-layered rounded-3xl p-6 md:p-10 text-center relative overflow-hidden border border-emerald-500/30`}>
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500"></div>
-              <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
-              <div className="text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl">
-                {formatarGrana(patrimonioTotalConsolidado)}
+            <div className="neon-border-glow">
+              <div className={`${cardClasse} rounded-[28px] p-6 md:p-10 text-center relative overflow-hidden`}>
+                <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
+                <div className="text-5xl md:text-6xl font-black font-mono text-shimmer drop-shadow-xl">
+                  {formatarGrana(patrimonioTotalConsolidado)}
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className={`${cardClasse} card-layered rounded-3xl p-6 flex flex-col justify-between space-y-4`}>
+              <div className={`${cardClasse} card-layered rounded-3xl p-6 flex flex-col justify-between space-y-4 animate-slide-up`} style={{animationDelay: '100ms'}}>
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20"><Target className="w-6 h-6"/></div>
                   <div>
@@ -549,7 +639,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
               </div>
 
-              <div className={`${cardClasse} card-layered rounded-3xl p-6 flex flex-col justify-between space-y-4`}>
+              <div className={`${cardClasse} card-layered rounded-3xl p-6 flex flex-col justify-between space-y-4 animate-slide-up`} style={{animationDelay: '200ms'}}>
                 <div className="flex items-center gap-3">
                   <div className={`p-3 rounded-2xl border ${saudeDividas > 70 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : saudeDividas > 40 ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}><ShieldCheck className="w-6 h-6"/></div>
                   <div>
@@ -573,19 +663,19 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <div className="pt-4 space-y-3">
               <h3 className="font-black text-sm uppercase tracking-wider pl-2 border-l-4 border-emerald-500">Mural de Troféus</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 ${saldoNossoPatrimonio > 0 ? 'border-emerald-500/30' : 'opacity-50 grayscale'}`}>
+                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${saldoNossoPatrimonio > 0 ? 'border-emerald-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '50ms'}}>
                   <span className="text-3xl">🐷</span>
                   <span className="text-[10px] font-bold">Investidor Base</span>
                 </div>
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 ${saldoPatrimonioManuela > 0 ? 'border-cyan-500/30' : 'opacity-50 grayscale'}`}>
+                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${saldoPatrimonioManuela > 0 ? 'border-cyan-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '100ms'}}>
                   <span className="text-3xl">👶</span>
                   <span className="text-[10px] font-bold">Guardião do Futuro</span>
                 </div>
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 ${metas.length > 0 ? 'border-amber-500/30' : 'opacity-50 grayscale'}`}>
+                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${metas.length > 0 ? 'border-amber-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '150ms'}}>
                   <span className="text-3xl">🎯</span>
                   <span className="text-[10px] font-bold">Visionário</span>
                 </div>
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 ${percentualComprometidoDividas === 0 && rendaMensal > 0 ? 'border-purple-500/30' : 'opacity-50 grayscale'}`}>
+                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${percentualComprometidoDividas === 0 && rendaMensal > 0 ? 'border-purple-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '200ms'}}>
                   <span className="text-3xl">👑</span>
                   <span className="text-[10px] font-bold">Zero Dívidas</span>
                 </div>
@@ -612,10 +702,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           </div>
 
           {/* CAMADA 1: RENDA E CAIXA */}
-          <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 relative overflow-hidden`}>
+          <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 relative overflow-hidden animate-slide-up`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
             <div className="flex items-center space-x-2 pb-2 border-b border-slate-200 dark:border-slate-800/60">
-              <span className="text-lg">👑</span>
+              <span className="text-lg animate-heartbeat">👑</span>
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Parâmetros de Entrada</h3>
             </div>
             
@@ -645,7 +735,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           </div>
 
           {/* CAMADA 2: DÍVIDAS E CONTAS */}
-          <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 border-l-4 border-l-rose-500`}>
+          <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 border-l-4 border-l-rose-500 animate-slide-up`} style={{animationDelay: '100ms'}}>
             <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-800/60">
               <div className="flex items-center space-x-2">
                 <span className="text-lg">💳</span>
@@ -667,8 +757,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
             {contasFixasObrigatorias.length > 0 && (
               <div className="space-y-2.5 pt-2 max-h-52 overflow-y-auto pr-1">
-                {contasFixasObrigatorias.map(c => (
-                  <div key={c.id} className={`${inputBg} p-3.5 rounded-2xl flex justify-between items-center text-xs border border-slate-200 dark:border-slate-800 animate-pop-in`}>
+                {contasFixasObrigatorias.map((c, idx) => (
+                  <div key={c.id} className={`${inputBg} p-3.5 rounded-2xl flex justify-between items-center text-xs border border-slate-200 dark:border-slate-800 animate-pop-in`} style={{animationDelay: `${idx*50}ms`}}>
                     <div><span className="font-black block text-sm">{c.nome}</span><span className="text-[10px] text-slate-500 font-mono">{formatarGrana(c.valor)}/mês • {c.mesesTotales}x</span></div>
                     <button onClick={() => removerContaFixaObrigatoria(c.id)} className="text-rose-400 hover:text-rose-600 cursor-pointer hover:scale-125 transition-transform p-1.5"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -683,9 +773,9 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           </div>
 
           {/* CAMADA 3: DIVISÃO DE POTES */}
-          <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 border-l-4 border-l-emerald-500`}>
+          <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 border-l-4 border-l-emerald-500 animate-slide-up`} style={{animationDelay: '200ms'}}>
             <div className="flex items-center space-x-2 pb-2 border-b border-slate-200 dark:border-slate-800/60">
-              <span className="text-lg">👑</span>
+              <span className="text-lg animate-heartbeat">👑</span>
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Passo 2: Divisão de Potes & Destinos</h3>
             </div>
 
@@ -756,7 +846,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           {aportePendenteValor !== '' && Number(aportePendenteValor) > 0 && (
             <div className={`${cardClasse} card-layered rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-600 dark:text-emerald-400 animate-slide-up border border-emerald-500/30`}>
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20"><span className="text-xl">👑</span></div>
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20 animate-heartbeat"><span className="text-xl">👑</span></div>
                 <div>
                   <span className="font-black text-sm block">Aporte / Caixa Inicial Ativo</span>
                   <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Considerado no saldo real: {formatarGrana(Number(aportePendenteValor))}</span>
@@ -766,24 +856,26 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
           )}
 
-          <div className={`${cardClasse} card-layered rounded-[32px] p-6 md:p-8 flex flex-col justify-between space-y-4 border-2 border-emerald-500/40 relative overflow-hidden`}>
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
-            <div>
-              <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><span className="text-base">💰</span> SALDO REAL DISPONÍVEL NA CONTA</span>
-              <div className="text-4xl md:text-5xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono tracking-tight drop-shadow-md">
-                {formatarGrana(saldoUnicoReal)}
+          <div className="neon-border-glow">
+            <div className={`${cardClasse} rounded-[30px] p-6 md:p-8 flex flex-col justify-between space-y-4 relative overflow-hidden`}>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+              <div>
+                <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><span className="text-base animate-heartbeat">💰</span> SALDO REAL DISPONÍVEL NA CONTA</span>
+                <div className="text-4xl md:text-5xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono tracking-tight drop-shadow-md">
+                  {formatarGrana(saldoUnicoReal)}
+                </div>
               </div>
-            </div>
-            <span className={`text-xs ${textMuted}`}>Valores retidos, despesas e aportes já subtraídos. Dinheiro 100% livre.</span>
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button onClick={() => setModalAporteSobra(true)} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2 btn-magic">
-                <TrendingUp className="w-4 h-4" /> Aportar Sobra no Patrimônio
-              </button>
+              <span className={`text-xs ${textMuted}`}>Valores retidos, despesas e aportes já subtraídos. Dinheiro 100% livre.</span>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button onClick={() => setModalAporteSobra(true)} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2 btn-magic">
+                  <TrendingUp className="w-4 h-4" /> Aportar Sobra no Patrimônio
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-emerald-500 transition-all cursor-pointer`} onClick={() => navegarPara('patrimonio')}>
+            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-emerald-500 transition-all cursor-pointer animate-slide-up`} style={{animationDelay: '100ms'}} onClick={() => navegarPara('patrimonio')}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl drop-shadow-md">🐷</span>
                 <div>
@@ -793,7 +885,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
               <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
-            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500 transition-all cursor-pointer`} onClick={() => navegarPara('patrimonio')}>
+            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500 transition-all cursor-pointer animate-slide-up`} style={{animationDelay: '200ms'}} onClick={() => navegarPara('patrimonio')}>
               <div className="flex items-center space-x-3">
                 <span className="text-2xl drop-shadow-md">👶</span>
                 <div>
@@ -825,14 +917,14 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
               if (modoVisualizacaoPotes === 'grid') {
                 return (
-                  <div key={pote.id} style={{animationDelay: `${idx * 100}ms`}} className={`${cardClasse} card-layered rounded-2xl p-4 flex flex-col items-center text-center space-y-2 relative overflow-hidden animate-pop-in`}>
+                  <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-2xl p-4 flex flex-col items-center text-center space-y-2 relative overflow-hidden animate-pop-in`}>
                     {pote.retencaoAutomatica && (
                       <span className="absolute top-2 right-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Auto</span>
                     )}
                     <span className="text-3xl">{pote.iconeEmoji}</span>
                     <span className="text-xs font-bold truncate w-full">{pote.nome}</span>
                     <div className="w-full pt-1 border-t border-slate-200 dark:border-slate-800/80">
-                      <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatarGrana(saldoRealPote)}</span>
+                      <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatarGrana(saldoRealPote)}</span>
                       <span className="text-[9px] text-slate-400 font-bold uppercase">Disponível</span>
                     </div>
                   </div>
@@ -843,7 +935,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
 
               return (
-                <div key={pote.id} style={{animationDelay: `${idx * 100}ms`}} className={`${cardClasse} card-layered rounded-3xl p-5 md:p-6 flex flex-col items-center text-center space-y-4 relative overflow-hidden animate-pop-in`}>
+                <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-3xl p-5 md:p-6 flex flex-col items-center text-center space-y-4 relative overflow-hidden animate-pop-in`}>
                   {pote.retencaoAutomatica && (
                     <span className="absolute top-3 right-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Automático</span>
                   )}
@@ -872,7 +964,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       )}
 
       {telaAtiva === 'patrimonio' && (
-        <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+        <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6 animate-slide-up">
           <div className="flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Vault className="w-6 h-6 text-emerald-500" /> Patrimônio</h2>
             <div className="flex gap-2">
@@ -881,10 +973,14 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
           </div>
           <button onClick={() => setModalAporteSobra(true)} className="w-full md:hidden bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3.5 py-3 rounded-2xl text-xs font-bold cursor-pointer border border-emerald-500/30 flex items-center justify-center gap-2 btn-magic"><Vault className="w-4 h-4" /> + Aportar Sobra Aqui</button>
-          <div className={`${cardClasse} card-layered rounded-3xl p-5 md:p-6 text-center space-y-2 border-2 border-emerald-500/30`}>
-            <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Consolidado</span>
-            <div className="text-3xl md:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono drop-shadow-md">{formatarGrana(patrimonioTotalConsolidado)}</div>
+          
+          <div className="neon-border-glow">
+            <div className={`${cardClasse} rounded-3xl p-5 md:p-6 text-center space-y-2`}>
+              <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Consolidado</span>
+              <div className="text-3xl md:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono drop-shadow-md">{formatarGrana(patrimonioTotalConsolidado)}</div>
+            </div>
           </div>
+
           <div className="space-y-3">
             <div className={`${cardClasse} card-layered rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-emerald-500 animate-pop-in`} style={{animationDelay: '100ms'}}>
               <div className="flex items-center space-x-3"><span className="text-2xl">🐷</span><div><span className="font-bold block text-sm">Nosso Patrimônio (Pote)</span></div></div>
@@ -895,7 +991,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <span className="font-mono font-black text-cyan-500 dark:text-cyan-400 text-sm md:text-base">{formatarGrana(saldoPatrimonioManuela)}</span>
             </div>
             {itensPatrimonioManuais.map((item, idx) => (
-              <div key={item.id} className={`${cardClasse} card-layered rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-amber-500 animate-pop-in`} style={{animationDelay: `${(idx+3)*100}ms`}}>
+              <div key={item.id} className={`${cardClasse} card-layered rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-amber-500 animate-pop-in`} style={{animationDelay: `${(idx+3)*70}ms`}}>
                 <div className="flex items-center space-x-3"><span className="text-2xl">💎</span><div><span className="font-bold block text-sm">{item.nome}</span></div></div>
                 <div className="flex items-center space-x-3">
                   <span className="font-mono font-black text-amber-500 dark:text-amber-400 text-sm md:text-base">{formatarGrana(item.valor)}</span>
@@ -908,7 +1004,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       )}
 
       {telaAtiva === 'dividas' && (
-        <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+        <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6 animate-slide-up">
           <div className="flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><CreditCard className="w-6 h-6 text-rose-500" /> Dívidas</h2>
             <button onClick={() => navegarPara('onboarding')} className="bg-slate-900 text-white border border-slate-800 px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer btn-magic">+ Ajustar</button>
@@ -921,7 +1017,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             {contasFixasObrigatorias.map((c, idx) => {
               const progressoMeses = c.mesesTotales > 0 ? ((c.mesesTotales - c.mesesRestantes) / c.mesesTotales) * 100 : 0;
               return (
-                <div key={c.id} className={`${cardClasse} card-layered rounded-3xl p-5 space-y-3 border border-rose-500/20 animate-pop-in`} style={{animationDelay: `${idx*100}ms`}}>
+                <div key={c.id} className={`${cardClasse} card-layered rounded-3xl p-5 space-y-3 border border-rose-500/20 animate-pop-in`} style={{animationDelay: `${idx*80}ms`}}>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2"><span className="text-2xl">💳</span><div><span className="font-black text-base block">{c.nome}</span><span className="text-[10px] text-slate-500">Parcela: {formatarGrana(c.valor)} / mês</span></div></div>
                     <button onClick={() => pagarParcelaDivida(c.id)} disabled={c.mesesRestantes <= 0} className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 btn-magic shadow-md ${c.mesesRestantes <= 0 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-50' : 'bg-rose-600 text-white'}`}><Check className="w-4 h-4" /> Pagar</button>
@@ -938,7 +1034,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       )}
 
       {telaAtiva === 'metas' && (
-        <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
+        <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6 animate-slide-up">
           <div className="flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Target className="w-6 h-6 text-emerald-500" /> Metas</h2>
             <button onClick={() => setModalNovaMeta(true)} className="bg-emerald-500 text-slate-950 px-3.5 py-2 rounded-2xl text-xs font-black cursor-pointer btn-magic shadow-lg shadow-emerald-500/20">+ Nova Meta</button>
@@ -947,7 +1043,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             {metas.map((meta, idx) => {
               const progressoPct = Math.min(100, (meta.valorGuardado / meta.valorAlvo) * 100);
               return (
-                <div key={meta.id} className={`${cardClasse} card-layered rounded-3xl p-5 space-y-3 border border-emerald-500/20 animate-pop-in`} style={{animationDelay: `${idx*100}ms`}}>
+                <div key={meta.id} className={`${cardClasse} card-layered rounded-3xl p-5 space-y-3 border border-emerald-500/20 animate-pop-in`} style={{animationDelay: `${idx*80}ms`}}>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2"><span className="text-2xl">🎯</span><span className="font-black text-base">{meta.nome}</span></div>
                     <div className="flex items-center space-x-2">
@@ -967,7 +1063,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       )}
 
       {telaAtiva === 'extrato' && (
-        <div className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4">
+        <div className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 animate-slide-up">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-black flex items-center gap-2"><List className="w-6 h-6 text-emerald-500"/> Extrato</h2>
             <div className={`flex ${inputBg} p-1 rounded-xl border text-xs`}>
@@ -979,7 +1075,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className="space-y-2">
             {transacoesFiltradas.length === 0 && <p className="text-center text-xs py-8 text-slate-400">Nenhuma transação.</p>}
             {transacoesFiltradas.map((t, idx) => (
-              <div key={t.id} className={`${cardClasse} card-layered rounded-2xl p-3.5 flex justify-between items-center text-xs md:text-sm animate-pop-in hover:-translate-y-0.5 transition-transform`} style={{animationDelay: `${Math.min(idx*50, 500)}ms`}}>
+              <div key={t.id} className={`${cardClasse} card-layered rounded-2xl p-3.5 flex justify-between items-center text-xs md:text-sm animate-pop-in hover:-translate-y-0.5 transition-transform`} style={{animationDelay: `${Math.min(idx*50, 400)}ms`}}>
                 <div className="flex items-center space-x-2.5">
                   <div className={`p-2 rounded-full ${t.tipo==='entrada'?'bg-emerald-500/10 text-emerald-500':'bg-rose-500/10 text-rose-500'}`}>
                     {t.tipo === 'entrada' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -1008,7 +1104,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} card-layered rounded-3xl p-5 md:p-6 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalLancamento(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><span className="text-xl">👑</span> Novo Lançamento</h3>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><span className="text-xl animate-heartbeat">👑</span> Novo Lançamento</h3>
             
             <div className={`flex ${inputBg} p-1 rounded-xl border`}>
               <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-600 text-white shadow-md' : textMuted}`}>Gasto (Saída)</button>
@@ -1078,11 +1174,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       {animacaoEntrada && animacaoEntrada.ativo && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} card-layered rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/40 animate-pop-in max-h-[90vh] overflow-y-auto`}>
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/25 text-emerald-500 flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-500/30"><span className="text-3xl">👑</span></div>
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/25 text-emerald-500 flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-500/30"><span className="text-3xl animate-heartbeat">👑</span></div>
             <div><span className="text-xs uppercase font-extrabold text-emerald-600 dark:text-emerald-400 tracking-wider">Entrada Registrada! Dinheiro Distribuído</span><h3 className="text-3xl font-black font-mono mt-2 drop-shadow-md">{formatarGrana(animacaoEntrada.valorTotal)}</h3></div>
             <div className="space-y-2 text-left">
               {animacaoEntrada.detalhes.map((item, idx) => (
-                <div key={idx} style={{animationDelay: `${idx*100}ms`}} className={`${inputBg} p-3 rounded-2xl border flex justify-between items-center text-xs font-bold animate-slide-up`}>
+                <div key={idx} style={{animationDelay: `${idx*80}ms`}} className={`${inputBg} p-3 rounded-2xl border flex justify-between items-center text-xs font-bold animate-slide-up`}>
                   <span>{item.icone} {item.nome} ({item.percentual}%)</span><span className="font-mono text-emerald-600 dark:text-emerald-400">{formatarGrana(item.valor)}</span>
                 </div>
               ))}
@@ -1173,7 +1269,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className={`${cardClasse} card-layered w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between shadow-2xl`} onClick={(e) => e.stopPropagation()}>
             <div className="space-y-5">
               <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-              <h3 className="text-lg font-black text-emerald-500 flex items-center gap-2"><span className="text-xl">👑</span> MEU IMPÉRIO</h3>
+              <h3 className="text-lg font-black text-emerald-500 flex items-center gap-2"><span className="text-xl animate-heartbeat">👑</span> MEU IMPÉRIO</h3>
               <div className="space-y-1.5 text-xs md:text-sm font-bold">
                 <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20`}><User className="w-4 h-4" /> Ver Meu Perfil Gamificado</button>
                 <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard</button>
