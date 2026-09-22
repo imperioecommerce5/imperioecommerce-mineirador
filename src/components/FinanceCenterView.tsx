@@ -631,33 +631,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
 
-            {/* SELETOR DE TEMA DE CORES (SALVO LOCALMENTE POR APARELHO) */}
-            <div className={`${cardClasse} card-layered rounded-[32px] p-5 space-y-3`}>
-              <div className="flex items-center gap-2">
-                <Palette className={`w-5 h-5 ${configCorAtual.text}`} />
-                <div>
-                  <span className="font-black text-sm uppercase tracking-wider block">Aparência & Cores do Aparelho</span>
-                  <span className={`text-[10px] ${textMuted}`}>Ajuste exclusivo para este ecrã/telemóvel</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {[
-                  { id: 'esmeralda', nome: 'Esmeralda', emoji: '🟢' },
-                  { id: 'dourado', nome: 'Dourado', emoji: '🟡' },
-                  { id: 'azul', nome: 'Ciberazul', emoji: '🔵' },
-                  { id: 'rosa', nome: 'Rosa Real', emoji: '🌸' }
-                ].map((item) => (
-                  <button 
-                    key={item.id} 
-                    onClick={() => alterarTemaImperial(item.id as any)}
-                    className={`p-3 rounded-full border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer btn-magic ${corTemaImperial === item.id ? 'border-2 bg-emerald-500/10 ' + configCorAtual.text : 'border-slate-700 opacity-70'}`}
-                  >
-                    <span>{item.emoji}</span> {item.nome}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="neon-border-glow">
               <div className={`${cardClasse} rounded-[33px] p-6 md:p-10 text-center relative overflow-hidden`}>
                 <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} mb-2`}>Conquista Acumulada (Patrimônio)</span>
@@ -1347,7 +1320,32 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-full px-5 btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Vault className={`w-4 h-4 ${configCorAtual.text}`} /> Patrimônio Geral</button>
                 <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-full px-5 btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><List className={`w-4 h-4 ${configCorAtual.text}`} /> Extrato de Lançamentos</button>
               </div>
+
+              {/* SELETOR DE CORES ESCONDIDO NO MENU LATERAL */}
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center gap-1.5 px-2">
+                  <Palette className={`w-3.5 h-3.5 ${configCorAtual.text}`} />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aparência do Império</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'esmeralda', nome: 'Esmeralda', emoji: '🟢' },
+                    { id: 'dourado', nome: 'Dourado', emoji: '🟡' },
+                    { id: 'azul', nome: 'Ciberazul', emoji: '🔵' },
+                    { id: 'rosa', nome: 'Rosa Real', emoji: '🌸' }
+                  ].map((item) => (
+                    <button 
+                      key={item.id} 
+                      onClick={() => alterarTemaImperial(item.id as any)}
+                      className={`p-2 rounded-full border font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer btn-magic ${corTemaImperial === item.id ? 'border-2 bg-emerald-500/10 ' + configCorAtual.text : 'border-slate-700 opacity-70'}`}
+                    >
+                      <span>{item.emoji}</span> {item.nome}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
               <button onClick={reiniciarSistemaGeral} className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold p-3 rounded-full flex items-center justify-center gap-2 text-xs transition-colors"><Trash2 className="w-4 h-4" /> Reiniciar (Zerar Tudo)</button>
               {onLogout && <button onClick={onLogout} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold p-3 rounded-full flex items-center justify-center gap-2 text-xs transition-colors"><LogOut className="w-4 h-4" /> Sair da Conta</button>}
