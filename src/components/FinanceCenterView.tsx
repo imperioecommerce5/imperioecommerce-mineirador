@@ -25,7 +25,10 @@ import { 
   AlertTriangle,
   User,
   Award,
-  ShieldCheck
+  ShieldCheck,
+  Zap,
+  Compass,
+  Palette
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -81,9 +84,19 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [metas, setMetas] = useState<Meta[]>([]);
 
   const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
+  const [corTemaImperial, setCorTemaImperial] = useState<'esmeralda' | 'dourado' | 'azul' | 'roxo'>('esmeralda');
   const [tamparValores, setTamparValores] = useState<boolean>(false);
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
+
+  const temasCores = {
+    esmeralda: { primary: '#10B981', secondary: '#34D399', border: 'border-emerald-500/30', text: 'text-emerald-500', bgBtn: 'bg-emerald-500 text-slate-950' },
+    dourado: { primary: '#F59E0B', secondary: '#FBBF24', border: 'border-amber-500/30', text: 'text-amber-500', bgBtn: 'bg-amber-500 text-slate-950' },
+    azul: { primary: '#3B82F6', secondary: '#60A5FA', border: 'border-blue-500/30', text: 'text-blue-500', bgBtn: 'bg-blue-500 text-slate-950' },
+    roxo: { primary: '#8B5CF6', secondary: '#A78BFA', border: 'border-purple-500/30', text: 'text-purple-500', bgBtn: 'bg-purple-500 text-slate-950' }
+  };
+
+  const configCorAtual = temasCores[corTemaImperial];
 
   const todosPotesDisponiveis: Pote[] = [
     { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 0, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
@@ -95,8 +108,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     { id: 'desfrute_dela', nome: 'Desfrute Dela', percentual: 0, cor: '#EC4899', iconeEmoji: '👩' },
   ];
 
-  const salvarDadosNaNuvem = async (novosDados: Partial<{ rendaMensal: number; aportePendenteValor: number | ''; contasFixasObrigatorias: ContaFixa[]; potesAtivos: Pote[]; transacoes: Transacao[]; itensPatrimonioManuais: ItemPatrimonio[]; metas: Meta[]; }>) => {
-    const backupCompleto = { rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, ...novosDados };
+  const salvarDadosNaNuvem = async (novosDados: Partial<{ rendaMensal: number; aportePendenteValor: number | ''; contasFixasObrigatorias: ContaFixa[]; potesAtivos: Pote[]; transacoes: Transacao[]; itensPatrimonioManuais: ItemPatrimonio[]; metas: Meta[]; corTemaImperial: 'esmeralda' | 'dourado' | 'azul' | 'roxo'; }>) => {
+    const backupCompleto = { rendaMensal, aportePendenteValor, contasFixasObrigatorias, potesAtivos, transacoes, itensPatrimonioManuais, metas, corTemaImperial, ...novosDados };
     localStorage.setItem('meu_imperio_backup', JSON.stringify(backupCompleto));
     try {
       const docRef = doc(db, 'imperio_finance', docId);
@@ -124,6 +137,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         setTransacoes(dados.transacoes ?? []);
         setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
         setMetas(dados.metas ?? []);
+        if (dados.corTemaImperial) setCorTemaImperial(dados.corTemaImperial);
         if (!dados.potesAtivos || dados.potesAtivos.length === 0) setTelaAtiva('onboarding');
       } else {
         const localBackup = localStorage.getItem('meu_imperio_backup');
@@ -136,6 +150,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           setTransacoes(dados.transacoes ?? []);
           setItensPatrimonioManuais(dados.itensPatrimonioManuais ?? []);
           setMetas(dados.metas ?? []);
+          if (dados.corTemaImperial) setCorTemaImperial(dados.corTemaImperial);
           setDoc(docRef, dados, { merge: true }).catch(() => setErroFirebase(true));
         } else {
           setTelaAtiva('onboarding');
@@ -471,7 +486,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
   const inputBg = isDark ? 'bg-[#090D16] text-slate-100 border-slate-800' : 'bg-slate-100/70 text-slate-900 border-slate-200';
 
-  if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse text-emerald-500`}><span className="text-2xl mr-2 animate-heartbeat">👑</span> Sincronizando Cofre...</div>;
+  if (carregandoNuvem) return <div className={`min-h-screen ${bgClasse} flex items-center justify-center font-bold animate-pulse ${configCorAtual.text}`}><span className="text-2xl mr-2 animate-heartbeat">👑</span> Sincronizando Cofre...</div>;
 
   return (
     <div className={`min-h-screen ${bgClasse} font-sans tracking-tight flex flex-col justify-between transition-colors duration-500 pb-28 select-none relative overflow-x-hidden ${animandoErro ? 'animate-wobble' : ''}`}>
@@ -512,14 +527,14 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         .neon-border-glow {
           position: relative;
           border-radius: 2rem;
-          background: linear-gradient(135deg, #10B981, #06B6D4, #34D399, #10B981);
+          background: ${corTemaImperial === 'dourado' ? 'linear-gradient(135deg, #F59E0B, #FBBF24, #F59E0B)' : corTemaImperial === 'azul' ? 'linear-gradient(135deg, #3B82F6, #60A5FA, #3B82F6)' : corTemaImperial === 'roxo' ? 'linear-gradient(135deg, #8B5CF6, #A78BFA, #8B5CF6)' : 'linear-gradient(135deg, #10B981, #34D399, #10B981)'};
           background-size: 300% 300%;
           animation: rotateGradient 5s ease infinite;
           padding: 2px;
         }
 
         .btn-magic { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .btn-magic:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 30px -5px rgba(16, 185, 129, 0.4); }
+        .btn-magic:hover { transform: translateY(-3px) scale(1.02); }
         .btn-magic:active { transform: translateY(1px) scale(0.98); }
         
         .card-layered {
@@ -528,14 +543,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
         .card-layered:hover {
           transform: translateY(-4px);
-          box-shadow: ${isDark ? '0 25px 50px -12px rgba(16, 185, 129, 0.2), 0 0 1px 1px rgba(16, 185, 129, 0.3)' : '0 20px 40px -10px rgba(16, 185, 129, 0.12), 0 0 1px 1px rgba(16, 185, 129, 0.15)'};
         }
         .card-layered:active {
           transform: scale(0.98) translateY(1px);
         }
         
         .text-shimmer {
-          background: linear-gradient(to right, #10B981 20%, #34D399 40%, #34D399 60%, #10B981 80%);
+          background: ${corTemaImperial === 'dourado' ? 'linear-gradient(to right, #F59E0B 20%, #FBBF24 40%, #FBBF24 60%, #F59E0B 80%)' : corTemaImperial === 'azul' ? 'linear-gradient(to right, #3B82F6 20%, #60A5FA 40%, #60A5FA 60%, #3B82F6 80%)' : corTemaImperial === 'roxo' ? 'linear-gradient(to right, #8B5CF6 20%, #A78BFA 40%, #A78BFA 60%, #8B5CF6 80%)' : 'linear-gradient(to right, #10B981 20%, #34D399 40%, #34D399 60%, #10B981 80%)'};
           background-size: 200% auto;
           color: transparent;
           -webkit-background-clip: text;
@@ -544,7 +558,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         }
       `}</style>
 
-      {/* Partículas Flutuantes decorativas no fundo */}
       <div className="absolute top-12 left-6 text-emerald-500/30 sparkle-particle pointer-events-none text-xl">✨</div>
       <div className="absolute top-48 right-8 text-cyan-500/30 sparkle-particle pointer-events-none text-lg" style={{animationDelay: '1s'}}>👑</div>
       <div className="absolute bottom-32 left-12 text-emerald-500/20 sparkle-particle pointer-events-none text-xl" style={{animationDelay: '2s'}}>✨</div>
@@ -557,10 +570,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
       <header className={`p-3 md:p-4 border-b flex justify-between items-center sticky top-0 z-30 transition-colors duration-500 ${isDark ? 'border-slate-800/80 bg-[#070A10]/85 backdrop-blur-xl' : 'border-slate-200/80 bg-white/90 backdrop-blur-xl'}`}>
         <div className="flex items-center space-x-2.5 cursor-pointer group" onClick={() => navegarPara('dashboard')}>
-          <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform animate-heartbeat">
+          <div className={`w-8 h-8 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform animate-heartbeat ${corTemaImperial === 'dourado' ? 'from-amber-600 to-amber-400' : corTemaImperial === 'azul' ? 'from-blue-600 to-blue-400' : corTemaImperial === 'roxo' ? 'from-purple-600 to-purple-400' : ''}`}>
             <span className="text-base">👑</span>
           </div>
-          <span className="text-xl md:text-2xl font-black text-emerald-500 tracking-tight">MEU IMPÉRIO</span>
+          <span className={`text-xl md:text-2xl font-black ${configCorAtual.text} tracking-tight`}>MEU IMPÉRIO</span>
         </div>
         <div className="flex items-center space-x-2">
           <button onClick={() => setTamparValores(!tamparValores)} className={`p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 bg-[#101726] text-slate-300' : 'border-slate-200 bg-white text-slate-700'} hover:text-emerald-500 transition-all cursor-pointer hover:scale-105 shadow-sm`}>
@@ -569,8 +582,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2.5 rounded-2xl border ${isDark ? 'border-slate-800 bg-[#101726] text-slate-300' : 'border-slate-200 bg-white text-slate-700'} hover:text-emerald-500 transition-all cursor-pointer hover:scale-105 shadow-sm`}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button onClick={() => setMenuAberto(!menuAberto)} className="p-2.5 rounded-2xl bg-emerald-500 text-slate-950 btn-magic cursor-pointer shadow-lg shadow-emerald-500/30">
-            <Menu className="w-4 h-4 text-slate-950 font-black" />
+          <button onClick={() => setMenuAberto(!menuAberto)} className={`p-2.5 rounded-2xl ${configCorAtual.bgBtn} btn-magic cursor-pointer shadow-lg`}>
+            <Menu className="w-4 h-4 font-black" />
           </button>
         </div>
       </header>
@@ -581,7 +594,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         let nivelTexto = "Iniciante Aprendiz";
         let nivelCor = "text-slate-400";
         if (patrimonioTotalConsolidado > 5000) { nivelTexto = "Poupador Focado"; nivelCor = "text-cyan-500"; }
-        if (patrimonioTotalConsolidado > 20000) { nivelTexto = "Construtor de Riqueza"; nivelCor = "text-emerald-500"; }
+        if (patrimonioTotalConsolidado > 20000) { nivelTexto = "Construtor de Riqueza"; nivelCor = configCorAtual.text; }
         if (patrimonioTotalConsolidado > 100000) { nivelTexto = "Mestre do Patrimônio"; nivelCor = "text-amber-500"; }
         if (patrimonioTotalConsolidado > 500000) { nivelTexto = "Imperador Financeiro"; nivelCor = "text-purple-500"; }
 
@@ -589,13 +602,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         const totalAlvoMetas = metas.reduce((acc, m) => acc + m.valorAlvo, 0);
         const progressoMetasGeral = totalAlvoMetas > 0 ? (totalGuardadoMetas / totalAlvoMetas) * 100 : 0;
         const saudeDividas = 100 - percentualComprometidoDividas;
-        const saudeCor = saudeDividas > 70 ? 'text-emerald-500' : saudeDividas > 40 ? 'text-amber-500' : 'text-rose-500';
+        const saudeCor = saudeDividas > 70 ? configCorAtual.text : saudeDividas > 40 ? 'text-amber-500' : 'text-rose-500';
 
         return (
           <div className="max-w-3xl mx-auto p-4 md:p-8 w-full space-y-6">
             <div className="flex flex-col items-center text-center space-y-3 pt-4">
               <div className="relative animate-float">
-                <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-1 shadow-xl shadow-emerald-500/20">
+                <div className={`w-24 h-24 rounded-3xl bg-gradient-to-tr ${corTemaImperial === 'dourado' ? 'from-amber-500 to-orange-500' : corTemaImperial === 'azul' ? 'from-blue-500 to-cyan-500' : corTemaImperial === 'roxo' ? 'from-purple-500 to-pink-500' : 'from-emerald-500 to-cyan-500'} p-1 shadow-xl`}>
                   <div className={`w-full h-full rounded-[22px] ${isDark ? 'bg-[#0B0F17]' : 'bg-white'} flex items-center justify-center`}>
                     <span className="text-4xl animate-heartbeat">👑</span>
                   </div>
@@ -607,6 +620,30 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <div>
                 <h2 className="text-2xl font-black">Meu Império</h2>
                 <span className={`text-sm font-extrabold tracking-widest uppercase ${nivelCor}`}>{nivelTexto}</span>
+              </div>
+            </div>
+
+            {/* SELETOR DE TEMA DE CORES */}
+            <div className={`${cardClasse} card-layered rounded-3xl p-5 space-y-3`}>
+              <div className="flex items-center gap-2">
+                <Palette className={`w-5 h-5 ${configCorAtual.text}`} />
+                <span className="font-black text-sm uppercase tracking-wider">Estética & Cor do Império</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { id: 'esmeralda', nome: 'Esmeralda', emoji: '🟢' },
+                  { id: 'dourado', nome: 'Dourado', emoji: '🟡' },
+                  { id: 'azul', nome: 'Ciberazul', emoji: '🔵' },
+                  { id: 'roxo', nome: 'Roxo Real', emoji: '🟣' }
+                ].map((item) => (
+                  <button 
+                    key={item.id} 
+                    onClick={async () => { setCorTemaImperial(item.id as any); await salvarDadosNaNuvem({ corTemaImperial: item.id as any }); }}
+                    className={`p-3 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer btn-magic ${corTemaImperial === item.id ? 'border-2 bg-emerald-500/10 ' + configCorAtual.text : 'border-slate-700 opacity-70'}`}
+                  >
+                    <span>{item.emoji}</span> {item.nome}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -660,24 +697,29 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </div>
             </div>
 
-            <div className="pt-4 space-y-3">
-              <h3 className="font-black text-sm uppercase tracking-wider pl-2 border-l-4 border-emerald-500">Mural de Troféus</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${saldoNossoPatrimonio > 0 ? 'border-emerald-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '50ms'}}>
-                  <span className="text-3xl">🐷</span>
-                  <span className="text-[10px] font-bold">Investidor Base</span>
+            {/* MISSÕES DO IMPERADOR */}
+            <div className="pt-2 space-y-3">
+              <h3 className="font-black text-sm uppercase tracking-wider pl-2 border-l-4 border-emerald-500 flex items-center gap-2"><Compass className="w-4 h-4 text-emerald-500" /> Missões Ativas do Imperador</h3>
+              <div className="space-y-2.5">
+                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex items-center justify-between`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🛡️</span>
+                    <div>
+                      <span className="font-black text-sm block">Escudo Intacto</span>
+                      <span className={`text-[10px] ${textMuted}`}>Manter dívidas abaixo de 30% da renda</span>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-black ${percentualComprometidoDividas <= 30 ? 'text-emerald-500' : 'text-rose-500'}`}>{percentualComprometidoDividas <= 30 ? 'Concluído' : 'Em Risco'}</span>
                 </div>
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${saldoPatrimonioManuela > 0 ? 'border-cyan-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '100ms'}}>
-                  <span className="text-3xl">👶</span>
-                  <span className="text-[10px] font-bold">Guardião do Futuro</span>
-                </div>
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${metas.length > 0 ? 'border-amber-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '150ms'}}>
-                  <span className="text-3xl">🎯</span>
-                  <span className="text-[10px] font-bold">Visionário</span>
-                </div>
-                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex flex-col items-center text-center gap-2 animate-pop-in ${percentualComprometidoDividas === 0 && rendaMensal > 0 ? 'border-purple-500/30' : 'opacity-50 grayscale'}`} style={{animationDelay: '200ms'}}>
-                  <span className="text-3xl">👑</span>
-                  <span className="text-[10px] font-bold">Zero Dívidas</span>
+                <div className={`${cardClasse} card-layered p-4 rounded-2xl flex items-center justify-between`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🧱</span>
+                    <div>
+                      <span className="font-black text-sm block">Construtor de Riqueza</span>
+                      <span className={`text-[10px] ${textMuted}`}>Acumular mais de R$ 5.000 em patrimônio</span>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-black ${patrimonioTotalConsolidado >= 5000 ? 'text-emerald-500' : 'text-amber-500'}`}>{patrimonioTotalConsolidado >= 5000 ? 'Concluído' : `${((patrimonioTotalConsolidado/5000)*100).toFixed(0)}%`}</span>
                 </div>
               </div>
             </div>
@@ -706,7 +748,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
             <div className="flex items-center space-x-2 pb-2 border-b border-slate-200 dark:border-slate-800/60">
               <span className="text-lg animate-heartbeat">👑</span>
-              <h3 className="text-sm font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Parâmetros de Entrada</h3>
+              <h3 className={`text-sm font-extrabold uppercase tracking-wider ${configCorAtual.text}`}>Parâmetros de Entrada</h3>
             </div>
             
             <div className="space-y-5">
@@ -717,7 +759,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
                 <div className="flex items-center text-xl md:text-2xl font-black w-full sm:w-auto justify-end">
                   <span className={`text-sm mr-2 ${textMuted}`}>R$</span>
-                  <input type="number" value={rendaMensal === 0 ? '' : rendaMensal} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setRendaMensal(val); await salvarDadosNaNuvem({ rendaMensal: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono text-emerald-600 dark:text-emerald-400 text-base md:text-2xl`} />
+                  <input type="number" value={rendaMensal === 0 ? '' : rendaMensal} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setRendaMensal(val); await salvarDadosNaNuvem({ rendaMensal: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono ${configCorAtual.text} text-base md:text-2xl`} />
                 </div>
               </div>
 
@@ -728,7 +770,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
                 <div className="flex items-center text-xl md:text-2xl font-black w-full sm:w-auto justify-end">
                   <span className={`text-sm mr-2 ${textMuted}`}>R$</span>
-                  <input type="number" value={aportePendenteValor === 0 ? '' : aportePendenteValor} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? '' : Number(e.target.value); setAportePendenteValor(val); await salvarDadosNaNuvem({ aportePendenteValor: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono text-emerald-600 dark:text-emerald-400 text-base md:text-2xl`} />
+                  <input type="number" value={aportePendenteValor === 0 ? '' : aportePendenteValor} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? '' : Number(e.target.value); setAportePendenteValor(val); await salvarDadosNaNuvem({ aportePendenteValor: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono ${configCorAtual.text} text-base md:text-2xl`} />
                 </div>
               </div>
             </div>
@@ -768,7 +810,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex justify-between items-center text-xs font-bold shadow-inner">
               <span className={textMuted}>Restante após Dívidas (Base de cálculo):</span>
-              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-base">{formatarGrana(rendaRestanteAposDividas)}</span>
+              <span className={`font-mono font-black ${configCorAtual.text} text-base`}>{formatarGrana(rendaRestanteAposDividas)}</span>
             </div>
           </div>
 
@@ -776,7 +818,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className={`${cardClasse} card-layered rounded-[28px] p-6 md:p-8 space-y-6 border-l-4 border-l-emerald-500 animate-slide-up`} style={{animationDelay: '200ms'}}>
             <div className="flex items-center space-x-2 pb-2 border-b border-slate-200 dark:border-slate-800/60">
               <span className="text-lg animate-heartbeat">👑</span>
-              <h3 className="text-sm font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Passo 2: Divisão de Potes & Destinos</h3>
+              <h3 className={`text-sm font-extrabold uppercase tracking-wider ${configCorAtual.text}`}>Passo 2: Divisão de Potes & Destinos</h3>
             </div>
 
             <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
@@ -796,7 +838,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   })()}
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-3xl md:text-4xl font-black tracking-tight text-emerald-600 dark:text-emerald-400 animate-pulse">{totalMapeado}%</span>
+                  <span className={`text-3xl md:text-4xl font-black tracking-tight ${configCorAtual.text} animate-pulse`}>{totalMapeado}%</span>
                   <span className={`text-[10px] font-bold uppercase tracking-wider ${textMuted}`}>{disponivelGeral > 0 ? `${disponivelGeral}% livre` : '100% preenchido'}</span>
                 </div>
               </div>
@@ -808,13 +850,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                       <button onClick={(e) => { e.stopPropagation(); removerPote(pote.id); }} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity p-1"><X className="w-3.5 h-3.5" /></button>
                       <span className="text-3xl mb-1.5 group-hover:scale-110 transition-transform">{pote.iconeEmoji}</span>
                       <span className="text-xs font-bold truncate w-full">{pote.nome}</span>
-                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono mt-1">{pote.percentual}%</span>
+                      <span className={`text-xs font-black ${configCorAtual.text} font-mono mt-1`}>{pote.percentual}%</span>
                     </div>
                   ))}
                 </div>
 
                 {totalMapeado === 100 ? (
-                  <button onClick={() => navegarPara('dashboard')} className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-4 rounded-2xl btn-magic text-sm cursor-pointer shadow-xl shadow-emerald-500/20">Salvar Plano e Ir para o Painel</button>
+                  <button onClick={() => navegarPara('dashboard')} className={`w-full ${configCorAtual.bgBtn} font-black py-4 rounded-2xl btn-magic text-sm cursor-pointer shadow-xl`}>Salvar Plano e Ir para o Painel</button>
                 ) : (
                   <div className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-500 dark:text-amber-400 text-xs font-bold py-3.5 px-4 rounded-2xl text-center shadow-inner">⚠️ A soma total dos potes precisa atingir exatamente 100%.</div>
                 )}
@@ -830,7 +872,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                     <button key={pote.id} disabled={selecionado} onClick={() => solicitarAdicaoPote(pote)} style={{animationDelay: `${idx * 40}ms`}} className={`p-3 rounded-2xl border text-center flex flex-col items-center space-y-1.5 transition-all animate-pop-in ${selecionado ? 'opacity-30 border-slate-200 dark:border-slate-800 grayscale cursor-not-allowed bg-slate-100 dark:bg-slate-900/40' : `${cardClasse} card-layered hover:border-emerald-500 active:scale-95 cursor-pointer`}`}>
                       <span className="text-2xl">{pote.iconeEmoji}</span>
                       <span className="text-[11px] font-bold truncate w-full">{pote.nome}</span>
-                      <span className={`text-[10px] font-extrabold ${selecionado ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{selecionado ? 'Adicionado' : '+ Adicionar'}</span>
+                      <span className={`text-[10px] font-extrabold ${selecionado ? 'text-slate-400' : configCorAtual.text}`}>{selecionado ? 'Adicionado' : '+ Adicionar'}</span>
                     </button>
                   );
                 })}
@@ -843,8 +885,19 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       {telaAtiva === 'dashboard' && (
         <div className="max-w-5xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6">
           
+          {/* INSIGHTS INTELIGENTES NO PAINEL */}
+          <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center space-x-3 border-l-4 ${corTemaImperial === 'dourado' ? 'border-l-amber-500' : corTemaImperial === 'azul' ? 'border-l-blue-500' : corTemaImperial === 'roxo' ? 'border-l-purple-500' : 'border-l-emerald-500'} animate-slide-up`}>
+            <div className={`p-2.5 rounded-2xl bg-emerald-500/10 ${configCorAtual.text} shrink-0`}><Zap className="w-5 h-5"/></div>
+            <div className="text-xs">
+              <span className="font-black block text-sm">💡 Insight do Império</span>
+              <span className={textMuted}>
+                {percentualComprometidoDividas > 40 ? '⚠️ Atenção: Suas dívidas consomem mais de 40% da renda. Foque em quitá-las!' : patrimonioTotalConsolidado > 10000 ? '🚀 Seu patrimônio está em forte expansão! Continue aportando todos os meses.' : '✨ Seu cofre está equilibrado. Lembre-se de registrar cada gasto para manter a precisão absoluta.'}
+              </span>
+            </div>
+          </div>
+
           {aportePendenteValor !== '' && Number(aportePendenteValor) > 0 && (
-            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-600 dark:text-emerald-400 animate-slide-up border border-emerald-500/30`}>
+            <div className={`${cardClasse} card-layered rounded-3xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 ${configCorAtual.text} animate-slide-up border border-emerald-500/30`}>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20 animate-heartbeat"><span className="text-xl">👑</span></div>
                 <div>
@@ -852,7 +905,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Considerado no saldo real: {formatarGrana(Number(aportePendenteValor))}</span>
                 </div>
               </div>
-              <button onClick={() => setModalAportePendente(true)} className="bg-emerald-500 text-slate-950 font-black px-4 py-2 rounded-2xl text-xs btn-magic shrink-0 shadow-md">Ajustar Valor</button>
+              <button onClick={() => setModalAportePendente(true)} className={`bg-emerald-500 text-slate-950 font-black px-4 py-2 rounded-2xl text-xs btn-magic shrink-0 shadow-md ${configCorAtual.bgBtn}`}>Ajustar Valor</button>
             </div>
           )}
 
@@ -861,13 +914,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
               <div>
                 <span className={`text-xs uppercase font-extrabold tracking-widest block ${textMuted} flex items-center gap-1.5`}><span className="text-base animate-heartbeat">💰</span> SALDO REAL DISPONÍVEL NA CONTA</span>
-                <div className="text-4xl md:text-5xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono tracking-tight drop-shadow-md">
+                <div className={`text-4xl md:text-5xl font-black ${configCorAtual.text} mt-2 font-mono tracking-tight drop-shadow-md`}>
                   {formatarGrana(saldoUnicoReal)}
                 </div>
               </div>
               <span className={`text-xs ${textMuted}`}>Valores retidos, despesas e aportes já subtraídos. Dinheiro 100% livre.</span>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button onClick={() => setModalAporteSobra(true)} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2 btn-magic">
+                <button onClick={() => setModalAporteSobra(true)} className={`bg-emerald-500/10 hover:bg-emerald-500/20 ${configCorAtual.text} border border-emerald-500/30 font-bold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2 btn-magic`}>
                   <TrendingUp className="w-4 h-4" /> Aportar Sobra no Patrimônio
                 </button>
               </div>
@@ -883,7 +936,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <span className="font-black text-sm block">Nosso Patrimônio ({pctNossoPatrimonio}%)</span>
                 </div>
               </div>
-              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
+              <span className={`font-mono font-black ${configCorAtual.text} text-base`}>{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
             <div className={`${cardClasse} card-layered rounded-3xl p-4 flex items-center justify-between border-l-4 border-l-cyan-500 transition-all cursor-pointer animate-slide-up`} style={{animationDelay: '200ms'}} onClick={() => navegarPara('patrimonio')}>
               <div className="flex items-center space-x-3">
@@ -899,13 +952,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-black flex items-center gap-2"><LayoutGrid className="w-5 h-5 text-emerald-500"/> Limites de Gastos:</h3>
+              <h3 className="text-lg font-black flex items-center gap-2"><LayoutGrid className={`w-5 h-5 ${configCorAtual.text}`}/> Limites de Gastos:</h3>
               <div className={`flex ${inputBg} p-1.5 rounded-xl border`}>
-                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-2 rounded-lg transition-all cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}><Columns2 className="w-4 h-4" /></button>
-                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-2 rounded-lg transition-all cursor-pointer ${modoVisualizacaoPotes === 'grid' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}><LayoutGrid className="w-4 h-4" /></button>
+                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-2 rounded-lg transition-all cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? `${configCorAtual.bgBtn} font-black shadow-md` : textMuted}`}><Columns2 className="w-4 h-4" /></button>
+                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-2 rounded-lg transition-all cursor-pointer ${modoVisualizacaoPotes === 'grid' ? `${configCorAtual.bgBtn} font-black shadow-md` : textMuted}`}><LayoutGrid className="w-4 h-4" /></button>
               </div>
             </div>
-            <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 btn-magic text-xs md:text-sm shadow-lg shadow-emerald-500/20">
+            <button onClick={() => setModalLancamento(true)} className={`${configCorAtual.bgBtn} font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 btn-magic text-xs md:text-sm shadow-lg`}>
               <Plus className="w-4 h-4" /> + Lançamento
             </button>
           </div>
@@ -919,12 +972,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 return (
                   <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-2xl p-4 flex flex-col items-center text-center space-y-2 relative overflow-hidden animate-pop-in`}>
                     {pote.retencaoAutomatica && (
-                      <span className="absolute top-2 right-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Auto</span>
+                      <span className={`absolute top-2 right-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}>Auto</span>
                     )}
                     <span className="text-3xl">{pote.iconeEmoji}</span>
                     <span className="text-xs font-bold truncate w-full">{pote.nome}</span>
                     <div className="w-full pt-1 border-t border-slate-200 dark:border-slate-800/80">
-                      <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatarGrana(saldoRealPote)}</span>
+                      <span className={`text-xs font-black font-mono block ${saldoRealPote < 0 ? 'text-rose-500 animate-pulse' : configCorAtual.text}`}>{formatarGrana(saldoRealPote)}</span>
                       <span className="text-[9px] text-slate-400 font-bold uppercase">Disponível</span>
                     </div>
                   </div>
@@ -937,7 +990,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               return (
                 <div key={pote.id} style={{animationDelay: `${idx * 80}ms`}} className={`${cardClasse} card-layered rounded-3xl p-5 md:p-6 flex flex-col items-center text-center space-y-4 relative overflow-hidden animate-pop-in`}>
                   {pote.retencaoAutomatica && (
-                    <span className="absolute top-3 right-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Automático</span>
+                    <span className={`absolute top-3 right-3 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}>Automático</span>
                   )}
                   <div className="flex items-center space-x-2 font-black text-sm md:text-base">
                     <span className="text-2xl drop-shadow-md">{pote.iconeEmoji}</span>
@@ -966,25 +1019,25 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       {telaAtiva === 'patrimonio' && (
         <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6 animate-slide-up">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Vault className="w-6 h-6 text-emerald-500" /> Patrimônio</h2>
+            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Vault className={`w-6 h-6 ${configCorAtual.text}`} /> Patrimônio</h2>
             <div className="flex gap-2">
-              <button onClick={() => setModalAporteSobra(true)} className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer hidden md:block border border-emerald-500/30 btn-magic">+ Aportar Sobra</button>
-              <button onClick={() => setModalNovoPatrimonio(true)} className="bg-emerald-500 text-slate-950 px-3.5 py-2 rounded-2xl text-xs font-black cursor-pointer btn-magic shadow-lg shadow-emerald-500/20">+ Item Manual</button>
+              <button onClick={() => setModalAporteSobra(true)} className={`bg-emerald-500/10 ${configCorAtual.text} px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer hidden md:block border border-emerald-500/30 btn-magic`}>+ Aportar Sobra</button>
+              <button onClick={() => setModalNovoPatrimonio(true)} className={`${configCorAtual.bgBtn} px-3.5 py-2 rounded-2xl text-xs font-black cursor-pointer btn-magic shadow-lg`}>+ Item Manual</button>
             </div>
           </div>
-          <button onClick={() => setModalAporteSobra(true)} className="w-full md:hidden bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3.5 py-3 rounded-2xl text-xs font-bold cursor-pointer border border-emerald-500/30 flex items-center justify-center gap-2 btn-magic"><Vault className="w-4 h-4" /> + Aportar Sobra Aqui</button>
+          <button onClick={() => setModalAporteSobra(true)} className={`w-full md:hidden bg-emerald-500/10 ${configCorAtual.text} px-3.5 py-3 rounded-2xl text-xs font-bold cursor-pointer border border-emerald-500/30 flex items-center justify-center gap-2 btn-magic`}><Vault className="w-4 h-4" /> + Aportar Sobra Aqui</button>
           
           <div className="neon-border-glow">
             <div className={`${cardClasse} rounded-3xl p-5 md:p-6 text-center space-y-2`}>
               <span className={`text-xs uppercase font-bold font-mono tracking-wider ${textMuted}`}>Patrimônio Total Consolidado</span>
-              <div className="text-3xl md:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono drop-shadow-md">{formatarGrana(patrimonioTotalConsolidado)}</div>
+              <div className={`text-3xl md:text-4xl font-black ${configCorAtual.text} font-mono drop-shadow-md`}>{formatarGrana(patrimonioTotalConsolidado)}</div>
             </div>
           </div>
 
           <div className="space-y-3">
             <div className={`${cardClasse} card-layered rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-emerald-500 animate-pop-in`} style={{animationDelay: '100ms'}}>
               <div className="flex items-center space-x-3"><span className="text-2xl">🐷</span><div><span className="font-bold block text-sm">Nosso Patrimônio (Pote)</span></div></div>
-              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm md:text-base">{formatarGrana(saldoNossoPatrimonio)}</span>
+              <span className={`font-mono font-black ${configCorAtual.text} text-sm md:text-base`}>{formatarGrana(saldoNossoPatrimonio)}</span>
             </div>
             <div className={`${cardClasse} card-layered rounded-2xl p-4 flex justify-between items-center border-l-4 border-l-cyan-500 animate-pop-in`} style={{animationDelay: '200ms'}}>
               <div className="flex items-center space-x-3"><span className="text-2xl">👶</span><div><span className="font-bold block text-sm">Poupança Manuela</span></div></div>
@@ -1036,8 +1089,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       {telaAtiva === 'metas' && (
         <div className="max-w-2xl mx-auto p-3 md:p-6 w-full space-y-4 md:space-y-6 animate-slide-up">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Target className="w-6 h-6 text-emerald-500" /> Metas</h2>
-            <button onClick={() => setModalNovaMeta(true)} className="bg-emerald-500 text-slate-950 px-3.5 py-2 rounded-2xl text-xs font-black cursor-pointer btn-magic shadow-lg shadow-emerald-500/20">+ Nova Meta</button>
+            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><Target className={`w-6 h-6 ${configCorAtual.text}`} /> Metas</h2>
+            <button onClick={() => setModalNovaMeta(true)} className={`${configCorAtual.bgBtn} px-3.5 py-2 rounded-2xl text-xs font-black cursor-pointer btn-magic shadow-lg`}>+ Nova Meta</button>
           </div>
           <div className="space-y-3">
             {metas.map((meta, idx) => {
@@ -1047,12 +1100,12 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2"><span className="text-2xl">🎯</span><span className="font-black text-base">{meta.nome}</span></div>
                     <div className="flex items-center space-x-2">
-                      <button onClick={() => { setMetaSelecionadaId(meta.id); setModalDepositoMeta(true); }} className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 btn-magic border border-emerald-500/20"><ArrowUpRight className="w-3.5 h-3.5" /> Depositar</button>
+                      <button onClick={() => { setMetaSelecionadaId(meta.id); setModalDepositoMeta(true); }} className={`bg-emerald-500/10 ${configCorAtual.text} px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 btn-magic border border-emerald-500/20`}><ArrowUpRight className="w-3.5 h-3.5" /> Depositar</button>
                       <button onClick={() => removerMeta(meta.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer hover:scale-125 transition-transform"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold"><span className={textMuted}>{progressoPct.toFixed(1)}%</span><span className="font-mono text-emerald-600 dark:text-emerald-400">{formatarGrana(meta.valorGuardado)} / {formatarGrana(meta.valorAlvo)}</span></div>
+                    <div className="flex justify-between text-xs font-bold"><span className={textMuted}>{progressoPct.toFixed(1)}%</span><span className={`font-mono ${configCorAtual.text}`}>{formatarGrana(meta.valorGuardado)} / {formatarGrana(meta.valorAlvo)}</span></div>
                     <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000" style={{ width: `${progressoPct}%` }}></div></div>
                   </div>
                 </div>
@@ -1065,11 +1118,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       {telaAtiva === 'extrato' && (
         <div className="max-w-xl mx-auto p-3 md:p-6 w-full space-y-4 animate-slide-up">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-black flex items-center gap-2"><List className="w-6 h-6 text-emerald-500"/> Extrato</h2>
+            <h2 className="text-xl font-black flex items-center gap-2"><List className={`w-6 h-6 ${configCorAtual.text}`}/> Extrato</h2>
             <div className={`flex ${inputBg} p-1 rounded-xl border text-xs`}>
-              <button onClick={() => setFiltroExtrato('todos')} className={`px-3 py-1.5 font-bold rounded-lg transition-colors ${filtroExtrato === 'todos' ? 'bg-emerald-500 text-slate-950 font-black' : textMuted}`}>Todos</button>
-              <button onClick={() => setFiltroExtrato('entradas')} className={`px-3 py-1.5 font-bold rounded-lg transition-colors ${filtroExtrato === 'entradas' ? 'bg-emerald-500 text-slate-950 font-black' : textMuted}`}>Entradas</button>
-              <button onClick={() => setFiltroExtrato('saidas')} className={`px-3 py-1.5 font-bold rounded-lg transition-colors ${filtroExtrato === 'saidas' ? 'bg-emerald-500 text-slate-950 font-black' : textMuted}`}>Saídas</button>
+              <button onClick={() => setFiltroExtrato('todos')} className={`px-3 py-1.5 font-bold rounded-lg transition-colors ${filtroExtrato === 'todos' ? `${configCorAtual.bgBtn} font-black` : textMuted}`}>Todos</button>
+              <button onClick={() => setFiltroExtrato('entradas')} className={`px-3 py-1.5 font-bold rounded-lg transition-colors ${filtroExtrato === 'entradas' ? `${configCorAtual.bgBtn} font-black` : textMuted}`}>Entradas</button>
+              <button onClick={() => setFiltroExtrato('saidas')} className={`px-3 py-1.5 font-bold rounded-lg transition-colors ${filtroExtrato === 'saidas' ? `${configCorAtual.bgBtn} font-black` : textMuted}`}>Saídas</button>
             </div>
           </div>
           <div className="space-y-2">
@@ -1082,14 +1135,14 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   </div>
                   <div>
                     <span className="font-bold block">{t.descricao}</span>
-                    <span className={`text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 block`}>
+                    <span className={`text-[10px] font-semibold ${configCorAtual.text} block`}>
                       {t.tipo === 'entrada' ? `Origem: ${t.origemEntrada}` : `Saiu de: ${t.poteNome}`}
                     </span>
                     <span className={`text-[9px] ${textMuted}`}>{t.data}</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2.5">
-                  <span className={`font-black font-mono ${t.tipo === 'entrada' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>{t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}</span>
+                  <span className={`font-black font-mono ${t.tipo === 'entrada' ? configCorAtual.text : 'text-rose-500'}`}>{t.tipo === 'entrada' ? '+' : '-'} {formatarGrana(t.valor)}</span>
                   <button onClick={() => removerTransacao(t.id)} className="text-slate-400 hover:text-rose-500 cursor-pointer hover:scale-125 transition-transform"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
@@ -1108,15 +1161,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             
             <div className={`flex ${inputBg} p-1 rounded-xl border`}>
               <button onClick={() => setTipoLancamento('saida')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'saida' ? 'bg-rose-600 text-white shadow-md' : textMuted}`}>Gasto (Saída)</button>
-              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}>Renda (Entrada)</button>
+              <button onClick={() => setTipoLancamento('entrada')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${tipoLancamento === 'entrada' ? `${configCorAtual.bgBtn} shadow-md` : textMuted}`}>Renda (Entrada)</button>
             </div>
 
             {tipoLancamento === 'entrada' ? (
               <div className="space-y-3">
                 <label className={`text-xs font-bold block ${textMuted}`}>Origem da Entrada:</label>
                 <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-                  <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'Mercado Livre' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}>Mercado Livre</button>
-                  <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'CLT' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}>CLT</button>
+                  <button onClick={() => setOrigemEntradaModal('Mercado Livre')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'Mercado Livre' ? `${configCorAtual.bgBtn} shadow-md` : textMuted}`}>Mercado Livre</button>
+                  <button onClick={() => setOrigemEntradaModal('CLT')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${origemEntradaModal === 'CLT' ? `${configCorAtual.bgBtn} shadow-md` : textMuted}`}>CLT</button>
                 </div>
               </div>
             ) : (
@@ -1140,7 +1193,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                       <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome} (Disp: {formatarGrana(getSaldoDisponivelPorPote(p.id))})</option>
                     ))}
                   </select>
-                  <div className={`text-[10px] text-right font-black pt-1 ${getSaldoDisponivelPorPote(poteSelecionadoId) < 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  <div className={`text-[10px] text-right font-black pt-1 ${getSaldoDisponivelPorPote(poteSelecionadoId) < 0 ? 'text-rose-500 animate-pulse' : configCorAtual.text}`}>
                     Disponível neste pote: {formatarGrana(getSaldoDisponivelPorPote(poteSelecionadoId))}
                   </div>
                 </div>
@@ -1148,7 +1201,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             )}
 
             <input type="number" placeholder="Valor R$" value={valorLancamento} onChange={(e) => setValorLancamento(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg font-mono border focus:border-emerald-500 transition-colors text-center`} />
-            <button onClick={salvarLancamento} className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-5 h-5"/> Registrar Lançamento</button>
+            <button onClick={salvarLancamento} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2`}><Check className="w-5 h-5"/> Registrar Lançamento</button>
           </div>
         </div>
       )}
@@ -1162,11 +1215,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
               <div className={`w-24 h-24 rounded-full border-8 border-emerald-500 flex flex-col items-center justify-center ${isDark ? 'bg-[#090D16]' : 'bg-slate-100'} shadow-inner`}>
                 <span className="text-xl font-black">{percentualPendente}%</span>
-                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">{formatarGrana((rendaRestanteAposDividas * percentualPendente) / 100)}</span>
+                <span className={`text-[9px] font-bold ${configCorAtual.text}`}>{formatarGrana((rendaRestanteAposDividas * percentualPendente) / 100)}</span>
               </div>
             </div>
             <input type="range" min="0" max={100 - potesAtivos.filter(p => p.id !== potePendente.id).reduce((acc, p) => acc + p.percentual, 0)} value={percentualPendente} onChange={(e) => setPercentualPendente(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-            <button onClick={confirmarAdicionarPote} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Confirmar</button>
+            <button onClick={confirmarAdicionarPote} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic flex items-center justify-center gap-2`}><Check className="w-4 h-4" /> Confirmar</button>
           </div>
         </div>
       )}
@@ -1175,15 +1228,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} card-layered rounded-3xl p-6 max-w-md w-full text-center space-y-5 shadow-2xl relative border-2 border-emerald-500/40 animate-pop-in max-h-[90vh] overflow-y-auto`}>
             <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/25 text-emerald-500 flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-500/30"><span className="text-3xl animate-heartbeat">👑</span></div>
-            <div><span className="text-xs uppercase font-extrabold text-emerald-600 dark:text-emerald-400 tracking-wider">Entrada Registrada! Dinheiro Distribuído</span><h3 className="text-3xl font-black font-mono mt-2 drop-shadow-md">{formatarGrana(animacaoEntrada.valorTotal)}</h3></div>
+            <div><span className={`text-xs uppercase font-extrabold ${configCorAtual.text} tracking-wider`}>Entrada Registrada! Dinheiro Distribuído</span><h3 className="text-3xl font-black font-mono mt-2 drop-shadow-md">{formatarGrana(animacaoEntrada.valorTotal)}</h3></div>
             <div className="space-y-2 text-left">
               {animacaoEntrada.detalhes.map((item, idx) => (
                 <div key={idx} style={{animationDelay: `${idx*80}ms`}} className={`${inputBg} p-3 rounded-2xl border flex justify-between items-center text-xs font-bold animate-slide-up`}>
-                  <span>{item.icone} {item.nome} ({item.percentual}%)</span><span className="font-mono text-emerald-600 dark:text-emerald-400">{formatarGrana(item.valor)}</span>
+                  <span>{item.icone} {item.nome} ({item.percentual}%)</span><span className={`font-mono ${configCorAtual.text}`}>{formatarGrana(item.valor)}</span>
                 </div>
               ))}
             </div>
-            <button onClick={() => setAnimacaoEntrada(null)} className="w-full bg-emerald-500 text-slate-950 font-black py-3.5 rounded-2xl shadow-lg btn-magic mt-4">Concluir</button>
+            <button onClick={() => setAnimacaoEntrada(null)} className={`w-full ${configCorAtual.bgBtn} font-black py-3.5 rounded-2xl shadow-lg btn-magic mt-4`}>Concluir</button>
           </div>
         </div>
       )}
@@ -1192,7 +1245,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} card-layered rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalAporteSobra(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-            <h3 className="text-base md:text-lg font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2"><Vault className="w-5 h-5" /> Aportar Sobra</h3>
+            <h3 className={`text-base md:text-lg font-black ${configCorAtual.text} flex items-center gap-2`}><Vault className="w-5 h-5" /> Aportar Sobra</h3>
             <div className="space-y-3">
               <select value={destinoAporteSobra} onChange={(e) => setDestinoAporteSobra(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500 transition-colors`}>
                 <option value="nosso_patrimonio">🐷 Nosso Patrimônio</option>
@@ -1201,7 +1254,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Máximo disponível: {formatarGrana(saldoUnicoReal)}</label>
               <input type="number" placeholder="Valor R$" value={valorAporteSobra} onChange={(e) => setValorAporteSobra(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
             </div>
-            <button onClick={efetivarAporteSobraPatrimonio} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Confirmar Aporte</button>
+            <button onClick={efetivarAporteSobraPatrimonio} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic`}><Check className="w-5 h-5 inline mr-1"/> Confirmar Aporte</button>
           </div>
         </div>
       )}
@@ -1212,7 +1265,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <button onClick={() => setModalAportePendente(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
             <h3 className="text-base md:text-lg font-black">Ajustar Saldo em Caixa</h3>
             <input type="number" placeholder="Valor R$" value={aportePendenteValor} onChange={(e) => setAportePendenteValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
-            <button onClick={async () => { await salvarDadosNaNuvem({ aportePendenteValor }); setModalAportePendente(false); }} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic">Salvar Alteração</button>
+            <button onClick={async () => { await salvarDadosNaNuvem({ aportePendenteValor }); setModalAportePendente(false); }} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic`}>Salvar Alteração</button>
           </div>
         </div>
       )}
@@ -1224,7 +1277,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <h3 className="text-base md:text-lg font-black flex items-center gap-2">💎 Item de Patrimônio</h3>
             <input type="text" placeholder="Nome (Ex: Casa, Carro)" value={nomeNovoPatrimonio} onChange={(e) => setNomeNovoPatrimonio(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500 transition-colors`} />
             <input type="number" placeholder="Valor Atualizado R$" value={valorNovoPatrimonio} onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
-            <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Adicionar</button>
+            <button onClick={adicionarPatrimonioManual} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic`}><Check className="w-5 h-5 inline mr-1"/> Adicionar</button>
           </div>
         </div>
       )}
@@ -1233,7 +1286,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} card-layered rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500"/> Criar Meta</h3>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Target className={`w-5 h-5 ${configCorAtual.text}`}/> Criar Meta</h3>
             <input type="text" placeholder="Nome (Ex: Viagem)" value={nomeNovaMeta} onChange={(e) => setNomeNovaMeta(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500`} />
             <input type="number" placeholder="Valor Alvo Total R$" value={valorNovaMeta} onChange={(e) => setValorNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
             <div className="space-y-1">
@@ -1241,7 +1294,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               <input type="number" placeholder="Aporte Inicial R$ (Opcional)" value={guardadoNovaMeta} onChange={(e) => setGuardadoNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
             </div>
             <input type="number" placeholder="Prazo Estimado (Meses)" value={mesesNovaMeta} onChange={(e) => setMesesNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
-            <button onClick={adicionarMeta} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Salvar Meta</button>
+            <button onClick={adicionarMeta} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic`}><Check className="w-5 h-5 inline mr-1"/> Salvar Meta</button>
           </div>
         </div>
       )}
@@ -1250,7 +1303,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className={`${cardClasse} card-layered rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalDepositoMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><ArrowUpRight className="w-5 h-5 text-emerald-500"/> Depositar na Meta</h3>
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2"><ArrowUpRight className={`w-5 h-5 ${configCorAtual.text}`}/> Depositar na Meta</h3>
             <div className="space-y-3">
               <select value={origemDepositoMeta} onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500 transition-colors`}>
                 <option value="disponivel">💳 Tirar do Saldo Real ({formatarGrana(saldoUnicoReal)})</option>
@@ -1259,7 +1312,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
               </select>
               <input type="number" placeholder="Valor do Depósito R$" value={valorDepositoMeta} onChange={(e) => setValorDepositoMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
             </div>
-            <button onClick={efetivarTransferenciaMeta} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Efetivar Depósito</button>
+            <button onClick={efetivarTransferenciaMeta} className={`w-full ${configCorAtual.bgBtn} font-black py-3 rounded-2xl shadow-lg btn-magic`}><Check className="w-5 h-5 inline mr-1"/> Efetivar Depósito</button>
           </div>
         </div>
       )}
@@ -1269,15 +1322,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className={`${cardClasse} card-layered w-72 md:w-80 h-full p-5 space-y-5 overflow-y-auto relative border-l flex flex-col justify-between shadow-2xl`} onClick={(e) => e.stopPropagation()}>
             <div className="space-y-5">
               <button onClick={() => setMenuAberto(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
-              <h3 className="text-lg font-black text-emerald-500 flex items-center gap-2"><span className="text-xl animate-heartbeat">👑</span> MEU IMPÉRIO</h3>
+              <h3 className={`text-lg font-black ${configCorAtual.text} flex items-center gap-2`}><span className="text-xl animate-heartbeat">👑</span> MEU IMPÉRIO</h3>
               <div className="space-y-1.5 text-xs md:text-sm font-bold">
-                <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20`}><User className="w-4 h-4" /> Ver Meu Perfil Gamificado</button>
-                <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Home className="w-4 h-4 text-emerald-500" /> Início / Dashboard</button>
+                <button onClick={() => navegarPara('perfil')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 bg-emerald-500/10 ${configCorAtual.text} border border-emerald-500/20`}><User className="w-4 h-4" /> Ver Meu Perfil Gamificado</button>
+                <button onClick={() => navegarPara('dashboard')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Home className={`w-4 h-4 ${configCorAtual.text}`} /> Início / Dashboard</button>
                 <button onClick={() => navegarPara('onboarding')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'} text-amber-500`}><Sliders className="w-4 h-4" /> Editar Configurações</button>
                 <button onClick={() => navegarPara('dividas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><CreditCard className="w-4 h-4 text-rose-500" /> Controle de Dívidas</button>
-                <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Target className="w-4 h-4 text-emerald-500" /> Metas Financeiras</button>
-                <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Vault className="w-4 h-4 text-emerald-500" /> Patrimônio Geral</button>
-                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><List className="w-4 h-4 text-emerald-500" /> Extrato de Lançamentos</button>
+                <button onClick={() => navegarPara('metas')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Target className={`w-4 h-4 ${configCorAtual.text}`} /> Metas Financeiras</button>
+                <button onClick={() => navegarPara('patrimonio')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><Vault className={`w-4 h-4 ${configCorAtual.text}`} /> Patrimônio Geral</button>
+                <button onClick={() => navegarPara('extrato')} className={`w-full text-left p-3 rounded-2xl btn-magic flex items-center gap-2.5 ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}><List className={`w-4 h-4 ${configCorAtual.text}`} /> Extrato de Lançamentos</button>
               </div>
             </div>
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
@@ -1289,11 +1342,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       )}
 
       <nav className={`fixed bottom-0 inset-x-0 border-t p-1.5 flex justify-around items-center z-40 transition-colors duration-500 ${isDark ? 'bg-[#070A10]/95 border-slate-800/80' : 'bg-white/95 border-slate-200'} backdrop-blur-lg`}>
-        <button onClick={() => navegarPara('dashboard')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'dashboard' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><Home className="w-5 h-5 mb-0.5" /> Início</button>
-        <button onClick={() => navegarPara('extrato')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'extrato' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><List className="w-5 h-5 mb-0.5" /> Extrato</button>
-        <button onClick={() => setModalLancamento(true)} className="p-3 bg-emerald-500 text-slate-950 rounded-2xl shadow-xl shadow-emerald-500/30 -mt-6 btn-magic"><Plus className="w-5 h-5 font-black" /></button>
-        <button onClick={() => navegarPara('metas')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'metas' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><Target className="w-5 h-5 mb-0.5" /> Metas</button>
-        <button onClick={() => navegarPara('perfil')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'perfil' ? 'text-emerald-500 scale-110' : 'opacity-70 hover:opacity-100'}`}><User className="w-5 h-5 mb-0.5" /> Perfil</button>
+        <button onClick={() => navegarPara('dashboard')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'dashboard' ? `${configCorAtual.text} scale-110` : 'opacity-70 hover:opacity-100'}`}><Home className="w-5 h-5 mb-0.5" /> Início</button>
+        <button onClick={() => navegarPara('extrato')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'extrato' ? `${configCorAtual.text} scale-110` : 'opacity-70 hover:opacity-100'}`}><List className="w-5 h-5 mb-0.5" /> Extrato</button>
+        <button onClick={() => setModalLancamento(true)} className={`p-3 ${configCorAtual.bgBtn} rounded-2xl shadow-xl -mt-6 btn-magic`}><Plus className="w-5 h-5 font-black" /></button>
+        <button onClick={() => navegarPara('metas')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'metas' ? `${configCorAtual.text} scale-110` : 'opacity-70 hover:opacity-100'}`}><Target className="w-5 h-5 mb-0.5" /> Metas</button>
+        <button onClick={() => navegarPara('perfil')} className={`flex flex-col items-center p-1.5 text-[10px] font-bold cursor-pointer hover:-translate-y-1 transition-transform ${telaAtiva === 'perfil' ? `${configCorAtual.text} scale-110` : 'opacity-70 hover:opacity-100'}`}><User className="w-5 h-5 mb-0.5" /> Perfil</button>
       </nav>
     </div>
   );
