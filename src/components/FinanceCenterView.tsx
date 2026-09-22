@@ -113,7 +113,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
   const [modalAportePendente, setModalAportePendente] = useState<boolean>(false);
 
-  // Removido o Dízimo e adicionados Desfrute Dele e Desfrute Dela
   const todosPotesDisponiveis: Pote[] = [
     { id: 'nosso_patrimonio', nome: 'Nosso Patrimônio', percentual: 0, cor: '#10B981', iconeEmoji: '🐷', retencaoAutomatica: true },
     { id: 'patrimonio_manuela', nome: 'Poupança Manuela (Futuro Filha)', percentual: 0, cor: '#06B6D4', iconeEmoji: '👶', retencaoAutomatica: true },
@@ -124,7 +123,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     { id: 'desfrute_dela', nome: 'Desfrute Dela', percentual: 0, cor: '#EC4899', iconeEmoji: '👩' },
   ];
 
-  // Listener em tempo real do Firebase (Sincronização entre dispositivos)
   useEffect(() => {
     const docRef = doc(db, 'imperio_finance', docId);
     const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
@@ -153,7 +151,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     return () => unsubscribe();
   }, [docId]);
 
-  // Função centralizada para forçar o salvamento na nuvem (usada em cada ação)
   const salvarDadosNaNuvem = async (novosDados: {
     rendaMensal?: number;
     aportePendenteValor?: number | '';
@@ -187,7 +184,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const [filtroExtrato, setFiltroExtrato] = useState<'todos' | 'entradas' | 'saidas'>('todos');
   
-  // Modais de Patrimônio e Aporte de Sobra
   const [modalNovoPatrimonio, setModalNovoPatrimonio] = useState<boolean>(false);
   const [nomeNovoPatrimonio, setNomeNovoPatrimonio] = useState('');
   const [valorNovoPatrimonio, setValorNovoPatrimonio] = useState<number | ''>('');
@@ -196,7 +192,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [valorAporteSobra, setValorAporteSobra] = useState<number | ''>('');
   const [destinoAporteSobra, setDestinoAporteSobra] = useState<'nosso_patrimonio' | 'patrimonio_manuela'>('nosso_patrimonio');
 
-  // Modais de Metas
   const [modalNovaMeta, setModalNovaMeta] = useState<boolean>(false);
   const [nomeNovaMeta, setNomeNovaMeta] = useState('');
   const [valorNovaMeta, setValorNovaMeta] = useState<number | ''>('');
@@ -223,7 +218,6 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
     }
   };
 
-  // Cálculos base
   const totalContasFixasValor = contasFixasObrigatorias.reduce((acc, c) => acc + c.valor, 0);
   const percentualComprometidoDividas = rendaMensal > 0 ? (totalContasFixasValor / rendaMensal) * 100 : 0;
   const rendaRestanteAposDividas = Math.max(0, rendaMensal - totalContasFixasValor);
@@ -240,14 +234,11 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const percentualRetencaoTotal = potesAtivos.filter(p => p.retencaoAutomatica).reduce((acc, p) => acc + p.percentual, 0);
   const valorRetidoAutomaticoAcumulado = (totalEntradasGeral * percentualRetencaoTotal) / 100;
 
-  // Saldo Real Disponível (Desconta as saídas, incluindo transferências para metas e aportes extras)
   const saldoUnicoReal = (totalEntradasGeral - valorRetidoAutomaticoAcumulado) - totalSaidas;
 
-  // Cálculos de Aportes Extras Manuais (Sobra de Saldo transferida para Patrimônio)
   const aportesExtrasNossoPatrimonio = transacoes.filter(t => t.poteId === 'aporte_extra_nosso_patrimonio').reduce((acc, t) => acc + t.valor, 0);
   const aportesExtrasManuela = transacoes.filter(t => t.poteId === 'aporte_extra_patrimonio_manuela').reduce((acc, t) => acc + t.valor, 0);
 
-  // Acumulado real dos potes de retenção (Automático + Aportes Extras Manuais)
   const poteNossoPatrimonioObj = potesAtivos.find(p => p.id === 'nosso_patrimonio');
   const pctNossoPatrimonio = poteNossoPatrimonioObj ? poteNossoPatrimonioObj.percentual : 0;
   const saldoNossoPatrimonio = ((totalEntradasGeral * pctNossoPatrimonio) / 100) + aportesExtrasNossoPatrimonio;
@@ -258,6 +249,20 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const totalPatrimonioManual = itensPatrimonioManuais.reduce((acc, item) => acc + item.valor, 0);
   const patrimonioTotalConsolidado = saldoNossoPatrimonio + saldoPatrimonioManuela + totalPatrimonioManual;
+
+  // NOVA FUNÇÃO: Calcula o Saldo Disponível exato de um Pote (usada no Modal de Lançamentos)
+  const getSaldoDisponivelPorPote = (pId: string) => {
+    if (pId === 'divida_fixa') return saldoUnicoReal;
+    if (pId === 'nosso_patrimonio') return saldoNossoPatrimonio;
+    if (pId === 'patrimonio_manuela') return saldoPatrimonioManuela;
+    
+    const p = potesAtivos.find(x => x.id === pId);
+    if (!p) return 0;
+    
+    const valorDiluido = (totalEntradasGeral * p.percentual) / 100;
+    const gastos = transacoes.filter(t => t.tipo === 'saida' && t.poteId === p.id).reduce((acc, t) => acc + t.valor, 0);
+    return valorDiluido - gastos;
+  };
 
   const adicionarContaFixaObrigatoria = async () => {
     if (!novaContaNome || !novaContaValor || Number(novaContaValor) <= 0 || !novaContaMeses || Number(novaContaMeses) <= 0) return;
@@ -330,9 +335,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       if (poteSelecionadoId !== 'divida_fixa') {
         const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
         if (poteAlvo) {
-          const valorDiluidoNoPote = (totalEntradasGeral * poteAlvo.percentual) / 100;
-          const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === poteAlvo.id).reduce((acc, t) => acc + t.valor, 0);
-          const saldoDisponivelNoPote = poteAlvo.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
+          const saldoDisponivelNoPote = getSaldoDisponivelPorPote(poteAlvo.id);
 
           if (!poteAlvo.retencaoAutomatica && valorGasto > saldoDisponivelNoPote) {
             alert(`⚠️ Trava de Segurança Ativada!\n\nO valor do gasto (${formatarGrana(valorGasto)}) é superior ao saldo disponível no pote "${poteAlvo.nome}" (${formatarGrana(saldoDisponivelNoPote)}). Reduza o valor ou ajuste o orçamento.`);
@@ -366,7 +369,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       id: Date.now().toString(),
       descricao: `Aporte Extra em Patrimônio`,
       valor: valorTransf,
-      tipo: 'saida', // Subtrai do saldo
+      tipo: 'saida',
       poteId: poteIdDestino,
       poteNome: poteNomeDestino,
       data: new Date().toLocaleDateString('pt-BR')
@@ -737,9 +740,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
           <div className={modoVisualizacaoPotes === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6" : "space-y-4 max-w-2xl mx-auto"}>
             {potesAtivos.map(pote => {
+              const saldoRealPote = getSaldoDisponivelPorPote(pote.id);
               const valorDiluidoNoPote = (totalEntradasGeral * pote.percentual) / 100;
-              const gastosPote = transacoes.filter(t => t.tipo === 'saida' && t.poteId === pote.id).reduce((acc, t) => acc + t.valor, 0);
-              const saldoRealPote = pote.retencaoAutomatica ? valorDiluidoNoPote : Math.max(0, valorDiluidoNoPote - gastosPote);
               const percentualProgresso = pote.retencaoAutomatica ? pote.percentual : (valorDiluidoNoPote > 0 ? Math.max(0, Math.min(100, (saldoRealPote / valorDiluidoNoPote) * 100)) : 100);
               const dashOffset = 251.327 - (percentualProgresso * 2.51327);
 
@@ -1080,11 +1082,20 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                   <option value="Outros Gastos">📦 Outros Gastos</option>
                 </select>
 
-                <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
-                <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
-                  <option value="divida_fixa">💳 Direto do Saldo Real (Geral / Dívidas / Contas)</option>
-                  {potesAtivos.map(p => <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome}</option>)}
-                </select>
+                <div className="space-y-1">
+                  <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
+                  <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm focus:outline-none font-bold border`}>
+                    <option value="divida_fixa">💳 Direto do Saldo (Disp: {formatarGrana(getSaldoDisponivelPorPote('divida_fixa'))})</option>
+                    {potesAtivos.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.iconeEmoji} {p.nome} (Disp: {formatarGrana(getSaldoDisponivelPorPote(p.id))})
+                      </option>
+                    ))}
+                  </select>
+                  <div className={`text-[10px] text-right font-black ${getSaldoDisponivelPorPote(poteSelecionadoId) < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    Disponível para uso neste pote: {formatarGrana(getSaldoDisponivelPorPote(poteSelecionadoId))}
+                  </div>
+                </div>
               </div>
             )}
 
