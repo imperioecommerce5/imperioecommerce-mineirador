@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Plus, 
-  Sun, 
-  Moon, 
-  Menu, 
-  TrendingUp, 
-  TrendingDown, 
-  Eye, 
+import { 
+  X, 
+  Plus, 
+  Sun, 
+  Moon, 
+  Menu, 
+  TrendingUp, 
+  TrendingDown, 
+  Eye, 
   EyeOff,
   Home,
   List,
@@ -325,19 +325,19 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
       const poteAlvo = potesAtivos.find(p => p.id === poteSelecionadoId);
       const descFinal = descricaoSaidaManual.trim() !== '' ? descricaoSaidaManual.trim() : 'Gasto Geral';
       
-      const novaSaida: Transacao = { 
-        id: Date.now().toString(), 
-        descricao: descFinal, 
-        valor: valorGasto, 
-        tipo: 'saida', 
-        poteId: poteSelecionadoId, 
-        poteNome: poteAlvo ? poteAlvo.nome : 'Saldo Real', 
-        data: new Date().toLocaleDateString('pt-BR') 
+      const novaSaida: Transacao = { 
+        id: Date.now().toString(), 
+        descricao: descFinal, 
+        valor: valorGasto, 
+        tipo: 'saida', 
+        poteId: poteSelecionadoId, 
+        poteNome: poteAlvo ? poteAlvo.nome : 'Saldo Real', 
+        data: new Date().toLocaleDateString('pt-BR') 
       };
       
       const novasTransacoes = [novaSaida, ...transacoes];
-      setTransacoes(novasTransacoes); 
-      setValorLancamento(''); 
+      setTransacoes(novasTransacoes); 
+      setValorLancamento(''); 
       setDescricaoSaidaManual('');
       setModalLancamento(false);
       await salvarDadosNaNuvem({ transacoes: novasTransacoes });
@@ -627,7 +627,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
                 <div className="flex items-center text-xl md:text-2xl font-black w-full sm:w-auto justify-end">
                   <span className={`text-sm mr-2 ${textMuted}`}>R$</span>
-                  <input type="number" value={rendaMensal === 0 ? '' : rendaMensal} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setRendaMensal(val); await salvarDadosNaNuvem({ rendaMensal: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono text-emerald-600 dark:text-emerald-400`} />
+                  <input type="number" value={rendaMensal === 0 ? '' : rendaMensal} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setRendaMensal(val); await salvarDadosNaNuvem({ rendaMensal: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono text-emerald-600 dark:text-emerald-400 text-base md:text-2xl`} />
                 </div>
               </div>
 
@@ -638,7 +638,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                 </div>
                 <div className="flex items-center text-xl md:text-2xl font-black w-full sm:w-auto justify-end">
                   <span className={`text-sm mr-2 ${textMuted}`}>R$</span>
-                  <input type="number" value={aportePendenteValor === 0 ? '' : aportePendenteValor} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? '' : Number(e.target.value); setAportePendenteValor(val); await salvarDadosNaNuvem({ aportePendenteValor: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono text-emerald-600 dark:text-emerald-400`} />
+                  <input type="number" value={aportePendenteValor === 0 ? '' : aportePendenteValor} placeholder="0" onChange={async (e) => { const val = e.target.value === '' ? '' : Number(e.target.value); setAportePendenteValor(val); await salvarDadosNaNuvem({ aportePendenteValor: val }); }} className={`w-36 md:w-44 text-right bg-transparent focus:outline-none border-b-2 border-emerald-500 font-black font-mono text-emerald-600 dark:text-emerald-400 text-base md:text-2xl`} />
                 </div>
               </div>
             </div>
@@ -655,10 +655,10 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             </div>
 
             <div className="space-y-3">
-              <input type="text" placeholder="Nome (Ex: Aluguel, Empréstimo)" value={novaContaNome} onChange={(e) => setNovaContaNome(e.target.value)} className={`w-full ${inputBg} p-3.5 rounded-2xl text-xs font-bold border focus:border-rose-500 transition-all`} />
+              <input type="text" placeholder="Nome (Ex: Aluguel, Empréstimo)" value={novaContaNome} onChange={(e) => setNovaContaNome(e.target.value)} className={`w-full ${inputBg} p-3.5 rounded-2xl text-base md:text-xs font-bold border focus:border-rose-500 transition-all`} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input type="number" placeholder="Valor Mensal R$" value={novaContaValor} onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3.5 rounded-2xl text-xs font-bold border font-mono focus:border-rose-500`} />
-                <input type="number" placeholder="Duração (Meses)" value={novaContaMeses} onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3.5 rounded-2xl text-xs font-bold border font-mono focus:border-rose-500`} />
+                <input type="number" placeholder="Valor Mensal R$" value={novaContaValor} onChange={(e) => setNovaContaValor(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3.5 rounded-2xl text-base md:text-xs font-bold border font-mono focus:border-rose-500`} />
+                <input type="number" placeholder="Duração (Meses)" value={novaContaMeses} onChange={(e) => setNovaContaMeses(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3.5 rounded-2xl text-base md:text-xs font-bold border font-mono focus:border-rose-500`} />
               </div>
               <button type="button" onClick={adicionarContaFixaObrigatoria} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 cursor-pointer btn-magic shadow-lg shadow-rose-600/20">
                 <Plus className="w-4 h-4" /> Adicionar Dívida / Conta Fixa
@@ -808,9 +808,9 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
             <div className="flex items-center gap-3">
               <h3 className="text-lg font-black flex items-center gap-2"><LayoutGrid className="w-5 h-5 text-emerald-500"/> Limites de Gastos:</h3>
-              <div className={`flex ${inputBg} p-1 rounded-xl border`}>
-                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-1.5 rounded-lg transition-all ${modoVisualizacaoPotes === 'coluna' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}><Columns2 className="w-4 h-4" /></button>
-                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-1.5 rounded-lg transition-all ${modoVisualizacaoPotes === 'grid' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}><LayoutGrid className="w-4 h-4" /></button>
+              <div className={`flex ${inputBg} p-1.5 rounded-xl border`}>
+                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-2 rounded-lg transition-all cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}><Columns2 className="w-4 h-4" /></button>
+                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-2 rounded-lg transition-all cursor-pointer ${modoVisualizacaoPotes === 'grid' ? 'bg-emerald-500 text-slate-950 font-black shadow-md' : textMuted}`}><LayoutGrid className="w-4 h-4" /></button>
               </div>
             </div>
             <button onClick={() => setModalLancamento(true)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2.5 rounded-2xl flex items-center gap-2 btn-magic text-xs md:text-sm shadow-lg shadow-emerald-500/20">
@@ -1015,13 +1015,13 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
                     placeholder="Ex: Jantar, Uber, Supermercado..." 
                     value={descricaoSaidaManual} 
                     onChange={(e) => setDescricaoSaidaManual(e.target.value)} 
-                    className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`} 
+                    className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-sm font-bold border focus:border-emerald-500 transition-colors`} 
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className={`text-xs font-bold block ${textMuted}`}>Retirar de Onde:</label>
-                  <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
+                  <select value={poteSelecionadoId} onChange={(e) => setPoteSelecionadoId(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-sm font-bold border focus:border-emerald-500 transition-colors`}>
                     <option value="divida_fixa">💳 Direto do Saldo Livre (Disp: {formatarGrana(getSaldoDisponivelPorPote('divida_fixa'))})</option>
                     {potesAtivos.map(p => (
                       <option key={p.id} value={p.id}>{p.iconeEmoji} {p.nome} (Disp: {formatarGrana(getSaldoDisponivelPorPote(p.id))})</option>
@@ -1081,7 +1081,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <button onClick={() => setModalAporteSobra(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
             <h3 className="text-base md:text-lg font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2"><Vault className="w-5 h-5" /> Aportar Sobra</h3>
             <div className="space-y-3">
-              <select value={destinoAporteSobra} onChange={(e) => setDestinoAporteSobra(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`}>
+              <select value={destinoAporteSobra} onChange={(e) => setDestinoAporteSobra(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500 transition-colors`}>
                 <option value="nosso_patrimonio">🐷 Nosso Patrimônio</option>
                 <option value="patrimonio_manuela">👶 Poupança Manuela</option>
               </select>
@@ -1109,7 +1109,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className={`${cardClasse} card-layered rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalNovoPatrimonio(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
             <h3 className="text-base md:text-lg font-black flex items-center gap-2">💎 Item de Patrimônio</h3>
-            <input type="text" placeholder="Nome (Ex: Casa, Carro)" value={nomeNovoPatrimonio} onChange={(e) => setNomeNovoPatrimonio(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`} />
+            <input type="text" placeholder="Nome (Ex: Casa, Carro)" value={nomeNovoPatrimonio} onChange={(e) => setNomeNovoPatrimonio(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500 transition-colors`} />
             <input type="number" placeholder="Valor Atualizado R$" value={valorNovoPatrimonio} onChange={(e) => setValorNovoPatrimonio(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black text-lg text-center font-mono border focus:border-emerald-500 transition-colors`} />
             <button onClick={adicionarPatrimonioManual} className="w-full bg-emerald-500 text-slate-950 font-black py-3 rounded-2xl shadow-lg btn-magic"><Check className="w-5 h-5 inline mr-1"/> Adicionar</button>
           </div>
@@ -1121,7 +1121,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <div className={`${cardClasse} card-layered rounded-3xl p-5 max-w-sm w-full space-y-4 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-pop-in border border-emerald-500/20`}>
             <button onClick={() => setModalNovaMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
             <h3 className="text-base md:text-lg font-black flex items-center gap-2"><Target className="w-5 h-5 text-emerald-500"/> Criar Meta</h3>
-            <input type="text" placeholder="Nome (Ex: Viagem)" value={nomeNovaMeta} onChange={(e) => setNomeNovaMeta(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500`} />
+            <input type="text" placeholder="Nome (Ex: Viagem)" value={nomeNovaMeta} onChange={(e) => setNomeNovaMeta(e.target.value)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500`} />
             <input type="number" placeholder="Valor Alvo Total R$" value={valorNovaMeta} onChange={(e) => setValorNovaMeta(e.target.value === '' ? '' : Number(e.target.value))} className={`w-full ${inputBg} p-3 rounded-2xl font-black font-mono border focus:border-emerald-500`} />
             <div className="space-y-1">
               <label className={`text-[10px] font-bold block text-right ${textMuted}`}>Puxar do Saldo Livre (Máx: {formatarGrana(saldoUnicoReal)})</label>
@@ -1139,7 +1139,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <button onClick={() => setModalDepositoMeta(false)} className="absolute top-4 right-4 text-slate-400 hover:rotate-90 transition-transform"><X className="w-5 h-5" /></button>
             <h3 className="text-base md:text-lg font-black flex items-center gap-2"><ArrowUpRight className="w-5 h-5 text-emerald-500"/> Depositar na Meta</h3>
             <div className="space-y-3">
-              <select value={origemDepositoMeta} onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-xs font-bold border focus:border-emerald-500 transition-colors`}>
+              <select value={origemDepositoMeta} onChange={(e) => setOrigemDepositoMeta(e.target.value as any)} className={`w-full ${inputBg} p-3 rounded-2xl text-base md:text-xs font-bold border focus:border-emerald-500 transition-colors`}>
                 <option value="disponivel">💳 Tirar do Saldo Real ({formatarGrana(saldoUnicoReal)})</option>
                 <option value="nosso_patrimonio">🐷 Resgatar Nosso Patrimônio ({formatarGrana(saldoNossoPatrimonio)})</option>
                 <option value="patrimonio_manuela">👶 Resgatar Poup. Manuela ({formatarGrana(saldoPatrimonioManuela)})</option>
