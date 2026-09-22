@@ -84,7 +84,17 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
   const [itensPatrimonioManuais, setItensPatrimonioManuais] = useState<ItemPatrimonio[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
 
-  const [tema, setTema] = useState<'claro' | 'escuro'>('escuro');
+  // Preferências visuais salvas no dispositivo
+  const [tema, setTema] = useState<'claro' | 'escuro'>(() => {
+    return (localStorage.getItem('meu_imperio_modo_tema') as 'claro' | 'escuro') || 'escuro';
+  });
+
+  const alternarTemaClaroEscuro = () => {
+    const novoTema = tema === 'escuro' ? 'claro' : 'escuro';
+    setTema(novoTema);
+    localStorage.setItem('meu_imperio_modo_tema', novoTema);
+  };
+
   const [corTemaImperial, setCorTemaImperial] = useState<'esmeralda' | 'dourado' | 'azul' | 'rosa'>(() => {
     return (localStorage.getItem('meu_imperio_tema_dispositivo') as any) || 'esmeralda';
   });
@@ -96,7 +106,15 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
 
   const [tamparValores, setTamparValores] = useState<boolean>(false);
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
-  const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>('coluna');
+  
+  const [modoVisualizacaoPotes, setModoVisualizacaoPotes] = useState<'grid' | 'coluna'>(() => {
+    return (localStorage.getItem('meu_imperio_modo_potes') as 'grid' | 'coluna') || 'coluna';
+  });
+
+  const alterarModoVisualizacaoPotes = (modo: 'grid' | 'coluna') => {
+    setModoVisualizacaoPotes(modo);
+    localStorage.setItem('meu_imperio_modo_potes', modo);
+  };
 
   const temasCores = {
     esmeralda: { primary: '#10B981', secondary: '#34D399', border: 'border-emerald-500/30', text: 'text-emerald-500', bgBtn: 'bg-emerald-500 text-slate-950', gradient: 'from-emerald-600 to-emerald-400' },
@@ -577,7 +595,7 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
           <button onClick={() => setTamparValores(!tamparValores)} className={`p-2.5 rounded-full border ${isDark ? 'border-slate-800 bg-[#101726] text-slate-300' : 'border-slate-200 bg-white text-slate-700'} hover:text-emerald-500 transition-all cursor-pointer hover:scale-105 shadow-sm`}>
             {tamparValores ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
-          <button onClick={() => setTema(isDark ? 'claro' : 'escuro')} className={`p-2.5 rounded-full border ${isDark ? 'border-slate-800 bg-[#101726] text-slate-300' : 'border-slate-200 bg-white text-slate-700'} hover:text-emerald-500 transition-all cursor-pointer hover:scale-105 shadow-sm`}>
+          <button onClick={alternarTemaClaroEscuro} className={`p-2.5 rounded-full border ${isDark ? 'border-slate-800 bg-[#101726] text-slate-300' : 'border-slate-200 bg-white text-slate-700'} hover:text-emerald-500 transition-all cursor-pointer hover:scale-105 shadow-sm`}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           <button onClick={() => setMenuAberto(!menuAberto)} className={`p-2.5 rounded-full ${configCorAtual.bgBtn} btn-magic cursor-pointer shadow-lg`}>
@@ -934,8 +952,8 @@ export const FinanceCenterView: React.FC<FinanceCenterViewProps> = ({ onLogout }
             <div className="flex items-center gap-3">
               <h3 className="text-lg font-black flex items-center gap-2"><LayoutGrid className={`w-5 h-5 ${configCorAtual.text}`}/> Limites de Gastos:</h3>
               <div className={`flex ${inputBg} p-1.5 rounded-full border`}>
-                <button onClick={() => setModoVisualizacaoPotes('coluna')} className={`p-2 rounded-full transition-all cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? `${configCorAtual.bgBtn} font-black shadow-md` : textMuted}`}><Columns2 className="w-4 h-4" /></button>
-                <button onClick={() => setModoVisualizacaoPotes('grid')} className={`p-2 rounded-full transition-all cursor-pointer ${modoVisualizacaoPotes === 'grid' ? `${configCorAtual.bgBtn} font-black shadow-md` : textMuted}`}><LayoutGrid className="w-4 h-4" /></button>
+                <button onClick={() => alterarModoVisualizacaoPotes('coluna')} className={`p-2 rounded-full transition-all cursor-pointer ${modoVisualizacaoPotes === 'coluna' ? `${configCorAtual.bgBtn} font-black shadow-md` : textMuted}`}><Columns2 className="w-4 h-4" /></button>
+                <button onClick={() => alterarModoVisualizacaoPotes('grid')} className={`p-2 rounded-full transition-all cursor-pointer ${modoVisualizacaoPotes === 'grid' ? `${configCorAtual.bgBtn} font-black shadow-md` : textMuted}`}><LayoutGrid className="w-4 h-4" /></button>
               </div>
             </div>
             <button onClick={() => setModalLancamento(true)} className={`${configCorAtual.bgBtn} font-black px-5 py-2.5 rounded-full flex items-center gap-2 btn-magic text-xs md:text-sm shadow-lg`}>
