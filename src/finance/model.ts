@@ -1,9 +1,9 @@
-export type Actor = "Rhuan" | "Anne";
+export type Actor = "voce" | "esposa";
 export type RecordActor = Actor | "sistema" | "anterior";
 export const actorName = (actor?: RecordActor) =>
-  actor === "Rhuan"
+  actor === "voce"
     ? "Rhuan"
-    : actor === "Anne"
+    : actor === "esposa"
       ? "Anne"
       : actor === "sistema"
         ? "Sistema"
@@ -703,4 +703,67 @@ export function resetFinance(current: Finance): Finance {
   const next = empty();
   next.revision = current.revision;
   return next;
+}
+
+// Compromissos vencidos e do mês atual; meses futuros ficam no planejamento.
+export function potCommitment(
+  f: Finance,
+  pot: string,
+  through = today(),
+): number {
+  return f.entries
+    .filter(
+      (e) =>
+        !e.deleted &&
+        e.kind === "expense" &&
+        e.status === "pending" &&
+        e.pot === pot &&
+        e.date.slice(0, 7) <= through.slice(0, 7),
+    )
+    .reduce((sum, e) => sum + e.cents, 0);
+}
+
+export function payBill(
+  f: Finance,
+  id: string,
+  cents: number,
+  date: string,
+): Finance {
+  const bill = f.entries.find((e) => e.id === id);
+  if (
+    !bill ||
+    bill.deleted ||
+    bill.kind !== "expense" ||
+    bill.status !== "pending"
+  )
+    throw new Error("Esta conta não está mais pendente. Atualize a tela.");
+  if (
+    !Number.isSafeInteger(cents) ||
+    cents <= 0 ||
+    !validDate(date) ||
+    date > today()
+  )
+    throw new Error(
+      "Confira o valor e a data do pagamento. Use hoje ou uma data anterior.",
+    );
+  if (
+    f.closedMonths.some(
+      (m) => bill.date.slice(0, 7) <= m || date.slice(0, 7) <= m,
+    )
+  )
+    throw new Error("Reabra o mês antes de registrar este pagamento.");
+  return {
+    ...f,
+    entries: f.entries.map((e) =>
+      e.id === id
+        ? {
+            ...e,
+            status: "paid",
+            cents,
+            date,
+            updatedAt: new Date().toISOString(),
+          }
+        : e,
+    ),
+  };
 }

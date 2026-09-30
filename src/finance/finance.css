@@ -1932,3 +1932,40 @@ button {
 .login-form .primary:hover {
   background: #536b92;
 }
+
+.pot-commitments {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+.pot-commitments > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pot-commitments small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.row-actions .pay-button,
+.pay-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 78px;
+  padding: 8px 12px;
+}
+.payment-undo {
+  position: sticky;
+  bottom: calc(85px + env(safe-area-inset-bottom));
+  z-index: 35;
+  margin: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
