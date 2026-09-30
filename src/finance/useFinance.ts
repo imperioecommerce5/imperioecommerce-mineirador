@@ -1,6 +1,16 @@
 import { storage } from "./storage";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { doc, onSnapshot, runTransaction } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  runTransaction,
+  collection,
+  query,
+  orderBy,
+  limit,
+  getDocs,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import {
   Finance,
@@ -10,6 +20,9 @@ import {
   generateRecurring,
   entry,
   today,
+  Actor,
+  attributeChanges,
+  uid,
 } from "./model";
 const KEY = "meu_imperio_finance_v2";
 export function demoData(): Finance {
@@ -62,7 +75,7 @@ export function demoData(): Finance {
   ];
   return f;
 }
-export function useFinance(demo: boolean) {
+export function useFinance(demo: boolean, actor: Actor) {
   const [data, setData] = useState<Finance | null>(null);
   const [status, setStatus] = useState("Carregando");
   const [error, setError] = useState("");
@@ -103,7 +116,7 @@ export function useFinance(demo: boolean) {
       () => {
         setStatus("Sem conexão com a nuvem");
         setError(
-          "Não foi possível acessar o Firebase. Confira sua conexão e as regras de acesso. Edições ficam bloqueadas para evitar conflitos.",
+          "Não foi possível acessar o Firebase. Confira sua conexão e as regras de acesso. Não há salvamento offline; reconecte para registrar alterações.",
         );
         const backup = storage.getItem(KEY);
         if (backup) {
@@ -120,7 +133,7 @@ export function useFinance(demo: boolean) {
     return stop;
   }, [demo, receive]);
   const save = useCallback(
-    async (transform: (f: Finance) => Finance) => {
+    async (transform: (f: Finance) => Finance, backupBefore = false) => {
       if (!ref.current || busy.current)
         throw new Error("Aguarde o carregamento ou o salvamento atual.");
       busy.current = true;
@@ -129,9 +142,22 @@ export function useFinance(demo: boolean) {
       setError("");
       try {
         const expected = ref.current.revision;
+        const backupId = uid();
+
         let saved: Finance;
         if (demo) {
-          saved = transform(structuredClone(ref.current));
+          if (
+            backupBefore &&
+            !storage.setItem("imperio_last_reset", JSON.stringify(ref.current))
+          )
+            throw new Error(
+              "Não foi possível guardar a cópia anterior. O reset foi cancelado.",
+            );
+          saved = attributeChanges(
+            ref.current,
+            transform(structuredClone(ref.current)),
+            actor,
+          );
           saved.revision = expected + 1;
           validateFinance(saved);
           storage.setItem("imperio_demo", JSON.stringify(saved));
@@ -144,7 +170,11 @@ export function useFinance(demo: boolean) {
               throw new Error(
                 "Os dados mudaram em outro dispositivo. Atualize a página e tente novamente.",
               );
-            const next = transform(structuredClone(current));
+            const next = attributeChanges(
+              current,
+              transform(structuredClone(current)),
+              actor,
+            );
             next.revision = current.revision + 1;
             validateFinance(next);
             // Keep every legacy field as a rollback copy; only financeV2 is written.
@@ -159,6 +189,12 @@ export function useFinance(demo: boolean) {
               throw new Error(
                 "O histórico está próximo do limite deste formato de armazenamento. Exporte um backup e solicite a migração para lançamentos individuais antes de continuar.",
               );
+            if (backupBefore)
+              tx.set(doc(db, "imperio_finance_backups", backupId), {
+                financeV2: current,
+                createdAt: serverTimestamp(),
+                createdBy: actor,
+              });
             tx.set(target, { financeV2: next }, { merge: true });
             return next;
           });
@@ -177,7 +213,7 @@ export function useFinance(demo: boolean) {
         setSaving(false);
       }
     },
-    [demo, receive],
+    [demo, receive, actor],
   );
   useEffect(() => {
     if (!data || saving || (!demo && status !== "Salvo")) return;
@@ -185,5 +221,24 @@ export function useFinance(demo: boolean) {
     if (generated.entries.length !== data.entries.length)
       save((f) => generateRecurring(f)).catch(() => {});
   }, [data, saving, status, demo, save]);
-  return { data, save, status, error, saving };
+  async function lastReset(): Promise<Finance> {
+    if (demo) {
+      const raw = storage.getItem("imperio_last_reset");
+      if (!raw) throw new Error("Ainda não há cópia de reset para recuperar.");
+      const f = JSON.parse(raw);
+      validateFinance(f);
+      return migrate({ financeV2: f });
+    }
+    const snap = await getDocs(
+      query(
+        collection(db, "imperio_finance_backups"),
+        orderBy("createdAt", "desc"),
+        limit(1),
+      ),
+    );
+    if (snap.empty)
+      throw new Error("Ainda não há cópia de reset para recuperar.");
+    return migrate(snap.docs[0].data());
+  }
+  return { data, save, status, error, saving, lastReset };
 }

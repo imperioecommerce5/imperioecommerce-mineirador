@@ -1,21 +1,21 @@
 # Referência do projeto
 
-Data desta entrega: 30/09/2026.
+Entrega: 30/09/2026, versão 2.1.
 
-Aplicação: Meu Império Financeiro, hospedada pelo usuário em Vercel, com repositório GitHub e dados Firebase. Base desta edição: ZIP `imperioecommerce-mineirador-main (1).zip`, commit de origem indicado no ZIP `e8e57f0c25df595e8f53ba071321984bf319bc1d`.
+Meu Império Financeiro, código GitHub, hospedagem Vercel, dados Firebase. Base: ZIP original do minerador, commit de origem `e8e57f0c25df595e8f53ba071321984bf319bc1d`.
 
-Objetivo autorizado: aprimorar primeiro o financeiro; remover duplicidade entre estimativa e aporte; permitir aportes de qualquer data; conservar configuração inicial dos potes; renovar design; implementar as ideias financeiras propostas.
+Escopo autorizado: melhorar primeiro o financeiro; aporte único com data; preservar configuração inicial; automatizações, novo design, sem Google; escolha Você/Esposa com senha numérica; autoria no extrato; tema escuro mais neutro; prioridade de uso iOS; símbolos com volume nos potes; sliders de porcentagem; reset para reconfigurar do zero.
 
-Identidade: fundo suave ou grafite, verde sóbrio, tipografia limpa, poucos elementos decorativos, navegação responsiva, foco em saldo e ação.
+Senha real: somente na variável APP_PIN da Vercel. Chave administrativa Firebase: somente na variável FIREBASE_SERVICE_ACCOUNT_JSON da Vercel. Nenhum valor privado fica cadastrado neste documento.
 
-Dados existentes: documento Firestore `imperio_finance/familia_imperio`. Nova estrutura `financeV2`, mantendo campos antigos para rollback. Valores inteiros em centavos. Política de distribuição registrada em cada aporte. Datas financeiras em calendário de São Paulo.
+Sessões: `imperio-familia-voce` e `imperio-familia-esposa`, com claims familyFinance e actor. Perfil representa a seleção feita no login, já que a senha é compartilhada. Identificação anterior desconhecida fica marcada como anterior; pendências geradas automaticamente como sistema.
 
-Autenticação preparada: Google, restrita nas regras à conta familiar existente. Ativação e domínio autorizado precisam ser confirmados no Firebase antes do deploy.
+Dados: `imperio_finance/familia_imperio`, estrutura `financeV2`, valores inteiros em centavos, política registrada por aporte. Reset preserva snapshot em `imperio_finance_backups` antes da substituição. Campos legados permanecem intactos e não são reutilizados depois de um reset v2.
 
-Entrega: código e demonstração local com dados fictícios. Nenhuma edição na base de produção e nenhum deploy realizado.
+Identidade: tema claro suave e tema escuro grafite/azul, símbolos vetoriais com volume e sombra, botões de toque e porcentagens arrastáveis. Safari iPhone é o alvo principal, sem validação física nesta entrega.
 
-Pendências externas: configurar/verificar Firebase Authentication; aplicar/revisar regras; publicar no repositório GitHub/Vercel; revisar avisos de migração depois da primeira entrada.
+Validação: compilação TypeScript/Vite; testes unitários de cálculo e login com serviços simulados; testes de interface com DOM simulado. Produção não foi alterada.
 
-Limites conhecidos: sem notificações externas ou tarefas no servidor; meses futuros de recorrências gerados durante uso; histórico legado sem percentuais anteriores; migração de metas genéricas exige conferência; crescimento do histórico exige futura divisão por documentos.
+Pendências externas: cadastrar variáveis Vercel; revisar/publicar regras Firebase; publicar código no GitHub/Vercel; verificar login real e salvamento; conferir migração; validar Safari no iPhone.
 
-O código de mineração e estoque segue preservado, sem integração nesta etapa. Consulte README para instalação, validação e decisões financeiras.
+Mineração e estoque permanecem preservados e fora desta etapa. Consulte README e CONFIGURAR-ACESSO para procedimentos completos.

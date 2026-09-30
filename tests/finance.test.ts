@@ -305,3 +305,30 @@ test("recorrências não escrevem em meses fechados; migração sem potes preser
   });
   assert.equal(balances(migrated, today()).account, 10000);
 });
+
+test("autoria: criada por um perfil, alterada pelo outro, original preservado e reset sem mutação", async () => {
+  const { attributeChanges, resetFinance } =
+    await import("../src/finance/model");
+  const f = empty();
+  const e = entry(
+    { kind: "income", description: "Aporte", cents: 10000, date: today() },
+    f.pots,
+  );
+  const created = attributeChanges(f, { ...f, entries: [e] }, "voce");
+  assert.equal(created.entries[0].createdBy, "voce");
+  const edited = attributeChanges(
+    created,
+    {
+      ...created,
+      entries: [{ ...created.entries[0], description: "Aporte editado" }],
+    },
+    "esposa",
+  );
+  assert.equal(edited.entries[0].createdBy, "voce");
+  assert.equal(edited.entries[0].updatedBy, "esposa");
+  const reset = resetFinance(edited);
+  assert.equal(reset.entries.length, 0);
+  assert.equal(reset.configured, false);
+  assert.equal(edited.entries.length, 1);
+  assert.equal(reset.pots.length, 7);
+});

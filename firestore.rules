@@ -3,8 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function family() {
       return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email == 'imperioecommerce5@gmail.com';
+        && request.auth.token.familyFinance == true
+        && request.auth.uid in ['imperio-familia-voce', 'imperio-familia-esposa'];
     }
     match /imperio_finance/familia_imperio {
       allow read: if family();
@@ -17,6 +17,14 @@ service cloud.firestore {
         && request.resource.data.financeV2.version == 2
         && request.resource.data.financeV2.revision == (('financeV2' in resource.data) ? resource.data.financeV2.revision + 1 : 1);
       allow delete: if false;
+    }
+    match /imperio_finance_backups/{backupId} {
+      allow read: if family();
+      allow create: if family()
+        && request.resource.data.keys().hasOnly(['financeV2','createdAt','createdBy'])
+        && request.resource.data.createdBy == request.auth.token.actor
+        && request.resource.data.financeV2.version == 2;
+      allow update, delete: if false;
     }
     match /{document=**} { allow read, write: if false; }
   }

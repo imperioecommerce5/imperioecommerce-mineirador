@@ -5,9 +5,12 @@ import { JSDOM } from "jsdom";
 import { transformSync } from "esbuild";
 import { randomUUID } from "node:crypto";
 const sleep = () => new Promise((resolve) => setTimeout(resolve, 35));
-async function openApp() {
+async function openApp(
+  profile: "voce" | "esposa" | null = "voce",
+  initial?: object,
+) {
   const dom = new JSDOM(
-    '<!doctype html><html data-demo="true"><body><div id="root"></div></body></html>',
+    `<!doctype html><html data-demo="true" ${profile ? `data-demo-profile="${profile}"` : ""}><body><div id="root"></div></body></html>`,
     {
       url: "https://demo.invalid/?demo=1",
       runScripts: "dangerously",
@@ -19,6 +22,11 @@ async function openApp() {
   });
   Object.defineProperty(dom.window.crypto, "randomUUID", { value: randomUUID });
   dom.window.confirm = () => true;
+  dom.window.URL.createObjectURL = () => "blob:demo";
+  dom.window.URL.revokeObjectURL = () => {};
+  dom.window.HTMLAnchorElement.prototype.click = function () {};
+  if (initial)
+    dom.window.localStorage.setItem("imperio_demo", JSON.stringify(initial));
   dom.window.scrollTo = () => {};
   const js = fs.readdirSync("dist/assets").find((n) => n.endsWith(".js"))!;
   const code = transformSync(fs.readFileSync("dist/assets/" + js, "utf8"), {
@@ -123,7 +131,7 @@ test("interface: configuração inicial pede apenas um aporte e distribui confor
     );
     // A new isolated document avoids stale React state while retaining the explicitly supplied setup fixture.
     const second = new JSDOM(
-      '<html data-demo="true"><body><div id="root"></div></body></html>',
+      '<html data-demo="true" data-demo-profile="voce"><body><div id="root"></div></body></html>',
       {
         url: "https://demo.invalid/?demo=1",
         runScripts: "dangerously",
@@ -211,6 +219,239 @@ test("interface: conta recorrente gera pendência, pagamento afeta saldo e trans
       dom.window.document.querySelector('[role="dialog"]')?.textContent || "",
       /não altera o saldo em conta/,
     );
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("interface: escolha de perfil e senha numérica, sem acesso Google", async () => {
+  const dom = await openApp(null);
+  try {
+    assert.match(dom.window.document.body.textContent || "", /Quem está/);
+    assert.doesNotMatch(dom.window.document.body.textContent || "", /Google/);
+    (
+      dom.window.document.querySelector(
+        ".profile-picker button:nth-child(2)",
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    fill(dom, "Senha numérica", "111");
+    await sleep();
+    dom.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    assert.match(
+      dom.window.document.body.textContent || "",
+      /quatro números da senha/,
+    );
+    fill(dom, "Senha numérica", "5729");
+    await sleep();
+    dom.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    await sleep();
+    assert.match(
+      dom.window.document.querySelector(".account-chip")?.textContent || "",
+      /Esposa/,
+    );
+    click(dom, "Registrar aporte");
+    await sleep();
+    fill(dom, "Descrição", "Aporte da esposa");
+    fill(dom, "Valor (R$)", "100,00");
+    await sleep();
+    dom.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    await sleep();
+    const f = JSON.parse(dom.window.localStorage.getItem("imperio_demo")!);
+    assert.equal(
+      f.entries.find((e: any) => e.description === "Aporte da esposa")
+        .createdBy,
+      "esposa",
+    );
+    assert.match(dom.window.document.body.textContent || "", /Por Esposa/);
+    (
+      dom.window.document.querySelector(
+        '[aria-label="Trocar perfil"]',
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    assert.ok(dom.window.document.querySelector(".profile-picker"));
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("interface: edição pela esposa preserva autor original e identifica última alteração", async () => {
+  const first = await openApp("voce");
+  let data: any;
+  try {
+    click(first, "Registrar aporte");
+    await sleep();
+    fill(first, "Descrição", "Aporte compartilhado");
+    fill(first, "Valor (R$)", "500,00");
+    await sleep();
+    first.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new first.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    await sleep();
+    data = JSON.parse(first.window.localStorage.getItem("imperio_demo")!);
+  } finally {
+    first.window.close();
+  }
+  const second = await openApp("esposa", data);
+  try {
+    const row = Array.from(
+      second.window.document.querySelectorAll(".ledger-row"),
+    ).find((el) => el.textContent?.includes("Aporte compartilhado"))!;
+    (
+      row.querySelector('[aria-label="Editar lançamento"]') as HTMLElement
+    ).click();
+    await sleep();
+    fill(second, "Valor (R$)", "600,00");
+    await sleep();
+    second.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new second.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    await sleep();
+    const e = JSON.parse(
+      second.window.localStorage.getItem("imperio_demo")!,
+    ).entries.find((e: any) => e.description === "Aporte compartilhado");
+    assert.equal(e.createdBy, "voce");
+    assert.equal(e.updatedBy, "esposa");
+    assert.match(
+      second.window.document.body.textContent || "",
+      /Última alteração: Esposa/,
+    );
+  } finally {
+    second.window.close();
+  }
+});
+
+test("interface: porcentagem arrastável respeita orçamento e potes possuem símbolos com volume", async () => {
+  const dom = await openApp();
+  try {
+    assert.ok(
+      dom.window.document.querySelectorAll("svg.pot-symbol").length >= 7,
+    );
+    click(dom, "Potes");
+    await sleep();
+    (
+      dom.window.document.querySelector(
+        '[aria-label="Editar Supermercado"]',
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    const range = dom.window.document.querySelector('input[type="range"]')!;
+    Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(range, "90");
+    range.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    await sleep();
+    assert.equal(
+      (
+        dom.window.document.querySelector(
+          '[aria-label="Porcentagem do pote valor"]',
+        ) as HTMLInputElement
+      ).value,
+      "32",
+    );
+    Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(range, "20");
+    range.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    await sleep();
+    (
+      dom.window.document.querySelector(
+        '[aria-label="Símbolo Carteira"]',
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    dom.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    await sleep();
+    const f = JSON.parse(dom.window.localStorage.getItem("imperio_demo")!);
+    const p = f.pots.find((p: any) => p.id === "supermercado");
+    assert.equal(p.value, 20);
+    assert.equal(p.icon, "wallet");
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("interface: reset guarda cópia, reabre configuração e permite recuperar", async () => {
+  const dom = await openApp();
+  try {
+    click(dom, "Configurações");
+    await sleep();
+    click(dom, "Resetar e configurar do zero");
+    await sleep();
+    assert.equal(
+      (
+        dom.window.document.querySelector(
+          'button[type="submit"]',
+        ) as HTMLButtonElement
+      ).disabled,
+      true,
+    );
+    fill(dom, "Digite REINICIAR para confirmar", "REINICIAR");
+    await sleep();
+    dom.window.document
+      .querySelector("form")!
+      .dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await sleep();
+    await sleep();
+    const reset = JSON.parse(dom.window.localStorage.getItem("imperio_demo")!);
+    assert.equal(reset.configured, false);
+    assert.equal(reset.entries.length, 0);
+    assert.equal(
+      JSON.parse(dom.window.localStorage.getItem("imperio_last_reset")!).entries
+        .length,
+      3,
+    );
+    click(dom, "Configurar planejamento");
+    await sleep();
+    assert.equal(
+      dom.window.document.querySelectorAll('input[type="range"]').length,
+      7,
+    );
+    (
+      dom.window.document.querySelector('[aria-label="Fechar"]') as HTMLElement
+    ).click();
+    await sleep();
+    click(dom, "Configurações");
+    await sleep();
+    click(dom, "Recuperar último reset");
+    await sleep();
+    await sleep();
+    const restored = JSON.parse(
+      dom.window.localStorage.getItem("imperio_demo")!,
+    );
+    assert.equal(restored.configured, true);
+    assert.equal(restored.entries.length, 3);
   } finally {
     dom.window.close();
   }

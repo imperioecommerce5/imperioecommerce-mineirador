@@ -1,3 +1,5 @@
+import { PotSymbol, potSymbol, symbols } from "../finance/PotSymbol";
+import { PercentageControl } from "../finance/PercentageControl";
 import { storage } from "../finance/storage";
 import { useMemo, useState, FormEvent, useEffect } from "react";
 import {
@@ -48,6 +50,9 @@ import {
   validateFinance,
   migrate,
   monthDate,
+  Actor,
+  actorName,
+  resetFinance,
 } from "../finance/model";
 import "../finance/finance.css";
 type View = "home" | "ledger" | "pots" | "bills" | "goals" | "settings";
@@ -59,6 +64,7 @@ type Modal =
   | { type: "rule" }
   | { type: "asset" }
   | { type: "setup" }
+  | { type: "reset" }
   | null;
 const labels = {
   home: "Visão geral",
@@ -141,13 +147,22 @@ function exportFile(name: string, text: string, type = "application/json") {
 }
 export default function FinanceCenterView({
   demo = false,
+  actor = "voce",
   onLogout,
 }: {
   demo?: boolean;
+  actor?: Actor;
   onLogout?: () => void;
   emailUsuario?: string;
 }) {
-  const { data: f, save, status, error, saving } = useFinance(demo);
+  const {
+    data: f,
+    save,
+    status,
+    error,
+    saving,
+    lastReset,
+  } = useFinance(demo, actor);
   const [view, setView] = useState<View>("home"),
     [modal, setModal] = useState<Modal>(null),
     [toast, setToast] = useState(""),
@@ -161,16 +176,28 @@ export default function FinanceCenterView({
   const [dark, setDark] = useState(
     () => storage.getItem("imperio_visual") === "dark",
   );
+  useEffect(() => {
+    const color = dark ? "#11141b" : "#f5f6f3";
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", color);
+    document
+      .querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+      ?.setAttribute("content", dark ? "black-translucent" : "default");
+    document.body.style.backgroundColor = color;
+  }, [dark]);
+  const [actorFilter, setActorFilter] = useState("all");
   const [undo, setUndo] = useState<Entry | null>(null);
   const b = useMemo(() => (f ? balances(f) : null), [f]);
   const cash = (v: number) => (hidden ? "R$ ••••" : money(v));
   async function change(
     fn: (s: Finance) => Finance,
     message = "Alteração salva",
+    backupBefore = false,
   ) {
     try {
       setLocalError("");
-      await save(fn);
+      await save(fn, backupBefore);
       setToast(message);
       return true;
     } catch (e) {
@@ -230,6 +257,9 @@ export default function FinanceCenterView({
     .filter(
       (e) =>
         (showDeleted || !e.deleted) &&
+        (actorFilter === "all" ||
+          e.createdBy === actorFilter ||
+          e.updatedBy === actorFilter) &&
         e.date.slice(0, 7) === month &&
         (filter === "all" ||
           (filter === "pending"
@@ -329,6 +359,12 @@ export default function FinanceCenterView({
             {e.kind === "transfer" ? ` → ${potName(e.destination)}` : ""}
             {e.date > today() ? " · Agendado" : ""}
           </small>
+          <span className="entry-author">
+            Por {actorName(e.createdBy)}
+            {e.updatedBy && e.updatedBy !== e.createdBy
+              ? ` · Última alteração: ${actorName(e.updatedBy)}`
+              : ""}
+          </span>
         </div>
         <span className={`badge ${e.status === "pending" ? "warning" : ""}`}>
           {e.deleted
@@ -468,7 +504,14 @@ export default function FinanceCenterView({
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <span className="avatar">IF</span>
+            <button
+              className="account-chip"
+              onClick={onLogout}
+              aria-label="Trocar perfil"
+            >
+              <span className="avatar">{actor === "voce" ? "V" : "E"}</span>
+              <span>{actorName(actor)}</span>
+            </button>
           </div>
         </header>
         <main className="content">
@@ -786,6 +829,16 @@ export default function FinanceCenterView({
                     </option>
                   ))}
                 </select>
+                <select
+                  aria-label="Quem fez a movimentação"
+                  value={actorFilter}
+                  onChange={(e) => setActorFilter(e.target.value)}
+                >
+                  <option value="all">Todos os perfis</option>
+                  <option value="voce">Você</option>
+                  <option value="esposa">Esposa</option>
+                  <option value="sistema">Sistema</option>
+                </select>
                 <label className="checkbox">
                   <input
                     type="checkbox"
@@ -811,7 +864,7 @@ export default function FinanceCenterView({
                     onClick={() =>
                       exportFile(
                         `extrato-${month}.csv`,
-                        "Data;Tipo;Descrição;Valor;Status;Pote\n" +
+                        "Data;Tipo;Descrição;Valor;Status;Pote;Criado por;Última alteração por\n" +
                           filtered
                             .map((e) =>
                               [
@@ -821,6 +874,8 @@ export default function FinanceCenterView({
                                 money(e.cents),
                                 e.status === "paid" ? "Pago" : "Pendente",
                                 potName(e.pot),
+                                actorName(e.createdBy),
+                                actorName(e.updatedBy),
                               ]
                                 .map(
                                   (v) =>
@@ -1153,6 +1208,18 @@ export default function FinanceCenterView({
           )}
           {view === "settings" && (
             <>
+              <section className="panel account-panel">
+                <div>
+                  <p className="eyebrow">PERFIL DESTA SESSÃO</p>
+                  <h2>{actorName(actor)}</h2>
+                  <p className="muted">
+                    As movimentações desta sessão registram seu perfil.
+                  </p>
+                </div>
+                <button className="secondary" onClick={onLogout}>
+                  <LogOut size={17} /> Trocar perfil ou sair
+                </button>
+              </section>
               <section className="panel">
                 <h2>Fechamento mensal</h2>
                 <p className="muted">
@@ -1363,6 +1430,49 @@ export default function FinanceCenterView({
                   </label>
                 </div>
               </section>
+              <section className="panel reset-panel">
+                <div>
+                  <h2>Recomeçar o planejamento</h2>
+                  <p className="muted">
+                    Volte à configuração inicial de potes e aporte. Uma cópia
+                    anterior será guardada antes do reset.
+                  </p>
+                </div>
+                <div className="toolbar">
+                  <button
+                    className="reset-button"
+                    onClick={() => open({ type: "reset" })}
+                  >
+                    <RotateCcw size={17} /> Resetar e configurar do zero
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={async () => {
+                      try {
+                        const previous = await lastReset();
+                        if (
+                          !window.confirm(
+                            "Recuperar o planejamento anterior ao último reset?",
+                          )
+                        )
+                          return;
+                        exportFile(
+                          `imperio-antes-recuperacao-${today()}.json`,
+                          JSON.stringify({ financeV2: f }, null, 2),
+                        );
+                        await change(
+                          (s) => ({ ...previous, revision: s.revision }),
+                          "Planejamento anterior recuperado",
+                        );
+                      } catch (e) {
+                        setLocalError((e as Error).message);
+                      }
+                    }}
+                  >
+                    Recuperar último reset
+                  </button>
+                </div>
+              </section>
               <section className="panel">
                 <h2>Como seus valores são calculados</h2>
                 <p className="muted">
@@ -1420,19 +1530,47 @@ export default function FinanceCenterView({
           </button>
         </div>
       )}
-      {modal && (
-        <FinanceModal
-          modal={modal}
-          f={f}
+      {modal?.type === "reset" ? (
+        <ResetDialog
           saving={saving}
-          cash={cash}
+          count={f.entries.filter((e) => !e.deleted).length}
           close={() => setModal(null)}
-          commit={async (fn) => {
-            const ok = await change(fn);
-            if (ok) setModal(null);
-            return ok;
+          confirm={async () => {
+            exportFile(
+              `imperio-antes-reset-${today()}.json`,
+              JSON.stringify(
+                { financeV2: f, exportedAt: new Date().toISOString() },
+                null,
+                2,
+              ),
+            );
+            const ok = await change(
+              resetFinance,
+              "Planejamento reiniciado. A cópia anterior está disponível em Ajustes.",
+              true,
+            );
+            if (ok) {
+              setModal(null);
+              setView("home");
+              setUndo(null);
+            }
           }}
         />
+      ) : (
+        modal && (
+          <FinanceModal
+            modal={modal}
+            f={f}
+            saving={saving}
+            cash={cash}
+            close={() => setModal(null)}
+            commit={async (fn) => {
+              const ok = await change(fn);
+              if (ok) setModal(null);
+              return ok;
+            }}
+          />
+        )
       )}
     </div>
   );
@@ -1473,6 +1611,12 @@ function PotCard({
           <Pencil size={14} />
         </button>
       </header>
+      <div className="pot-art">
+        <PotSymbol symbol={potSymbol(p)} />
+        <span className="pot-percentage">
+          {p.mode === "percent" ? `${p.value}%` : "Fixo"}
+        </span>
+      </div>
       <h3>{p.name}</h3>
       <strong>{cash(balance)}</strong>
       <small>{p.reserve ? "Reservado" : "Disponível no pote"}</small>
@@ -1507,7 +1651,7 @@ function FinanceModal({
   close,
   commit,
 }: {
-  modal: Exclude<Modal, null>;
+  modal: Exclude<Modal, null | { type: "reset" }>;
   f: Finance;
   saving: boolean;
   cash: (v: number) => string;
@@ -1548,6 +1692,7 @@ function FinanceModal({
       g ? f.pots.find((p) => p.id === g.pot)?.value || 0 : 0,
     ),
     [opening, setOpening] = useState(g ? decimal(g.opening) : "0");
+  const [symbol, setSymbol] = useState(p ? potSymbol(p) : "wallet");
   const [ruleText, setRuleText] = useState(""),
     [formError, setFormError] = useState(""),
     [suggestion, setSuggestion] = useState("");
@@ -1690,7 +1835,8 @@ function FinanceModal({
           rollover,
           priority,
           active,
-          color: p?.color || "#13765e",
+          color: p?.color || "#8296bb",
+          icon: symbol,
         };
         const next = [...f.pots.filter((x) => x.id !== updated.id), updated];
         validatePots(next);
@@ -1825,23 +1971,27 @@ function FinanceModal({
             </p>
             <div className="setup-pots">
               {setupPots.map((p, i) => (
-                <Field key={p.id} label={`${p.name} (%)`}>
-                  <input
-                    aria-label={`${p.name} percentual`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
+                <div className="setup-pot" key={p.id}>
+                  <PotSymbol symbol={potSymbol(p)} />
+                  <PercentageControl
+                    label={`${p.name} percentual`}
                     value={p.value}
-                    onChange={(e) =>
+                    color={p.color}
+                    maxAllowed={
+                      100 -
+                      setupPots
+                        .filter((_, j) => j !== i)
+                        .reduce((sum, p) => sum + p.value, 0)
+                    }
+                    onChange={(value) =>
                       setSetupPots(
                         setupPots.map((x, j) =>
-                          i === j ? { ...x, value: Number(e.target.value) } : x,
+                          j === i ? { ...x, value } : x,
                         ),
                       )
                     }
                   />
-                </Field>
+                </div>
               ))}
             </div>
             <p className="muted">
@@ -1878,28 +2028,44 @@ function FinanceModal({
             />
           </Field>
         )}
-        {modal.type !== "rule" && (
-          <Field
-            label={
-              modal.type === "pot"
-                ? mode === "percent"
-                  ? "Porcentagem do restante (%)"
-                  : "Valor fixo por aporte (R$)"
-                : modal.type === "goal"
-                  ? "Valor da meta (R$)"
-                  : modal.type === "bill"
-                    ? "Valor de cada parcela (R$)"
-                    : "Valor (R$)"
+        {modal.type === "pot" && mode === "percent" ? (
+          <PercentageControl
+            label="Porcentagem do pote"
+            value={Number(value.replace(",", ".")) || 0}
+            maxAllowed={
+              100 -
+              f.pots
+                .filter(
+                  (x) => x.active && x.mode === "percent" && x.id !== p?.id,
+                )
+                .reduce((sum, x) => sum + x.value, 0)
             }
-          >
-            <input
-              inputMode="decimal"
-              required
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="0,00"
-            />
-          </Field>
+            onChange={(n) => setValue(String(n))}
+          />
+        ) : (
+          modal.type !== "rule" && (
+            <Field
+              label={
+                modal.type === "pot"
+                  ? mode === "percent"
+                    ? "Porcentagem do restante (%)"
+                    : "Valor fixo por aporte (R$)"
+                  : modal.type === "goal"
+                    ? "Valor da meta (R$)"
+                    : modal.type === "bill"
+                      ? "Valor de cada parcela (R$)"
+                      : "Valor (R$)"
+              }
+            >
+              <input
+                inputMode="decimal"
+                required
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,00"
+              />
+            </Field>
+          )
         )}
         {["entry", "setup", "bill", "goal"].includes(modal.type) && (
           <Field
@@ -1992,6 +2158,25 @@ function FinanceModal({
                 <option value="fixed">Valor fixo por aporte</option>
               </select>
             </Field>
+            <div
+              className="symbol-picker"
+              role="group"
+              aria-label="Símbolo do pote"
+            >
+              {symbols.map(([key, label]) => (
+                <button
+                  type="button"
+                  key={key}
+                  className={symbol === key ? "selected" : ""}
+                  aria-label={`Símbolo ${label}`}
+                  aria-pressed={symbol === key}
+                  onClick={() => setSymbol(key)}
+                >
+                  <PotSymbol symbol={key} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
             <Field label="Prioridade dos valores fixos (menor vem primeiro)">
               <input
                 type="number"
@@ -2095,16 +2280,19 @@ function FinanceModal({
         )}
         {modal.type === "goal" && (
           <>
-            <Field label="Percentual automático dos próximos aportes (%)">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={goalPct}
-                onChange={(e) => setGoalPct(Number(e.target.value))}
-              />
-            </Field>
+            <PercentageControl
+              label="Percentual automático da meta"
+              value={goalPct}
+              maxAllowed={
+                100 -
+                f.pots
+                  .filter(
+                    (p) => p.active && p.mode === "percent" && p.id !== g?.pot,
+                  )
+                  .reduce((sum, p) => sum + p.value, 0)
+              }
+              onChange={setGoalPct}
+            />
             <Field label="Saldo anterior externo à conta (R$)">
               <input
                 inputMode="decimal"
@@ -2144,6 +2332,62 @@ function FinanceModal({
               : modal.type === "setup"
                 ? "Começar com este aporte"
                 : "Salvar"}
+          </button>
+        </footer>
+      </form>
+    </ModalShell>
+  );
+}
+
+function ResetDialog({
+  saving,
+  count,
+  close,
+  confirm,
+}: {
+  saving: boolean;
+  count: number;
+  close: () => void;
+  confirm: () => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  return (
+    <ModalShell title="Recomeçar do zero" onClose={close}>
+      <form
+        className="modal-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (text === "REINICIAR") await confirm();
+        }}
+      >
+        <p className="muted">
+          O planejamento atual, com {count} movimentações, será substituído pela
+          configuração inicial. Uma cópia ficará guardada para recuperação e um
+          backup será oferecido para download.
+        </p>
+        <div className="notice">
+          Você voltará a escolher as porcentagens dos potes e registrar um único
+          aporte inicial.
+        </div>
+        <Field label="Digite REINICIAR para confirmar">
+          <input
+            autoFocus
+            autoComplete="off"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="REINICIAR"
+          />
+        </Field>
+        <footer className="modal-footer">
+          <button className="secondary" type="button" onClick={close}>
+            Cancelar
+          </button>
+          <button
+            className="reset-button"
+            type="submit"
+            disabled={saving || text !== "REINICIAR"}
+          >
+            {saving ? "Guardando cópia…" : "Confirmar reset"}
           </button>
         </footer>
       </form>

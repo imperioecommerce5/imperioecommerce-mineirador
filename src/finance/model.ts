@@ -1,3 +1,13 @@
+export type Actor = "voce" | "esposa";
+export type RecordActor = Actor | "sistema" | "anterior";
+export const actorName = (actor?: RecordActor) =>
+  actor === "voce"
+    ? "Você"
+    : actor === "esposa"
+      ? "Esposa"
+      : actor === "sistema"
+        ? "Sistema"
+        : "Registro anterior";
 export type Pot = {
   id: string;
   name: string;
@@ -8,6 +18,7 @@ export type Pot = {
   priority: number;
   active: boolean;
   color: string;
+  icon?: string;
 };
 export type Allocation = Record<string, number>;
 export type Entry = {
@@ -25,6 +36,8 @@ export type Entry = {
   policy: Pot[];
   deleted: boolean;
   source: string;
+  createdBy?: RecordActor;
+  updatedBy?: RecordActor;
 };
 export type Recurrence = {
   id: string;
@@ -405,7 +418,14 @@ function legacyDate(s: string) {
 export function migrate(raw: any): Finance {
   if (raw?.financeV2) {
     validateFinance(raw.financeV2);
-    return raw.financeV2;
+    return {
+      ...raw.financeV2,
+      entries: raw.financeV2.entries.map((e: Entry) => ({
+        ...e,
+        createdBy: e.createdBy || "anterior",
+        updatedBy: e.updatedBy || e.createdBy || "anterior",
+      })),
+    };
   }
   const f = empty();
   if (!raw || !Array.isArray(raw.potesAtivos)) return f;
@@ -531,7 +551,14 @@ export function migrate(raw: any): Finance {
     f.migrationNotes.push(
       "Contas antigas preservadas e pausadas. Confira a data do próximo vencimento e ative em Contas.",
     );
-  return f;
+  return {
+    ...f,
+    entries: f.entries.map((e) => ({
+      ...e,
+      createdBy: "anterior" as const,
+      updatedBy: "anterior" as const,
+    })),
+  };
 }
 export function validateFinance(f: any): asserts f is Finance {
   if (
@@ -585,6 +612,14 @@ export function validateFinance(f: any): asserts f is Finance {
     )
       throw new Error("Tipo ou destino de lançamento inválido.");
     if (e.kind === "income") validatePots(e.policy);
+    if (
+      [e.createdBy, e.updatedBy].some(
+        (a) =>
+          a !== undefined &&
+          !["voce", "esposa", "sistema", "anterior"].includes(a),
+      )
+    )
+      throw new Error("Perfil de movimentação inválido.");
     ids.add(e.id);
     if (
       Object.values(e.allocations).some(
@@ -633,4 +668,39 @@ export function validateFinance(f: any): asserts f is Finance {
       g.opening < 0
     )
       throw new Error("Meta inválida no backup.");
+}
+
+export function attributeChanges(
+  before: Finance,
+  after: Finance,
+  actor: Actor,
+): Finance {
+  const prior = new Map(before.entries.map((e) => [e.id, e]));
+  const timestamp = new Date().toISOString();
+  return {
+    ...after,
+    entries: after.entries.map((e) => {
+      const old = prior.get(e.id);
+      if (
+        (old && JSON.stringify(old) === JSON.stringify(e)) ||
+        (!old && e.createdBy)
+      )
+        return e;
+      const generated = !old && e.id.startsWith("rec-");
+      return {
+        ...e,
+        createdBy:
+          old?.createdBy ||
+          e.createdBy ||
+          (!old ? (generated ? "sistema" : actor) : "anterior"),
+        updatedBy: generated ? "sistema" : actor,
+        updatedAt: timestamp,
+      };
+    }),
+  };
+}
+export function resetFinance(current: Finance): Finance {
+  const next = empty();
+  next.revision = current.revision;
+  return next;
 }

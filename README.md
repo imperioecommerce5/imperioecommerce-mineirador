@@ -1,106 +1,89 @@
-# Meu Império Financeiro — versão 2
+# Meu Império Financeiro — versão 2.1
 
-Financeiro familiar em React, TypeScript, Vite e Firebase. O código de mineração, estoque e comparação foi preservado no projeto; a navegação principal continua dedicada ao financeiro.
+Financeiro familiar com aporte único, potes, metas, contas e extrato. Esta versão prioriza o uso no iPhone e substitui o login Google pelo acesso com perfil e senha numérica.
 
-## O que mudou
+## Mudanças desta versão
 
-- Entrada única de dinheiro: aporte com valor e data, sem duplicidade de valor estimado e aporte inicial.
-- Configuração inicial de porcentagens e primeiro aporte no mesmo fluxo.
-- Distribuição registrada por aporte; alterações de potes só afetam entradas novas. Editar o valor de uma entrada conserva a política original.
-- Valores calculados em centavos inteiros, com distribuição exata dos resíduos de arredondamento.
-- Saldo em conta, reservas e valor livre apresentados separadamente. Transferências internas não são despesas.
-- Potes percentuais ou fixos, prioridade, reserva protegida, saldo acumulativo e arquivamento sem apagar histórico.
-- Recorrências e parcelas com geração idempotente; vencimentos no dia 31 são ajustados ao último dia de meses menores.
-- Pagamentos pendentes, alertas de vencimento, limites de 80% e 100%, sugestão de categoria por descrição e regras configuráveis.
-- Metas com pote próprio, contribuições extras, porcentagem automática e estimativa pela média dos últimos três meses.
-- Extrato com busca, filtros, edição, repetição, exclusão recuperável e CSV.
-- Resumo mensal, fechamento e reabertura; redistribuição das sobras dos potes que não acumulam.
-- Backup JSON, validação de importação e exportação anterior à recuperação.
-- Design responsivo, claro ou escuro, com navegação lateral no computador e barra inferior no celular.
-- Google Authentication e modelo de regras restrito à conta da família. O PIN fixo foi removido.
-- Gravação transacional com revisão para detectar alterações concorrentes.
+- Escolha de perfil Você / Sua esposa e senha numérica validada no servidor.
+- Autor original e perfil da última alteração registrados nas movimentações e no CSV.
+- Filtro do extrato por perfil. Registros anteriores sem autoria identificável aparecem como Registro anterior.
+- Tema escuro em grafite e azul discreto, com contraste entre fundo, cartões, textos e ações.
+- Símbolos vetoriais com volume e sombra para os potes: patrimônio, poupança infantil, compras, transporte, lazer, perfis pessoais, meta e carteira. O símbolo pode ser escolhido ao editar o pote.
+- Porcentagens arrastáveis na configuração inicial, na edição dos potes e nas metas, com entrada numérica alternativa e limite total de 100%.
+- Áreas de toque maiores, campos com fonte de 16 px, margens seguras do iPhone e formulários em painel inferior no celular.
+- Ícone e manifesto para adicionar o app à tela inicial no Safari.
+- Reset recuperável: cópia em transação no Firestore antes de substituir o planejamento, download de backup e botão para recuperar o último reset.
 
-## Regras financeiras
+## Como publicar
 
-**Saldo em conta** = aportes pagos com data até hoje − gastos pagos com data até hoje.
+Leia primeiro **CONFIGURAR-ACESSO.md**. Esta atualização exige duas variáveis privadas na Vercel, APP_PIN e FIREBASE_SERVICE_ACCOUNT_JSON, além das regras Firestore novas. Não publique esperando que o login Google ou o PIN do código antigo continuem funcionando.
 
-**Reservado** = saldos positivos dos potes marcados como reserva.
+Guarde a versão anterior e exporte o documento `imperio_finance/familia_imperio` pela sua rotina de backup antes de atualizar. Coloque os conteúdos desta pasta na raiz do repositório existente. A Vercel usa Vite, `npm ci`, `npm run build` e saída `dist`; a rota `/api/login` é atendida pela função de servidor, sem ser reescrita para a página principal.
 
-**Livre para gastar** = saldo em conta − reservado − despesas pendentes com vencimento até o final do mês atual.
+O projeto usa Node.js 22; para testes locais, use 22.22.2 ou posterior da série 22, ou 24.15+ em ambiente de teste. O deploy de produção configura a série 22.
 
-Uma pendência de meses futuros fica no calendário e não diminui o livre deste mês. Um aporte futuro aparece no extrato, mas não é usado antes da data informada. Confirmar uma conta como paga registra o pagamento na data de hoje; é possível editar a data pelo extrato.
+O arquivo de regras é um modelo para o financeiro. Ele nega acesso a outras coleções; se outras aplicações usarem o mesmo Firebase, integre os blocos financeiros sem apagar as regras específicas dessas aplicações.
 
-Potes de valor fixo recebem primeiro, na ordem de prioridade; as porcentagens dividem o restante de **cada aporte**. Esses valores fixos não são tetos mensais. Por exemplo: num aporte de R$ 1.000, um pote fixo de R$ 200 recebe R$ 200; uma reserva de 10% recebe R$ 80 do restante. Se o aporte não cobrir todos os valores fixos, os potes de menor prioridade recebem apenas o restante disponível.
+## Uso no iPhone
 
-Metas recebem dinheiro em potes internos. O saldo anterior externo de uma meta é informativo: não cria dinheiro na conta atual. Bens e investimentos externos também são informativos. Gastar acima de um pote pode deixá-lo negativo; o app evidencia o limite. Transferir exige saldo suficiente na origem na data escolhida.
+Depois de publicar, abra o endereço no Safari e use Compartilhar → Adicionar à Tela de Início. O app tem ícone, margens seguras e navegação inferior. Os ajustes têm como alvo Safari de iOS 16 ou posterior. Login e salvamento na nuvem exigem internet; não há promessa de funcionamento offline.
 
-## Antes de publicar
+A implementação tem CSS responsivo e os fluxos foram testados em DOM simulado. **Não houve teste em iPhone físico nem em Safari real nesta entrega.** A validação final de teclado, gesto de arrastar, tamanho dos textos e abertura pela tela inicial deve ser feita no seu dispositivo.
 
-1. Guarde o ZIP original e exporte uma cópia do documento `imperio_finance/familia_imperio` no Firestore, pela sua rotina de backup.
-2. Em Firebase Console → Authentication → Sign-in method, ative Google.
-3. Em Authentication → Settings → Authorized domains, adicione `imperioecommerce-mineirador.vercel.app`. Adicione também o domínio de produção personalizado, se houver.
-4. Acesse usando `imperioecommerce5@gmail.com`. O modelo de regras permite apenas essa conta verificada. Sua esposa pode usar a mesma conta, conforme o funcionamento atual.
-5. Em Firestore → Rules, revise e publique as regras de `firestore.rules`. **O arquivo é um modelo para a aplicação financeira e nega acesso às outras coleções.** Se houver outras aplicações usando o mesmo Firebase, preserve suas regras específicas e integre somente o bloco de `imperio_finance/familia_imperio`.
-6. Substitua os arquivos do projeto na raiz do repositório GitHub. Não coloque a pasta `imperio-financeiro` dentro da raiz existente: use seus conteúdos.
-7. Na Vercel, mantenha framework Vite, build `npm run build` e saída `dist`. O `vercel.json` já contém esses valores.
-8. Confira o acesso em uma implantação de teste antes de promover a versão de produção. Use `?demo=1` para avaliar o visual sem acessar os dados financeiros reais.
-9. Após entrar na versão nova, confira os avisos de migração e registre uma alteração de teste. Verifique que o estado indica “Salvo”.
+## Regras financeiras preservadas
 
-Não publique a autenticação nova sem ativar Google e autorizar o domínio: o PIN antigo deixa de existir nesta versão.
+Saldo em conta = aportes pagos com data até hoje − gastos pagos com data até hoje.
 
-## Migração dos dados existentes
+Reservado = saldos positivos dos potes marcados como reserva.
 
-A leitura usa o mesmo documento familiar existente. Os dados novos são escritos apenas em `financeV2`; os campos antigos permanecem no documento para recuperação. A migração é calculada ao carregar e persistida na primeira alteração salva. Não há substituição automática dos campos legados.
+Livre para gastar = saldo em conta − reservado − despesas pendentes com vencimento até o fim do mês atual.
 
-- O aporte inicial vira uma entrada única com ID estável `legacy-opening`.
-- `rendaMensal`, que era uma estimativa, não é usada como entrada de dinheiro.
-- A data do aporte inicial é inferida do primeiro lançamento ou da data da migração, pois não existia uma data própria. Confira e ajuste no extrato.
-- O app antigo não guardava percentuais históricos: as entradas anteriores usam os percentuais encontrados no momento da migração. A partir da versão 2, cada aporte possui seu histórico de distribuição.
-- Reservas extras identificadas pelo código anterior são convertidas em transferências internas.
-- Depósitos de metas com identificação explícita são ligados à meta. Movimentos genéricos sem identificação suficiente continuam como despesas, com aviso para conferência. O saldo anterior das metas é preservado como valor externo quando não há vínculo seguro. Essa limitação exige revisão manual; não foi inventada uma atribuição entre metas.
-- Contas parceladas antigas são preservadas pausadas, com a quantidade de parcelas restantes. Confira o primeiro vencimento antes de ativá-las.
-- Itens de patrimônio externo são preservados.
+Potes fixos são atendidos primeiro, na ordem de prioridade. As porcentagens dividem o restante de **cada aporte**. Valores fixos não são tetos mensais. Cada aporte guarda a política usada; editar seu valor recalcula essa mesma política. Configurações novas valem para novos aportes.
 
-Se voltar ao código antigo, ele continuará vendo somente os dados legados: **as movimentações feitas na versão 2 não aparecerão na versão antiga**. Antes de qualquer retorno, exporte o backup novo.
+Reserva e transferência entre potes não retiram dinheiro da conta. Confirmar uma conta como paga usa a data de hoje; sua data pode ser editada no extrato. Aporte futuro só passa a compor os saldos na data informada. Bens externos e saldo anterior externo de metas são informativos.
 
-## Automatizações e limites
+As automatizações de recorrências geram pendências até o mês atual ao abrir ou usar o app. Elas não fazem pagamentos, não enviam notificações externas e não executam tarefas com o app fechado. Parcelas existentes devem ser editadas pelo extrato; mudanças no cadastro recorrente afetam apenas as parcelas ainda não geradas.
 
-Recorrências são geradas ao abrir o app e durante o uso, até o mês atual. Parcelas futuras são geradas nos meses seguintes; não há servidor agendado, push externo nem pagamento automático. Editar uma recorrência altera apenas as parcelas ainda não geradas; ajuste pendências existentes no extrato. Pausar não apaga pendências.
+## Migração e recuperação
 
-Fechamentos são confirmados manualmente; o resumo mensal é calculado automaticamente. Meses fechados bloqueiam novas movimentações e alterações retroativas. Para reabrir vários meses, comece pelo mais recente.
+Os dados novos são escritos em `financeV2` no documento familiar já existente. Campos legados ficam preservados. O aporte inicial vira uma única entrada; a estimativa `rendaMensal` não vira dinheiro recebido.
 
-A gravação usa transações e controle de revisão. Alterações concorrentes não são sobrescritas silenciosamente: um conflito pede atualização da página. Não há fila de gravações offline; a aplicação mostra a cópia local disponível, mas a nuvem precisa aceitar a transação para uma alteração ser considerada salva.
+A data do aporte antigo é inferida do primeiro lançamento ou da data da migração, pois não existia uma data própria. Percentuais históricos também não existiam: os aportes antigos usam a configuração encontrada na migração. Confira os avisos apresentados no app.
 
-O financeiro continua em um documento para preservar compatibilidade com a estrutura atual. Existe um limite preventivo de aproximadamente 850 KB de JSON, considerando os campos legados e novos. Quando o histórico crescer, a próxima etapa será migrar lançamentos para documentos individuais. A cópia local é auxiliar; exporte backups periódicos.
+Depósitos de metas identificados explicitamente são ligados à meta. Movimentos sem vínculo identificável permanecem como saída, com aviso para conferência; não é inventada uma atribuição entre metas. Contas antigas são preservadas pausadas, para revisão de vencimentos antes de ativar.
 
-## Desenvolvimento e verificações
+O reset substitui somente o financeiro novo por uma configuração vazia. Antes disso, guarda a cópia antiga no Firestore na mesma transação; se a gravação da cópia falhar, o reset não ocorre. Na demonstração, a cópia é local. A recuperação do último reset mantém a autoria dos registros antigos. Se voltar ao código v1, ele verá os campos legados, não as movimentações novas; exporte o backup v2 antes de retornar.
 
-Requer Node.js 22.13+ e npm.
+As transações usam controle de revisão para recusar sobrescritas por outro dispositivo. O histórico continua em um documento, com limite preventivo de aproximadamente 850 KB considerando campos antigos e novos. Quando crescer, a próxima etapa será separar os lançamentos em documentos individuais.
+
+## Desenvolvimento
 
 ```bash
 npm ci
-npm run dev
 npm run lint
 npm run test
+npm run dev
 ```
 
-`npm run test` faz a compilação e executa os testes de cálculo e interface em DOM simulado, usando dados fictícios. `npm run build` gera `dist`. `npm run format` formata os arquivos novos. `npm run demo` gera `demonstracao.html`, uma demonstração independente com dados fictícios.
+`npm run test` compila e executa os testes financeiros, do fluxo de login e da interface em DOM simulado. `npm run demo` cria `demonstracao.html` com dados fictícios. O Vite local não fornece `/api/login`; use `vercel dev` com as variáveis privadas para testar o backend completo ou uma implantação Preview da Vercel. Para testar apenas as telas no Vite, use `?demo=1`.
 
-Foram verificados: centavos, políticas históricas, aporte único, transferência, migração, parcelas idempotentes, fechamento, exclusão/restauração, configuração inicial, navegação e pagamento de recorrências.
+Verificações: autoria, edição por outro perfil, PIN inválido, perfil inválido, limite de tentativas, origem recusada, ausência de configuração, sliders, reset/recuperação, centavos, migração, transferências e recorrências. A validação do backend usou serviços simulados, sem acessar a base de produção.
 
-**Não foram validados nesta entrega:** login Google real, aplicação das regras no seu Firebase, gravação na sua base de produção e layout em um navegador gráfico. O navegador remoto bloqueou o servidor local. Os fluxos foram testados em DOM simulado e a demonstração HTML usa os mesmos arquivos compilados da versão entregue.
+Não foram testados nesta entrega: emissão real de tokens com sua conta de serviço, regras no seu projeto, transações na base de produção e interface em navegador gráfico. Nenhum deploy foi realizado.
 
-## Documentação oficial
+## Estrutura
 
-- [Transações do Firestore](https://firebase.google.com/docs/firestore/manage-data/transactions)
-- [Acesso Google no Firebase](https://firebase.google.com/docs/auth/web/google-signin)
+- `src/App.tsx`: perfil e login numérico.
+- `api/login.ts`: função Vercel e autenticação Firebase por token personalizado.
+- `server/login-handler.ts`: validação de senha, origem e limite de tentativas.
+- `src/finance/model.ts`: cálculos, migração, autoria e reset.
+- `src/finance/useFinance.ts`: sincronização, transações e cópias de reset.
+- `src/finance/PotSymbol.tsx`: símbolos vetoriais com volume.
+- `src/finance/PercentageControl.tsx`: porcentagens arrastáveis.
+- `src/components/FinanceCenterView.tsx`: telas e formulários.
+- `src/finance/finance.css`: visual responsivo e ajustes de iOS.
+- `firestore.rules`: acesso dos dois perfis e cópias de recuperação.
 
-## Arquivos principais
+Os módulos anteriores de mineração, estoque e comparação continuam no código, sem integração nesta etapa.
 
-- `src/finance/model.ts`: valores, distribuição, migração, fechamento e recorrências.
-- `src/finance/useFinance.ts`: leitura, backup auxiliar e gravações transacionais.
-- `src/components/FinanceCenterView.tsx`: interface e formulários financeiros.
-- `src/finance/finance.css`: identidade visual responsiva.
-- `src/App.tsx`: autenticação e demonstração local.
-- `firestore.rules`: modelo de acesso para o documento financeiro.
-- `tests/`: testes do financeiro e fluxos da interface.
+Documentação oficial: [autenticação personalizada do Firebase](https://firebase.google.com/docs/auth/admin/create-custom-tokens), [transações Firestore](https://firebase.google.com/docs/firestore/manage-data/transactions), [funções Node.js na Vercel](https://vercel.com/docs/functions/runtimes/node-js).
