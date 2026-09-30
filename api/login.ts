@@ -3,7 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { ipAddress } from "@vercel/functions";
 import { createHash } from "node:crypto";
-import { loginHandler } from "../server/login-handler.ts";
+import { loginHandler } from "../server/login-handler.js";
 function backend() {
   let app = getApps().find((a) => a.name === "imperio-pin");
   if (!app) {
