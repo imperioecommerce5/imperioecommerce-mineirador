@@ -53,6 +53,8 @@ import {
   Actor,
   actorName,
   resetFinance,
+  potCommitment,
+  payBill,
 } from "../finance/model";
 import "../finance/finance.css";
 type View = "home" | "ledger" | "pots" | "bills" | "goals" | "settings";
@@ -187,6 +189,12 @@ export default function FinanceCenterView({
     document.body.style.backgroundColor = color;
   }, [dark]);
   const [actorFilter, setActorFilter] = useState("all");
+  const [payment, setPayment] = useState<Entry | null>(null);
+  const [paymentUndo, setPaymentUndo] = useState<{
+    before: Entry;
+    cents: number;
+    date: string;
+  } | null>(null);
   const [undo, setUndo] = useState<Entry | null>(null);
   const b = useMemo(() => (f ? balances(f) : null), [f]);
   const cash = (v: number) => (hidden ? "R$ ••••" : money(v));
@@ -317,27 +325,47 @@ export default function FinanceCenterView({
     );
     setUndo(null);
   }
-  async function pay(e: Entry) {
-    if (f.closedMonths.some((m) => e.date.slice(0, 7) <= m)) {
-      setLocalError("Reabra o mês para registrar o pagamento.");
-      return;
-    }
-    await change(
-      (s) => ({
+  function pay(e: Entry) {
+    setLocalError("");
+    setPayment(e);
+  }
+  async function undoPayment() {
+    if (!paymentUndo) return;
+    const previous = paymentUndo;
+    const ok = await change((s) => {
+      const current = s.entries.find((e) => e.id === previous.before.id);
+      if (
+        !current ||
+        current.deleted ||
+        current.status !== "paid" ||
+        current.date !== previous.date ||
+        current.cents !== previous.cents
+      )
+        throw new Error("A conta mudou desde o pagamento. Confira o extrato.");
+      if (
+        s.closedMonths.some(
+          (m) =>
+            current.date.slice(0, 7) <= m ||
+            previous.before.date.slice(0, 7) <= m,
+        )
+      )
+        throw new Error("Reabra o mês antes de desfazer o pagamento.");
+      return {
         ...s,
-        entries: s.entries.map((x) =>
-          x.id === e.id
+        entries: s.entries.map((e) =>
+          e.id === current.id
             ? {
-                ...x,
-                status: "paid",
-                date: today(),
+                ...e,
+                status: "pending",
+                cents: previous.before.cents,
+                date: previous.before.date,
                 updatedAt: new Date().toISOString(),
               }
-            : x,
+            : e,
         ),
-      }),
-      "Pagamento registrado hoje",
-    );
+      };
+    }, "Pagamento desfeito. A conta voltou a ficar pendente.");
+    if (ok) setPaymentUndo(null);
   }
   function ledgerRow(e: Entry) {
     const Icon =
@@ -371,7 +399,9 @@ export default function FinanceCenterView({
             ? "Excluído"
             : e.status === "pending"
               ? "Pendente"
-              : kindNames[e.kind]}
+              : e.kind === "expense"
+                ? "Pago"
+                : kindNames[e.kind]}
         </span>
         <strong
           className={`entry-value ${e.kind === "income" ? "positive" : ""}`}
@@ -391,11 +421,12 @@ export default function FinanceCenterView({
             <>
               {e.status === "pending" && (
                 <button
-                  aria-label="Marcar como pago hoje"
-                  title="Marcar como pago hoje"
+                  aria-label={`Pagar ${e.description}`}
+                  className="pay-button"
+                  disabled={saving}
                   onClick={() => pay(e)}
                 >
-                  <Check size={16} />
+                  <Check size={16} /> Pagar
                 </button>
               )}
               <button
@@ -672,11 +703,12 @@ export default function FinanceCenterView({
                       </div>
                       <b>{cash(e.cents)}</b>
                       <button
-                        className="icon-button"
-                        aria-label="Registrar pagamento hoje"
+                        className="secondary pay-button"
+                        disabled={saving}
+                        aria-label={`Pagar ${e.description}`}
                         onClick={() => pay(e)}
                       >
-                        <Check size={17} />
+                        <Check size={17} /> Pagar
                       </button>
                     </div>
                   ))}
@@ -744,6 +776,7 @@ export default function FinanceCenterView({
                     key={p.id}
                     pot={p}
                     balance={b.buckets[p.id] || 0}
+                    committed={potCommitment(f, p.id)}
                     funded={b.funded[p.id] || 0}
                     spent={
                       p.rollover
@@ -835,8 +868,8 @@ export default function FinanceCenterView({
                   onChange={(e) => setActorFilter(e.target.value)}
                 >
                   <option value="all">Todos os perfis</option>
-                  <option value="voce">Você</option>
-                  <option value="esposa">Esposa</option>
+                  <option value="voce">Rhuan</option>
+                  <option value="esposa">Anne</option>
                   <option value="sistema">Sistema</option>
                 </select>
                 <label className="checkbox">
@@ -937,6 +970,7 @@ export default function FinanceCenterView({
                     key={p.id}
                     pot={p}
                     balance={b.buckets[p.id] || 0}
+                    committed={potCommitment(f, p.id)}
                     funded={b.funded[p.id] || 0}
                     spent={
                       p.rollover
@@ -1005,12 +1039,38 @@ export default function FinanceCenterView({
                 <header className="section-heading">
                   <h2>Pagamentos pendentes</h2>
                   <span className="muted">
-                    O saldo só diminui ao confirmar o pagamento
+                    Contas pendentes comprometem o pote; ao pagar, viram gastos
                   </span>
                 </header>
                 {pending.map(ledgerRow)}
                 {!pending.length && (
                   <div className="empty-state">Tudo em dia por aqui.</div>
+                )}
+              </section>
+              <section className="panel">
+                <h2>Pagamentos deste mês</h2>
+                {f.entries
+                  .filter(
+                    (e) =>
+                      !e.deleted &&
+                      e.kind === "expense" &&
+                      e.status === "paid" &&
+                      e.date.slice(0, 7) === today().slice(0, 7) &&
+                      e.date <= today(),
+                  )
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map(ledgerRow)}
+                {!f.entries.some(
+                  (e) =>
+                    !e.deleted &&
+                    e.kind === "expense" &&
+                    e.status === "paid" &&
+                    e.date.slice(0, 7) === today().slice(0, 7) &&
+                    e.date <= today(),
+                ) && (
+                  <div className="empty-state">
+                    Nenhum pagamento registrado neste mês.
+                  </div>
                 )}
               </section>
               <section className="panel">
@@ -1514,6 +1574,39 @@ export default function FinanceCenterView({
           })}
         </nav>
       </div>
+      {paymentUndo && (
+        <div className="notice payment-undo" role="status">
+          <span>Pagamento de {paymentUndo.before.description} registrado.</span>
+          <button
+            className="text-button"
+            disabled={saving}
+            onClick={undoPayment}
+          >
+            Desfazer pagamento
+          </button>
+        </div>
+      )}
+      {payment && (
+        <PaymentDialog
+          bill={payment}
+          saving={saving}
+          potName={potName(payment.pot)}
+          error={localError}
+          close={() => {
+            if (!saving) setPayment(null);
+          }}
+          confirm={async (cents, date) => {
+            const ok = await change(
+              (s) => payBill(s, payment.id, cents, date),
+              "Pagamento registrado",
+            );
+            if (ok) {
+              setPaymentUndo({ before: payment, cents, date });
+              setPayment(null);
+            }
+          }}
+        />
+      )}
       {(toast || undo) && (
         <div className="toast" role="status">
           <Check size={17} />
@@ -1578,6 +1671,7 @@ export default function FinanceCenterView({
 function PotCard({
   pot: p,
   balance,
+  committed,
   funded,
   spent,
   cash,
@@ -1585,11 +1679,13 @@ function PotCard({
 }: {
   pot: Pot;
   balance: number;
+  committed: number;
   funded: number;
   spent: number;
   cash: (v: number) => string;
   onEdit: () => void;
 }) {
+  const available = balance - committed;
   const budget = balance + spent;
   const used =
     budget > 0 ? (spent / budget) * 100 : balance <= 0 && spent > 0 ? 100 : 0;
@@ -1618,8 +1714,24 @@ function PotCard({
         </span>
       </div>
       <h3>{p.name}</h3>
-      <strong>{cash(balance)}</strong>
-      <small>{p.reserve ? "Reservado" : "Disponível no pote"}</small>
+      <strong>{cash(Math.max(0, available))}</strong>
+      <small>
+        {p.reserve ? "Guardado após compromissos" : "Disponível para gastar"}
+      </small>
+      <div className="pot-commitments">
+        <span>
+          Saldo do pote <b>{cash(balance)}</b>
+        </span>
+        <span>
+          Comprometido <b>{cash(committed)}</b>
+        </span>
+        <small>Contas vencidas e do mês atual</small>
+        {available < 0 && (
+          <span className="overdue">
+            Faltam {cash(-available)} para cobrir os compromissos.
+          </span>
+        )}
+      </div>
       <div className="spending-bar">
         <span
           style={{
@@ -2390,6 +2502,87 @@ function ResetDialog({
             {saving ? "Guardando cópia…" : "Confirmar reset"}
           </button>
         </footer>
+      </form>
+    </ModalShell>
+  );
+}
+
+function PaymentDialog({
+  bill,
+  saving,
+  potName,
+  error,
+  close,
+  confirm,
+}: {
+  bill: Entry;
+  saving: boolean;
+  potName: string;
+  error: string;
+  close: () => void;
+  confirm: (cents: number, date: string) => Promise<void>;
+}) {
+  const [value, setValue] = useState(decimal(bill.cents));
+  const [date, setDate] = useState(today());
+  const [validation, setValidation] = useState("");
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    setValidation("");
+    try {
+      await confirm(parseMoney(value), date);
+    } catch (err) {
+      setValidation((err as Error).message);
+    }
+  }
+  return (
+    <ModalShell title="Confirmar pagamento" onClose={close}>
+      <form onSubmit={submit}>
+        <p>
+          <strong>{bill.description}</strong>
+        </p>
+        <p className="muted">
+          Vencimento: {displayDate(bill.date)} · Pote: {potName}
+        </p>
+        <Field label="Valor pago (R$)">
+          <input
+            inputMode="decimal"
+            value={value}
+            required
+            disabled={saving}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </Field>
+        <Field label="Data do pagamento">
+          <input
+            type="date"
+            value={date}
+            max={today()}
+            required
+            disabled={saving}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </Field>
+        <p className="muted">
+          O pagamento desconta do saldo do pote e retira a conta dos
+          compromissos, sem descontar duas vezes.
+        </p>
+        {(validation || error) && (
+          <div className="notice danger" role="alert">
+            {validation || error}
+          </div>
+        )}
+        <button className="primary" type="submit" disabled={saving}>
+          {saving ? "Salvando…" : "Confirmar pagamento"}
+        </button>
+        <button
+          className="text-button"
+          type="button"
+          disabled={saving}
+          onClick={close}
+        >
+          Cancelar
+        </button>
       </form>
     </ModalShell>
   );
