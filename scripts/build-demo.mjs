@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { transformSync } from 'esbuild';
+const assets=fs.readdirSync('dist/assets');
+const js=fs.readFileSync(path.join('dist/assets',assets.find(n=>n.endsWith('.js'))),'utf8');
+const css=fs.readFileSync(path.join('dist/assets',assets.find(n=>n.endsWith('.css'))),'utf8').replace(/@import[^;]*;/g,'');
+const code=transformSync(js,{format:'iife',minify:true}).code.replace(/<\/script/gi,'<\\/script');
+const html=`<!doctype html><html lang="pt-BR" data-demo="true"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meu Império Financeiro — Demonstração</title><style>${css}</style></head><body><div id="root"></div><script>${code}</script></body></html>`;
+fs.writeFileSync(process.argv[2]||'demonstracao.html',html);
+console.log('Demonstração criada. Somente dados fictícios e armazenamento local.');

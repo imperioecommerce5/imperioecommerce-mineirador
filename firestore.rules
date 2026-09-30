@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function family() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'imperioecommerce5@gmail.com';
+    }
+    match /imperio_finance/familia_imperio {
+      allow read: if family();
+      allow create: if family()
+        && request.resource.data.keys().hasOnly(['financeV2'])
+        && request.resource.data.financeV2.version == 2
+        && request.resource.data.financeV2.revision == 1;
+      allow update: if family()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['financeV2'])
+        && request.resource.data.financeV2.version == 2
+        && request.resource.data.financeV2.revision == (('financeV2' in resource.data) ? resource.data.financeV2.revision + 1 : 1);
+      allow delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
