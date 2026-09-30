@@ -90,6 +90,19 @@ const kindNames = {
   transfer: "Transferência",
 };
 const displayDate = (s: string) => s.split("-").reverse().join("/");
+function isFamilyCoffer(p: Pot) {
+  const name = p.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return (
+    p.id === "nosso_patrimonio" ||
+    p.id === "patrimonio_manuela" ||
+    name.includes("nosso patrimonio") ||
+    name.includes("manuela")
+  );
+}
+
 function Field({ label, children }: { label: string; children: any }) {
   return (
     <label className="field">
@@ -657,6 +670,77 @@ export default function FinanceCenterView({
                   </div>
                 </div>
               </section>
+              {pots.some(isFamilyCoffer) && (
+                <section
+                  className="family-coffers"
+                  aria-label="Cofrinhos da família"
+                >
+                  <header className="section-heading">
+                    <div>
+                      <h2>Seus cofrinhos</h2>
+                      <p>Um pouco de cada aporte para o futuro de vocês.</p>
+                    </div>
+                  </header>
+                  <div className="coffer-grid">
+                    {pots.filter(isFamilyCoffer).map((p) => {
+                      const received = f.entries
+                        .filter(
+                          (e) =>
+                            !e.deleted &&
+                            e.status === "paid" &&
+                            e.date <= today() &&
+                            e.date.slice(0, 7) === today().slice(0, 7),
+                        )
+                        .reduce(
+                          (sum, e) =>
+                            sum +
+                            (e.kind === "income"
+                              ? e.allocations[p.id] || 0
+                              : e.kind === "transfer" && e.destination === p.id
+                                ? e.cents
+                                : 0),
+                          0,
+                        );
+                      return (
+                        <CofferCard
+                          key={p.id}
+                          pot={p}
+                          balance={b.buckets[p.id] || 0}
+                          received={received}
+                          committed={potCommitment(f, p.id)}
+                          cash={cash}
+                          onEdit={() => open({ type: "pot", existing: p })}
+                          onAdd={() =>
+                            open({
+                              type: "entry",
+                              kind: "transfer",
+                              existing: {
+                                ...entry(
+                                  {
+                                    kind: "transfer",
+                                    description: `Guardar em ${p.name}`,
+                                    cents: 1,
+                                    date: today(),
+                                    pot: "free",
+                                    destination: p.id,
+                                  },
+                                  f.pots,
+                                ),
+                                id: "",
+                                cents: 0,
+                              },
+                            })
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="coffer-note">
+                    A divisão é automática em cada aporte registrado. Os valores
+                    acumulam; não há rendimento bancário calculado.
+                  </p>
+                </section>
+              )}
               {(b.free < 0 || b.buckets.free !== 0) && (
                 <div className={`notice ${b.free < 0 ? "danger" : ""}`}>
                   {b.free < 0
@@ -771,32 +855,34 @@ export default function FinanceCenterView({
                 </button>
               </header>
               <section className="pot-grid">
-                {pots.map((p) => (
-                  <PotCard
-                    key={p.id}
-                    pot={p}
-                    balance={b.buckets[p.id] || 0}
-                    committed={potCommitment(f, p.id)}
-                    funded={b.funded[p.id] || 0}
-                    spent={
-                      p.rollover
-                        ? b.spent[p.id] || 0
-                        : f.entries
-                            .filter(
-                              (e) =>
-                                !e.deleted &&
-                                e.kind === "expense" &&
-                                e.status === "paid" &&
-                                e.pot === p.id &&
-                                e.date.slice(0, 7) === today().slice(0, 7) &&
-                                e.date <= today(),
-                            )
-                            .reduce((s, e) => s + e.cents, 0)
-                    }
-                    cash={cash}
-                    onEdit={() => open({ type: "pot", existing: p })}
-                  />
-                ))}
+                {pots
+                  .filter((p) => !isFamilyCoffer(p))
+                  .map((p) => (
+                    <PotCard
+                      key={p.id}
+                      pot={p}
+                      balance={b.buckets[p.id] || 0}
+                      committed={potCommitment(f, p.id)}
+                      funded={b.funded[p.id] || 0}
+                      spent={
+                        p.rollover
+                          ? b.spent[p.id] || 0
+                          : f.entries
+                              .filter(
+                                (e) =>
+                                  !e.deleted &&
+                                  e.kind === "expense" &&
+                                  e.status === "paid" &&
+                                  e.pot === p.id &&
+                                  e.date.slice(0, 7) === today().slice(0, 7) &&
+                                  e.date <= today(),
+                              )
+                              .reduce((s, e) => s + e.cents, 0)
+                      }
+                      cash={cash}
+                      onEdit={() => open({ type: "pot", existing: p })}
+                    />
+                  ))}
               </section>
               <section className="panel">
                 <header className="section-heading">
@@ -1707,15 +1793,15 @@ function PotCard({
           <Pencil size={14} />
         </button>
       </header>
-      <div className="pot-art">
+      <div className="pot-circle" style={{ borderColor: p.color }}>
         <PotSymbol symbol={potSymbol(p)} />
-        <span className="pot-percentage">
-          {p.mode === "percent" ? `${p.value}%` : "Fixo"}
-        </span>
+        <strong title={cash(Math.max(0, available))}>
+          {cash(Math.max(0, available))}
+        </strong>
+        <small>{p.reserve ? "Guardado" : "Pode gastar"}</small>
       </div>
       <h3>{p.name}</h3>
-      <strong>{cash(Math.max(0, available))}</strong>
-      <small>
+      <small className="pot-availability-label">
         {p.reserve ? "Guardado após compromissos" : "Disponível para gastar"}
       </small>
       <div className="pot-commitments">
@@ -2585,5 +2671,70 @@ function PaymentDialog({
         </button>
       </form>
     </ModalShell>
+  );
+}
+
+function CofferCard({
+  pot,
+  balance,
+  received,
+  committed,
+  cash,
+  onEdit,
+  onAdd,
+}: {
+  pot: Pot;
+  balance: number;
+  received: number;
+  committed: number;
+  cash: (v: number) => string;
+  onEdit: () => void;
+  onAdd: () => void;
+}) {
+  const child =
+    pot.id.includes("manuela") || pot.name.toLowerCase().includes("manuela");
+  return (
+    <article className={`coffer-card ${child ? "coffer-child" : ""}`}>
+      <header>
+        <span className="coffer-emblem">
+          <PotSymbol symbol="pig" />
+        </span>
+        <div>
+          <span className="eyebrow">
+            {child ? "FUTURO DA MANUELA" : "FUTURO DA FAMÍLIA"}
+          </span>
+          <h3>{pot.name}</h3>
+        </div>
+        <button
+          className="icon-button"
+          aria-label={`Configurar cofrinho ${pot.name}`}
+          onClick={onEdit}
+        >
+          <Pencil size={16} />
+        </button>
+      </header>
+      <span className="coffer-label">Valor guardado</span>
+      <strong className="coffer-balance">{cash(balance)}</strong>
+      <div className="coffer-month">
+        <span>Recebeu neste mês</span>
+        <b>{cash(received)}</b>
+      </div>
+      {committed > 0 && (
+        <p className="muted">
+          {cash(committed)} comprometidos em contas até este mês.
+        </p>
+      )}
+      <footer>
+        <span className="coffer-rule">
+          <ShieldCheck size={15} />
+          {pot.mode === "percent"
+            ? `${pot.value}% de cada aporte após valores fixos`
+            : `${money(Math.round(pot.value * 100))} por aporte, conforme saldo`}
+        </span>
+        <button className="text-button" onClick={onAdd}>
+          Guardar mais <Plus size={15} />
+        </button>
+      </footer>
+    </article>
   );
 }
