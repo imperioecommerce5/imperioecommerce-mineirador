@@ -1969,3 +1969,205 @@ button {
   justify-content: space-between;
   gap: 8px;
 }
+
+/* Cofrinhos junto ao saldo e potes redondos. */
+.family-coffers {
+  margin: 22px 0 28px;
+}
+.family-coffers > .section-heading {
+  margin-bottom: 14px;
+}
+.coffer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.coffer-card {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(25, 38, 50, 0.035);
+}
+.coffer-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.coffer-card header > div {
+  flex: 1;
+  min-width: 0;
+}
+.coffer-card h3 {
+  margin: 5px 0 0;
+  font-size: 17px;
+}
+.coffer-card .eyebrow {
+  font-size: 9px;
+  letter-spacing: 1.3px;
+}
+.coffer-emblem {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  background: #f4eee2;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.coffer-child .coffer-emblem {
+  background: #eee9f6;
+}
+.coffer-emblem .pot-symbol {
+  width: 68px;
+  height: 62px;
+}
+.coffer-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 22px;
+}
+.coffer-balance {
+  display: block;
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -1px;
+  font-weight: 600;
+  margin: 5px 0 20px;
+  overflow-wrap: anywhere;
+}
+.coffer-month {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.coffer-month > span {
+  color: var(--muted);
+}
+.coffer-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+}
+.coffer-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.coffer-card .text-button {
+  min-height: 44px;
+}
+.coffer-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 12px 3px 0;
+}
+.dark .coffer-emblem {
+  background: #2b2a2d;
+}
+.dark .coffer-child .coffer-emblem {
+  background: #292735;
+}
+.pot-grid .pot-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 12px 14px 20px;
+}
+.pot-card .pot-circle {
+  width: min(100%, 220px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: 3px solid;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 14px auto 12px;
+  box-shadow: 0 10px 26px rgba(20, 30, 45, 0.06);
+  padding: 12px;
+}
+.pot-circle .pot-symbol {
+  width: 90px;
+  height: 80px;
+}
+.pot-circle > strong {
+  font-size: clamp(17px, 2vw, 25px);
+  letter-spacing: -0.5px;
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.pot-circle > small {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.pot-card > h3,
+.pot-card > .pot-availability-label {
+  text-align: center;
+}
+.pot-card > h3 {
+  margin: 8px 0 4px;
+}
+.pot-card > .pot-availability-label {
+  font-size: 11px;
+}
+.pot-card .pot-commitments {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 600px) {
+  .coffer-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .coffer-card {
+    padding: 18px;
+    border-radius: 22px;
+  }
+  .coffer-balance {
+    font-size: 30px;
+  }
+  .pot-grid {
+    gap: 8px;
+  }
+  .pot-grid .pot-card {
+    padding: 8px 3px 18px;
+  }
+  .pot-card .pot-circle {
+    padding: 8px;
+    border-width: 2px;
+  }
+  .pot-circle .pot-symbol {
+    width: 72px;
+    height: 62px;
+  }
+  .pot-circle > strong {
+    font-size: 17px;
+    letter-spacing: -0.5px;
+  }
+  .pot-circle > small {
+    font-size: 10px;
+  }
+  .pot-card .pot-commitments {
+    font-size: 11px;
+  }
+  .pot-card .pot-commitments > span {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
