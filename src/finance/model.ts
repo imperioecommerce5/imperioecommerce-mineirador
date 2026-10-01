@@ -2,9 +2,9 @@ export type Actor = "voce" | "esposa";
 export type RecordActor = Actor | "sistema" | "anterior";
 export const actorName = (actor?: RecordActor) =>
   actor === "voce"
-    ? "Rhuan"
+    ? "Você"
     : actor === "esposa"
-      ? "Anne"
+      ? "Esposa"
       : actor === "sistema"
         ? "Sistema"
         : "Registro anterior";
@@ -19,6 +19,7 @@ export type Pot = {
   active: boolean;
   color: string;
   icon?: string;
+  allocationBase?: "gross" | "remainder";
 };
 export type Allocation = Record<string, number>;
 export type Entry = {
@@ -106,7 +107,7 @@ export const defaults: Pot[] = [
   },
   {
     id: "patrimonio_manuela",
-    name: "Poupança Manuela",
+    name: "Patrimônio Manuela",
     value: 10,
     reserve: true,
     color: "#4c7c94",
@@ -121,7 +122,7 @@ export const defaults: Pot[] = [
   {
     id: "transporte",
     name: "Transporte",
-    value: 25,
+    value: 24,
     reserve: false,
     color: "#5073a0",
   },
@@ -142,7 +143,7 @@ export const defaults: Pot[] = [
   {
     id: "desfrute_dela",
     name: "Desfrute dela",
-    value: 3,
+    value: 4,
     reserve: false,
     color: "#a57483",
   },
@@ -154,6 +155,10 @@ export const defaults: Pot[] = [
       rollover: true,
       priority: i,
       active: true,
+      allocationBase:
+        p.id === "nosso_patrimonio" || p.id === "patrimonio_manuela"
+          ? "gross"
+          : "remainder",
     }) as Pot,
 );
 export const empty = (): Finance => ({
@@ -169,6 +174,12 @@ export const empty = (): Finance => ({
   assets: [],
   migrationNotes: [],
 });
+export const potAllocationBase = (p: Pot): "gross" | "remainder" =>
+  p.allocationBase ||
+  (p.id === "nosso_patrimonio" || p.id === "patrimonio_manuela"
+    ? "gross"
+    : "remainder");
+
 export function validatePots(pots: Pot[]) {
   const active = pots.filter((p) => p.active);
   if (new Set(pots.map((p) => p.id)).size !== pots.length)
@@ -181,7 +192,8 @@ export function validatePots(pots: Pot[]) {
         !["percent", "fixed"].includes(p.mode) ||
         typeof p.reserve !== "boolean" ||
         typeof p.rollover !== "boolean" ||
-        typeof p.active !== "boolean",
+        typeof p.active !== "boolean" ||
+        !["gross", "remainder"].includes(potAllocationBase(p)),
     )
   )
     throw new Error("Configuração de potes inválida.");
@@ -196,56 +208,101 @@ export function validatePots(pots: Pot[]) {
     )
   )
     throw new Error("Confira os nomes, valores e prioridades dos potes.");
-  if (
-    active
-      .filter((p) => p.mode === "percent")
-      .reduce((s, p) => s + Math.round(p.value * 100), 0) > 10000
-  )
-    throw new Error("As porcentagens ultrapassam 100%.");
+  for (const base of ["gross", "remainder"] as const) {
+    const total = active
+      .filter((p) => p.mode === "percent" && potAllocationBase(p) === base)
+      .reduce((s, p) => s + Math.round(p.value * 100), 0);
+    if (total > 10000)
+      throw new Error(
+        base === "gross"
+          ? "Os percentuais de patrimônio ultrapassam 100% do aporte bruto."
+          : "As porcentagens dos potes ultrapassam 100% do valor disponível.",
+      );
+  }
 }
-// Fixed amounts are funded first, in priority order; percentages divide the remainder.
-export function allocate(cents: number, pots: Pot[]): Allocation {
+
+/**
+ * Distribui um aporte em duas bases independentes:
+ * 1) patrimônio calculado diretamente sobre o aporte bruto;
+ * 2) contas comprometidas ficam no saldo sem distribuição;
+ * 3) os demais potes recebem percentuais sobre o que restou depois de patrimônio + compromissos.
+ * O dinheiro comprometido não some: permanece em `free` até a conta ser paga.
+ */
+export function allocateContribution(
+  cents: number,
+  pots: Pot[],
+  committedCents = 0,
+): Allocation {
   validatePots(pots);
-  const result: Allocation = {};
-  let remaining = cents;
+  if (!Number.isSafeInteger(cents) || cents < 0)
+    throw new Error("Aporte inválido.");
   const active = pots
     .filter((p) => p.active)
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
-  active
-    .filter((p) => p.mode === "fixed")
-    .forEach((p) => {
-      const amount = Math.min(remaining, Math.round(p.value * 100));
-      result[p.id] = amount;
-      remaining -= amount;
-    });
-  const percents = active.filter((p) => p.mode === "percent");
-  const weights = [
-    ...percents.map((p) => ({ id: p.id, weight: Math.round(p.value * 100) })),
-    {
-      id: "free",
-      weight:
-        10000 - percents.reduce((s, p) => s + Math.round(p.value * 100), 0),
-    },
-  ];
-  const parts = weights.map((p) => ({
-    ...p,
-    amount: Math.floor((remaining * p.weight) / 10000),
-    fraction: (remaining * p.weight) % 10000,
-  }));
-  let leftover = remaining - parts.reduce((s, p) => s + p.amount, 0);
-  [...parts]
-    .sort((a, b) => b.fraction - a.fraction || a.id.localeCompare(b.id))
-    .forEach((p) => {
-      if (leftover > 0) {
-        p.amount++;
-        leftover--;
-      }
-    });
-  parts.forEach((p) => {
-    result[p.id] = p.amount;
-  });
+  const result: Allocation = {};
+
+  // Patrimônios: sempre sobre o bruto, uma única vez.
+  const grossPots = active.filter((p) => potAllocationBase(p) === "gross");
+  let grossAllocated = 0;
+  for (const p of grossPots.filter((p) => p.mode === "fixed")) {
+    const amount = Math.min(cents - grossAllocated, Math.round(p.value * 100));
+    result[p.id] = Math.max(0, amount);
+    grossAllocated += Math.max(0, amount);
+  }
+  for (const p of grossPots.filter((p) => p.mode === "percent")) {
+    const requested = Math.floor((cents * Math.round(p.value * 100)) / 10000);
+    const amount = Math.max(0, Math.min(cents - grossAllocated, requested));
+    result[p.id] = amount;
+    grossAllocated += amount;
+  }
+  grossAllocated = Math.min(cents, grossAllocated);
+
+  const committed = Math.max(0, Math.min(committedCents, cents - grossAllocated));
+  let remainder = Math.max(0, cents - grossAllocated - committed);
+  const regular = active.filter((p) => potAllocationBase(p) === "remainder");
+
+  // Valores fixos dos potes comuns são atendidos primeiro.
+  for (const p of regular.filter((p) => p.mode === "fixed")) {
+    const amount = Math.min(remainder, Math.round(p.value * 100));
+    result[p.id] = amount;
+    remainder -= amount;
+  }
+
+  // Percentuais dos potes comuns incidem sobre a base restante após contas + patrimônios.
+  const percentBase = remainder;
+  let normalAllocated = 0;
+  for (const p of regular.filter((p) => p.mode === "percent")) {
+    const amount = Math.floor((percentBase * Math.round(p.value * 100)) / 10000);
+    result[p.id] = amount;
+    normalAllocated += amount;
+  }
+  remainder = Math.max(0, percentBase - normalAllocated);
+
+  // Inclui compromissos e a parte não distribuída. Isso permite sugerir destino depois.
+  result.free = cents - Object.entries(result)
+    .filter(([id]) => id !== "free")
+    .reduce((sum, [, value]) => sum + value, 0);
   return result;
 }
+
+// Mantido como atalho para chamadas existentes sem compromissos mensais.
+export function allocate(cents: number, pots: Pot[]): Allocation {
+  return allocateContribution(cents, pots, 0);
+}
+
+export function pendingCommitmentsForMonth(f: Finance, date = today()): number {
+  const month = date.slice(0, 7);
+  return f.entries
+    .filter(
+      (e) =>
+        !e.deleted &&
+        e.kind === "expense" &&
+        e.status === "pending" &&
+        e.date.slice(0, 7) === month,
+    )
+    .reduce((sum, e) => sum + e.cents, 0);
+}
+
 export const validDate = (s: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(s) &&
   !Number.isNaN(Date.parse(s + "T12:00:00Z")) &&
@@ -417,15 +474,40 @@ function legacyDate(s: string) {
 }
 export function migrate(raw: any): Finance {
   if (raw?.financeV2) {
-    validateFinance(raw.financeV2);
-    return {
+    const recurrenceIds = new Set<string>(
+      (raw.financeV2.recurrences || []).map((r: Recurrence) => r.id),
+    );
+    const normalized = {
       ...raw.financeV2,
+      pots: raw.financeV2.pots.map((p: Pot) => ({
+        ...p,
+        allocationBase: potAllocationBase(p),
+      })),
+      recurrences: (raw.financeV2.recurrences || []).map((r: Recurrence) => ({
+        ...r,
+        // Contas fixas ficam fora dos potes de consumo.
+        pot: "free",
+      })),
       entries: raw.financeV2.entries.map((e: Entry) => ({
         ...e,
+        // Pendências geradas por contas recorrentes também usam o saldo reservado de contas.
+        pot:
+          e.kind === "expense" &&
+          e.status === "pending" &&
+          e.source &&
+          recurrenceIds.has(e.source)
+            ? "free"
+            : e.pot,
+        policy: (e.policy || []).map((p: Pot) => ({
+          ...p,
+          allocationBase: potAllocationBase(p),
+        })),
         createdBy: e.createdBy || "anterior",
         updatedBy: e.updatedBy || e.createdBy || "anterior",
       })),
     };
+    validateFinance(normalized);
+    return normalized;
   }
   const f = empty();
   if (!raw || !Array.isArray(raw.potesAtivos)) return f;
@@ -440,6 +522,10 @@ export function migrate(raw: any): Finance {
     priority: i,
     active: true,
     color: p.cor || "#13765e",
+    allocationBase:
+      p.id === "nosso_patrimonio" || p.id === "patrimonio_manuela"
+        ? "gross"
+        : "remainder",
   }));
   validatePots(f.pots);
   const initial = toCents(raw.aportePendenteValor);
@@ -498,6 +584,7 @@ export function migrate(raw: any): Finance {
       priority: f.pots.length,
       active: true,
       color: "#8472a0",
+      allocationBase: "remainder",
     });
     // Legacy goal deposits were recorded as expenses; reclassify matching records as internal transfers.
     let recovered = 0;
@@ -703,67 +790,4 @@ export function resetFinance(current: Finance): Finance {
   const next = empty();
   next.revision = current.revision;
   return next;
-}
-
-// Compromissos vencidos e do mês atual; meses futuros ficam no planejamento.
-export function potCommitment(
-  f: Finance,
-  pot: string,
-  through = today(),
-): number {
-  return f.entries
-    .filter(
-      (e) =>
-        !e.deleted &&
-        e.kind === "expense" &&
-        e.status === "pending" &&
-        e.pot === pot &&
-        e.date.slice(0, 7) <= through.slice(0, 7),
-    )
-    .reduce((sum, e) => sum + e.cents, 0);
-}
-
-export function payBill(
-  f: Finance,
-  id: string,
-  cents: number,
-  date: string,
-): Finance {
-  const bill = f.entries.find((e) => e.id === id);
-  if (
-    !bill ||
-    bill.deleted ||
-    bill.kind !== "expense" ||
-    bill.status !== "pending"
-  )
-    throw new Error("Esta conta não está mais pendente. Atualize a tela.");
-  if (
-    !Number.isSafeInteger(cents) ||
-    cents <= 0 ||
-    !validDate(date) ||
-    date > today()
-  )
-    throw new Error(
-      "Confira o valor e a data do pagamento. Use hoje ou uma data anterior.",
-    );
-  if (
-    f.closedMonths.some(
-      (m) => bill.date.slice(0, 7) <= m || date.slice(0, 7) <= m,
-    )
-  )
-    throw new Error("Reabra o mês antes de registrar este pagamento.");
-  return {
-    ...f,
-    entries: f.entries.map((e) =>
-      e.id === id
-        ? {
-            ...e,
-            status: "paid",
-            cents,
-            date,
-            updatedAt: new Date().toISOString(),
-          }
-        : e,
-    ),
-  };
 }

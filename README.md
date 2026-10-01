@@ -1,18 +1,21 @@
-# Meu Império Financeiro — versão 2.1
+# Meu Império Financeiro — versão 2.2
 
 Financeiro familiar com aporte único, potes, metas, contas e extrato. Esta versão prioriza o uso no iPhone e substitui o login Google pelo acesso com perfil e senha numérica.
 
 ## Mudanças desta versão
 
-- Escolha de perfil Você / Sua esposa e senha numérica validada no servidor.
-- Autor original e perfil da última alteração registrados nas movimentações e no CSV.
-- Filtro do extrato por perfil. Registros anteriores sem autoria identificável aparecem como Registro anterior.
-- Tema escuro em grafite e azul discreto, com contraste entre fundo, cartões, textos e ações.
-- Símbolos vetoriais com volume e sombra para os potes: patrimônio, poupança infantil, compras, transporte, lazer, perfis pessoais, meta e carteira. O símbolo pode ser escolhido ao editar o pote.
-- Porcentagens arrastáveis na configuração inicial, na edição dos potes e nas metas, com entrada numérica alternativa e limite total de 100%.
-- Áreas de toque maiores, campos com fonte de 16 px, margens seguras do iPhone e formulários em painel inferior no celular.
-- Ícone e manifesto para adicionar o app à tela inicial no Safari.
-- Reset recuperável: cópia em transação no Firestore antes de substituir o planejamento, download de backup e botão para recuperar o último reset.
+- Configuração inicial em quatro etapas: contas fixas/dívidas, aporte inicial, montagem dos potes e confirmação animada.
+- Nosso Patrimônio e Patrimônio Manuela são calculados sobre o aporte bruto; contas do período são reservadas; os demais potes recebem percentuais apenas sobre o valor restante.
+- Seletor de porcentagem circular com gesto ao redor do anel, passos de 2 pontos percentuais e bloqueio para impedir mais de 100% em cada base de distribuição.
+- Dashboard mais compacto, com os dois patrimônios em linhas protegidas abaixo dos saldos principais.
+- Gastos manuais são sempre pagos no ato, usam um único pote e são bloqueados se o pote não tiver saldo suficiente. Potes protegidos não aparecem como origem normal de gasto ou transferência.
+- Contas recorrentes ficam separadas dos potes de consumo e continuam como pendentes até a confirmação de pagamento.
+- Saldo não alocado exclui valores comprometidos com contas e pode ser direcionado, por decisão do usuário, para patrimônios, metas ou para os potes de uso.
+- Nova área Meu Perfil com leitura de evolução financeira, tendências e pontos de atenção, sem medalhas, pontuação ou gamificação.
+- Tema escuro mantém a identidade, mas usa grafite, azul e verde/sálvia para criar hierarquia entre fundos, cartões e ações.
+- Microanimações em dashboard, potes, perfil e finalização do planejamento; respeita `prefers-reduced-motion`.
+- A barra inferior móvel permanece com a mesma estrutura de navegação. O perfil é acessado pelo chip do usuário no topo.
+- Escolha de perfil Você / Sua esposa e senha numérica validada no servidor, autoria de movimentações, backup e reset recuperável continuam preservados.
 
 ## Como publicar
 
@@ -34,15 +37,19 @@ A implementação tem CSS responsivo e os fluxos foram testados em DOM simulado.
 
 Saldo em conta = aportes pagos com data até hoje − gastos pagos com data até hoje.
 
-Reservado = saldos positivos dos potes marcados como reserva.
+Reservado = saldos positivos dos potes protegidos.
 
-Livre para gastar = saldo em conta − reservado − despesas pendentes com vencimento até o fim do mês atual.
+Livre para gastar = saldo em conta − reservas protegidas − despesas pendentes com vencimento até o mês atual.
 
-Potes fixos são atendidos primeiro, na ordem de prioridade. As porcentagens dividem o restante de **cada aporte**. Valores fixos não são tetos mensais. Cada aporte guarda a política usada; editar seu valor recalcula essa mesma política. Configurações novas valem para novos aportes.
+Em cada aporte, os potes `Nosso Patrimônio` e `Patrimônio Manuela` usam o valor bruto como base. Depois, as contas pendentes do período são reservadas. Somente o restante vira base para os demais potes. O dinheiro reservado para contas permanece no saldo sem distribuição até o pagamento e não é contado como saldo não alocado.
 
-Reserva e transferência entre potes não retiram dinheiro da conta. Confirmar uma conta como paga usa a data de hoje; sua data pode ser editada no extrato. Aporte futuro só passa a compor os saldos na data informada. Bens externos e saldo anterior externo de metas são informativos.
+Cada pote de consumo tem saldo independente. Um gasto manual é considerado pago no momento do registro e só pode usar o pote escolhido; se o valor exceder o saldo disponível, a operação é bloqueada. O sistema não completa automaticamente um pote usando dinheiro de outro. Patrimônios protegidos não são origem normal de gasto ou transferência.
 
-As automatizações de recorrências geram pendências até o mês atual ao abrir ou usar o app. Elas não fazem pagamentos, não enviam notificações externas e não executam tarefas com o app fechado. Parcelas existentes devem ser editadas pelo extrato; mudanças no cadastro recorrente afetam apenas as parcelas ainda não geradas.
+As porcentagens configuradas pela interface avançam de 2 em 2 e a soma não pode ultrapassar 100% em sua respectiva base. Valores fixos, quando usados, continuam atendidos por prioridade. Cada aporte guarda a política usada; novas configurações valem para novos aportes.
+
+Contas recorrentes ou parceladas são geradas como pendentes e ficam fora dos potes de consumo. Confirmar uma conta como paga reduz o saldo em conta. Aporte futuro só passa a compor os saldos na data informada. Bens externos e saldo anterior externo de metas são informativos.
+
+As automatizações de recorrências geram pendências até o mês atual ao abrir ou usar o app. Elas não fazem pagamentos, não enviam notificações externas e não executam tarefas com o app fechado.
 
 ## Migração e recuperação
 

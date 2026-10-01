@@ -1,7 +1,7 @@
 import { PotSymbol, potSymbol, symbols } from "../finance/PotSymbol";
 import { PercentageControl } from "../finance/PercentageControl";
 import { storage } from "../finance/storage";
-import { useMemo, useState, FormEvent, useEffect } from "react";
+import { useMemo, useState, FormEvent, useEffect, useRef } from "react";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -28,6 +28,13 @@ import {
   CalendarDays,
   Eye,
   EyeOff,
+  ChevronLeft,
+  PiggyBank,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Sparkles,
+  User,
 } from "lucide-react";
 import { useFinance } from "../finance/useFinance";
 import {
@@ -44,6 +51,9 @@ import {
   entry,
   uid,
   allocate,
+  allocateContribution,
+  pendingCommitmentsForMonth,
+  potAllocationBase,
   validatePots,
   closeMonth,
   generateRecurring,
@@ -53,13 +63,12 @@ import {
   Actor,
   actorName,
   resetFinance,
-  potCommitment,
-  payBill,
 } from "../finance/model";
 import "../finance/finance.css";
-type View = "home" | "ledger" | "pots" | "bills" | "goals" | "settings";
+type View = "home" | "ledger" | "pots" | "bills" | "goals" | "settings" | "profile";
+const navViews: Exclude<View, "profile">[] = ["home", "ledger", "pots", "bills", "goals", "settings"];
 type Modal =
-  | { type: "entry"; kind: Entry["kind"]; existing?: Entry }
+  | { type: "entry"; kind: Entry["kind"]; existing?: Entry; presetPot?: string; presetDest?: string }
   | { type: "pot"; existing?: Pot }
   | { type: "bill"; existing?: Recurrence }
   | { type: "goal"; existing?: Goal }
@@ -75,6 +84,7 @@ const labels = {
   bills: "Contas",
   goals: "Metas",
   settings: "Configurações",
+  profile: "Meu perfil",
 };
 const icons = {
   home: Home,
@@ -83,6 +93,7 @@ const icons = {
   bills: CalendarDays,
   goals: Target,
   settings: Settings,
+  profile: User,
 };
 const kindNames = {
   income: "Aporte",
@@ -90,19 +101,6 @@ const kindNames = {
   transfer: "Transferência",
 };
 const displayDate = (s: string) => s.split("-").reverse().join("/");
-function isFamilyCoffer(p: Pot) {
-  const name = p.name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-  return (
-    p.id === "nosso_patrimonio" ||
-    p.id === "patrimonio_manuela" ||
-    name.includes("nosso patrimonio") ||
-    name.includes("manuela")
-  );
-}
-
 function Field({ label, children }: { label: string; children: any }) {
   return (
     <label className="field">
@@ -187,12 +185,14 @@ export default function FinanceCenterView({
     [filter, setFilter] = useState("all"),
     [potFilter, setPotFilter] = useState("all"),
     [showDeleted, setShowDeleted] = useState(false),
-    [hidden, setHidden] = useState(false);
+    [hidden, setHidden] = useState(false),
+    [surplusDismissed, setSurplusDismissed] = useState(false);
   const [dark, setDark] = useState(
     () => storage.getItem("imperio_visual") === "dark",
   );
+  const setupPrompted = useRef(false);
   useEffect(() => {
-    const color = dark ? "#11141b" : "#f5f6f3";
+    const color = dark ? "#10171a" : "#f5f6f3";
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", color);
@@ -202,14 +202,14 @@ export default function FinanceCenterView({
     document.body.style.backgroundColor = color;
   }, [dark]);
   const [actorFilter, setActorFilter] = useState("all");
-  const [payment, setPayment] = useState<Entry | null>(null);
-  const [paymentUndo, setPaymentUndo] = useState<{
-    before: Entry;
-    cents: number;
-    date: string;
-  } | null>(null);
   const [undo, setUndo] = useState<Entry | null>(null);
   const b = useMemo(() => (f ? balances(f) : null), [f]);
+  useEffect(() => {
+    if (f && !f.configured && !setupPrompted.current && !modal) {
+      setupPrompted.current = true;
+      setModal({ type: "setup" });
+    }
+  }, [f, modal]);
   const cash = (v: number) => (hidden ? "R$ ••••" : money(v));
   async function change(
     fn: (s: Finance) => Finance,
@@ -253,6 +253,7 @@ export default function FinanceCenterView({
         )}
       </main>
     );
+  const unallocated = Math.max(0, (b.buckets.free || 0) - b.pending);
   const pots = f.pots.filter((p) => p.active);
   const potName = (id: string) =>
     id === "free"
@@ -338,47 +339,89 @@ export default function FinanceCenterView({
     );
     setUndo(null);
   }
-  function pay(e: Entry) {
-    setLocalError("");
-    setPayment(e);
-  }
-  async function undoPayment() {
-    if (!paymentUndo) return;
-    const previous = paymentUndo;
-    const ok = await change((s) => {
-      const current = s.entries.find((e) => e.id === previous.before.id);
-      if (
-        !current ||
-        current.deleted ||
-        current.status !== "paid" ||
-        current.date !== previous.date ||
-        current.cents !== previous.cents
-      )
-        throw new Error("A conta mudou desde o pagamento. Confira o extrato.");
-      if (
-        s.closedMonths.some(
-          (m) =>
-            current.date.slice(0, 7) <= m ||
-            previous.before.date.slice(0, 7) <= m,
-        )
-      )
-        throw new Error("Reabra o mês antes de desfazer o pagamento.");
-      return {
+  async function pay(e: Entry) {
+    if (f.closedMonths.some((m) => e.date.slice(0, 7) <= m)) {
+      setLocalError("Reabra o mês para registrar o pagamento.");
+      return;
+    }
+    if (e.pot !== "free") {
+      const available = b?.buckets[e.pot] || 0;
+      if (available < e.cents) {
+        setLocalError(`O pote ${potName(e.pot)} tem apenas ${cash(Math.max(0, available))}. O pagamento não pode usar saldo de outro pote.`);
+        return;
+      }
+    }
+    await change(
+      (s) => ({
         ...s,
-        entries: s.entries.map((e) =>
-          e.id === current.id
+        entries: s.entries.map((x) =>
+          x.id === e.id
             ? {
-                ...e,
-                status: "pending",
-                cents: previous.before.cents,
-                date: previous.before.date,
+                ...x,
+                status: "paid",
+                date: today(),
                 updatedAt: new Date().toISOString(),
               }
-            : e,
+            : x,
         ),
-      };
-    }, "Pagamento desfeito. A conta voltou a ficar pendente.");
-    if (ok) setPaymentUndo(null);
+      }),
+      "Pagamento registrado hoje",
+    );
+  }
+  async function distributeUnallocatedAcrossPots() {
+    if (unallocated <= 0) {
+      setLocalError("Não há saldo não alocado disponível para distribuir.");
+      return;
+    }
+    const targets = f.pots
+      .filter(
+        (p) =>
+          p.active &&
+          !p.reserve &&
+          p.mode === "percent" &&
+          potAllocationBase(p) === "remainder" &&
+          p.value > 0,
+      )
+      .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+    const weight = targets.reduce((sum, p) => sum + p.value, 0);
+    if (!targets.length || weight <= 0) {
+      setLocalError("Defina percentuais nos potes de uso antes de distribuir o saldo livre.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Distribuir ${cash(unallocated)} entre os potes de uso conforme as proporções atuais? O valor reservado para contas não será utilizado.`,
+      )
+    )
+      return;
+
+    let assigned = 0;
+    const transfers: Entry[] = targets.flatMap((p, index) => {
+      const amount =
+        index === targets.length - 1
+          ? unallocated - assigned
+          : Math.floor((unallocated * p.value) / weight);
+      assigned += amount;
+      if (amount <= 0) return [];
+      return [
+        entry(
+          {
+            id: uid(),
+            kind: "transfer",
+            description: `Distribuição de saldo livre · ${p.name}`,
+            cents: amount,
+            date: today(),
+            pot: "free",
+            destination: p.id,
+          },
+          f.pots,
+        ),
+      ];
+    });
+    await change(
+      (state) => ({ ...state, entries: [...state.entries, ...transfers] }),
+      "Saldo livre distribuído entre os potes",
+    );
   }
   function ledgerRow(e: Entry) {
     const Icon =
@@ -412,9 +455,7 @@ export default function FinanceCenterView({
             ? "Excluído"
             : e.status === "pending"
               ? "Pendente"
-              : e.kind === "expense"
-                ? "Pago"
-                : kindNames[e.kind]}
+              : kindNames[e.kind]}
         </span>
         <strong
           className={`entry-value ${e.kind === "income" ? "positive" : ""}`}
@@ -434,12 +475,11 @@ export default function FinanceCenterView({
             <>
               {e.status === "pending" && (
                 <button
-                  aria-label={`Pagar ${e.description}`}
-                  className="pay-button"
-                  disabled={saving}
+                  aria-label="Marcar como pago hoje"
+                  title="Marcar como pago hoje"
                   onClick={() => pay(e)}
                 >
-                  <Check size={16} /> Pagar
+                  <Check size={16} />
                 </button>
               )}
               <button
@@ -488,7 +528,7 @@ export default function FinanceCenterView({
         </span>
         <p className="sidebar-caption">PLANEJAMENTO DA FAMÍLIA</p>
         <nav>
-          {(Object.keys(labels) as View[]).map((v) => {
+          {navViews.map((v) => {
             const Icon = icons[v];
             return (
               <button
@@ -549,9 +589,9 @@ export default function FinanceCenterView({
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button
-              className="account-chip"
-              onClick={onLogout}
-              aria-label="Trocar perfil"
+              className={`account-chip ${view === "profile" ? "active" : ""}`}
+              onClick={() => setView("profile")}
+              aria-label="Abrir meu perfil financeiro"
             >
               <span className="avatar">{actor === "voce" ? "V" : "E"}</span>
               <span>{actorName(actor)}</span>
@@ -578,10 +618,12 @@ export default function FinanceCenterView({
                         ? "Transforme contribuições em conquistas."
                         : view === "ledger"
                           ? "Cada movimento conta a história do seu dinheiro."
-                          : "Seu planejamento funciona do seu jeito."}
+                          : view === "profile"
+                    ? "Acompanhe a evolução e os pontos que merecem atenção."
+                    : "Seu planejamento funciona do seu jeito."}
               </p>
             </div>
-            <div className="heading-actions">
+            {view !== "profile" && <div className="heading-actions">
               <button
                 className="secondary"
                 disabled={saving || !f.configured}
@@ -596,7 +638,7 @@ export default function FinanceCenterView({
               >
                 <Plus size={17} /> Registrar aporte
               </button>
-            </div>
+            </div>}
           </div>
           {!f.configured && (
             <div className="setup-banner">
@@ -670,84 +712,45 @@ export default function FinanceCenterView({
                   </div>
                 </div>
               </section>
-              {pots.some(isFamilyCoffer) && (
-                <section
-                  className="family-coffers"
-                  aria-label="Cofrinhos da família"
-                >
-                  <header className="section-heading">
+              <section className="patrimony-strip" aria-label="Patrimônios protegidos">
+                <div>
+                  <span className="patrimony-icon"><PiggyBank size={18} /></span>
+                  <span><small>Nosso Patrimônio</small><strong>{cash(Math.max(0, b.buckets.nosso_patrimonio || 0))}</strong></span>
+                  <ShieldCheck size={16} />
+                </div>
+                <div>
+                  <span className="patrimony-icon"><PiggyBank size={18} /></span>
+                  <span><small>Patrimônio Manuela</small><strong>{cash(Math.max(0, b.buckets.patrimonio_manuela || 0))}</strong></span>
+                  <ShieldCheck size={16} />
+                </div>
+              </section>
+              {b.free < 0 && (
+                <div className="notice danger">
+                  As reservas e contas pendentes superam o saldo em conta. Revise os compromissos antes de gastar.
+                </div>
+              )}
+              {unallocated > 0 && !surplusDismissed && (
+                <section className="surplus-card">
+                  <div className="surplus-copy">
+                    <span className="surplus-icon"><Sparkles size={18} /></span>
                     <div>
-                      <h2>Seus cofrinhos</h2>
-                      <p>Um pouco de cada aporte para o futuro de vocês.</p>
+                      <small>SALDO NÃO ALOCADO</small>
+                      <strong>{cash(unallocated)}</strong>
+                      <p>Esse valor ainda não tem destino. Você decide se quer guardar, usar em uma meta ou manter livre.</p>
                     </div>
-                  </header>
-                  <div className="coffer-grid">
-                    {pots.filter(isFamilyCoffer).map((p) => {
-                      const received = f.entries
-                        .filter(
-                          (e) =>
-                            !e.deleted &&
-                            e.status === "paid" &&
-                            e.date <= today() &&
-                            e.date.slice(0, 7) === today().slice(0, 7),
-                        )
-                        .reduce(
-                          (sum, e) =>
-                            sum +
-                            (e.kind === "income"
-                              ? e.allocations[p.id] || 0
-                              : e.kind === "transfer" && e.destination === p.id
-                                ? e.cents
-                                : 0),
-                          0,
-                        );
-                      return (
-                        <CofferCard
-                          key={p.id}
-                          pot={p}
-                          balance={b.buckets[p.id] || 0}
-                          received={received}
-                          committed={potCommitment(f, p.id)}
-                          cash={cash}
-                          onEdit={() => open({ type: "pot", existing: p })}
-                          onAdd={() =>
-                            open({
-                              type: "entry",
-                              kind: "transfer",
-                              existing: {
-                                ...entry(
-                                  {
-                                    kind: "transfer",
-                                    description: `Guardar em ${p.name}`,
-                                    cents: 1,
-                                    date: today(),
-                                    pot: "free",
-                                    destination: p.id,
-                                  },
-                                  f.pots,
-                                ),
-                                id: "",
-                                cents: 0,
-                              },
-                            })
-                          }
-                        />
-                      );
-                    })}
                   </div>
-                  <p className="coffer-note">
-                    A divisão é automática em cada aporte registrado. Os valores
-                    acumulam; não há rendimento bancário calculado.
-                  </p>
+                  <div className="surplus-actions">
+                    <button className="secondary" onClick={() => open({ type: "entry", kind: "transfer", presetPot: "free", presetDest: "nosso_patrimonio" })}>Nosso patrimônio</button>
+                    <button className="secondary" onClick={() => open({ type: "entry", kind: "transfer", presetPot: "free", presetDest: "patrimonio_manuela" })}>Patrimônio Manuela</button>
+                    {f.goals[0] && <button className="secondary" onClick={() => open({ type: "entry", kind: "transfer", presetPot: "free", presetDest: f.goals[0].pot })}>Aportar em meta</button>}
+                    <button className="secondary" onClick={distributeUnallocatedAcrossPots}>Distribuir nos potes</button>
+                    <button className="text-button" onClick={() => setSurplusDismissed(true)}>Manter como saldo livre</button>
+                  </div>
                 </section>
               )}
-              {(b.free < 0 || b.buckets.free !== 0) && (
-                <div className={`notice ${b.free < 0 ? "danger" : ""}`}>
-                  {b.free < 0
-                    ? "As reservas e contas pendentes superam o saldo em conta. Revise os compromissos antes de gastar."
-                    : b.buckets.free < 0
-                      ? `O saldo sem distribuição está em ${cash(b.buckets.free)}. Transfira recursos de um pote de gastos para ajustar o orçamento.`
-                      : `Sem distribuição: ${cash(b.buckets.free || 0)}. Você pode transferir esse valor para um pote.`}
+              {b.buckets.free < 0 && (
+                <div className="notice danger">
+                  O saldo sem distribuição está em {cash(b.buckets.free)}. Revise transferências e pagamentos anteriores.
                 </div>
               )}
               <section className="two-columns">
@@ -787,12 +790,11 @@ export default function FinanceCenterView({
                       </div>
                       <b>{cash(e.cents)}</b>
                       <button
-                        className="secondary pay-button"
-                        disabled={saving}
-                        aria-label={`Pagar ${e.description}`}
+                        className="icon-button"
+                        aria-label="Registrar pagamento hoje"
                         onClick={() => pay(e)}
                       >
-                        <Check size={17} /> Pagar
+                        <Check size={17} />
                       </button>
                     </div>
                   ))}
@@ -855,34 +857,31 @@ export default function FinanceCenterView({
                 </button>
               </header>
               <section className="pot-grid">
-                {pots
-                  .filter((p) => !isFamilyCoffer(p))
-                  .map((p) => (
-                    <PotCard
-                      key={p.id}
-                      pot={p}
-                      balance={b.buckets[p.id] || 0}
-                      committed={potCommitment(f, p.id)}
-                      funded={b.funded[p.id] || 0}
-                      spent={
-                        p.rollover
-                          ? b.spent[p.id] || 0
-                          : f.entries
-                              .filter(
-                                (e) =>
-                                  !e.deleted &&
-                                  e.kind === "expense" &&
-                                  e.status === "paid" &&
-                                  e.pot === p.id &&
-                                  e.date.slice(0, 7) === today().slice(0, 7) &&
-                                  e.date <= today(),
-                              )
-                              .reduce((s, e) => s + e.cents, 0)
-                      }
-                      cash={cash}
-                      onEdit={() => open({ type: "pot", existing: p })}
-                    />
-                  ))}
+                {pots.map((p) => (
+                  <PotCard
+                    key={p.id}
+                    pot={p}
+                    balance={b.buckets[p.id] || 0}
+                    funded={b.funded[p.id] || 0}
+                    spent={
+                      p.rollover
+                        ? b.spent[p.id] || 0
+                        : f.entries
+                            .filter(
+                              (e) =>
+                                !e.deleted &&
+                                e.kind === "expense" &&
+                                e.status === "paid" &&
+                                e.pot === p.id &&
+                                e.date.slice(0, 7) === today().slice(0, 7) &&
+                                e.date <= today(),
+                            )
+                            .reduce((s, e) => s + e.cents, 0)
+                    }
+                    cash={cash}
+                    onEdit={() => open({ type: "pot", existing: p })}
+                  />
+                ))}
               </section>
               <section className="panel">
                 <header className="section-heading">
@@ -954,8 +953,8 @@ export default function FinanceCenterView({
                   onChange={(e) => setActorFilter(e.target.value)}
                 >
                   <option value="all">Todos os perfis</option>
-                  <option value="voce">Rhuan</option>
-                  <option value="esposa">Anne</option>
+                  <option value="voce">Você</option>
+                  <option value="esposa">Esposa</option>
                   <option value="sistema">Sistema</option>
                 </select>
                 <label className="checkbox">
@@ -1045,9 +1044,10 @@ export default function FinanceCenterView({
                 </button>
                 <span className="muted">
                   {pots
-                    .filter((p) => p.mode === "percent")
-                    .reduce((s, p) => s + p.value, 0)}
-                  % do restante distribuído
+                    .filter((p) => p.mode === "percent" && potAllocationBase(p) === "gross")
+                    .reduce((s, p) => s + p.value, 0)}% patrimônios · {pots
+                    .filter((p) => p.mode === "percent" && potAllocationBase(p) === "remainder")
+                    .reduce((s, p) => s + p.value, 0)}% demais potes
                 </span>
               </div>
               <section className="pot-grid">
@@ -1056,7 +1056,6 @@ export default function FinanceCenterView({
                     key={p.id}
                     pot={p}
                     balance={b.buckets[p.id] || 0}
-                    committed={potCommitment(f, p.id)}
                     funded={b.funded[p.id] || 0}
                     spent={
                       p.rollover
@@ -1114,49 +1113,17 @@ export default function FinanceCenterView({
                 >
                   <Plus size={17} /> Conta recorrente ou parcelada
                 </button>
-                <button
-                  className="secondary"
-                  onClick={() => open({ type: "entry", kind: "expense" })}
-                >
-                  Gasto avulso pendente
-                </button>
               </div>
               <section className="panel">
                 <header className="section-heading">
                   <h2>Pagamentos pendentes</h2>
                   <span className="muted">
-                    Contas pendentes comprometem o pote; ao pagar, viram gastos
+                    O saldo só diminui ao confirmar o pagamento
                   </span>
                 </header>
                 {pending.map(ledgerRow)}
                 {!pending.length && (
                   <div className="empty-state">Tudo em dia por aqui.</div>
-                )}
-              </section>
-              <section className="panel">
-                <h2>Pagamentos deste mês</h2>
-                {f.entries
-                  .filter(
-                    (e) =>
-                      !e.deleted &&
-                      e.kind === "expense" &&
-                      e.status === "paid" &&
-                      e.date.slice(0, 7) === today().slice(0, 7) &&
-                      e.date <= today(),
-                  )
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map(ledgerRow)}
-                {!f.entries.some(
-                  (e) =>
-                    !e.deleted &&
-                    e.kind === "expense" &&
-                    e.status === "paid" &&
-                    e.date.slice(0, 7) === today().slice(0, 7) &&
-                    e.date <= today(),
-                ) && (
-                  <div className="empty-state">
-                    Nenhum pagamento registrado neste mês.
-                  </div>
                 )}
               </section>
               <section className="panel">
@@ -1352,6 +1319,142 @@ export default function FinanceCenterView({
               </section>
             </>
           )}
+          {view === "profile" && (() => {
+            const currentMonth = today().slice(0, 7);
+            const previousMonth = monthDate(`${currentMonth}-01`, -1).slice(0, 7);
+            const monthTotals = (m: string) => {
+              const rows = f.entries.filter((e) => !e.deleted && e.status === "paid" && e.date.slice(0, 7) === m && e.date <= today());
+              return {
+                income: rows.filter((e) => e.kind === "income").reduce((sum, e) => sum + e.cents, 0),
+                expense: rows.filter((e) => e.kind === "expense").reduce((sum, e) => sum + e.cents, 0),
+                saved: rows.reduce(
+                  (sum, e) =>
+                    sum +
+                    (e.kind === "income"
+                      ? (e.allocations.nosso_patrimonio || 0) +
+                        (e.allocations.patrimonio_manuela || 0)
+                      : e.kind === "transfer" &&
+                          ["nosso_patrimonio", "patrimonio_manuela"].includes(e.destination)
+                        ? e.cents
+                        : 0),
+                  0,
+                ),
+              };
+            };
+            const now = monthTotals(currentMonth);
+            const before = monthTotals(previousMonth);
+            const protectedTotal = Math.max(0, b.buckets.nosso_patrimonio || 0) + Math.max(0, b.buckets.patrimonio_manuela || 0);
+            const externalTotal = f.assets.reduce((sum, a) => sum + a.cents, 0);
+            const months = Array.from({ length: 6 }, (_, i) => monthDate(`${currentMonth}-01`, i - 5).slice(0, 7));
+            const history = months.map((m) => ({ month: m, ...monthTotals(m) }));
+            const maxSaved = Math.max(1, ...history.map((x) => x.saved));
+            const expenseDelta = before.expense
+              ? ((now.expense - before.expense) / before.expense) * 100
+              : now.expense > 0
+                ? 100
+                : 0;
+            const savedDelta = before.saved ? ((now.saved - before.saved) / before.saved) * 100 : now.saved > 0 ? 100 : 0;
+            const insights = [
+              {
+                tone: savedDelta >= 0 ? "good" : "attention",
+                icon: savedDelta >= 0 ? TrendingUp : TrendingDown,
+                title: savedDelta >= 0 ? "Patrimônio em evolução" : "Patrimônio desacelerou",
+                text: before.saved
+                  ? `Neste mês vocês direcionaram ${Math.abs(Math.round(savedDelta))}% ${savedDelta >= 0 ? "a mais" : "a menos"} para os patrimônios do que no mês anterior.`
+                  : now.saved > 0
+                    ? `Neste mês já foram direcionados ${cash(now.saved)} aos patrimônios.`
+                    : "Ainda não houve aporte para os patrimônios neste mês.",
+              },
+              {
+                tone: expenseDelta <= 0 ? "good" : "attention",
+                icon: expenseDelta <= 0 ? TrendingDown : TrendingUp,
+                title: expenseDelta <= 0 ? "Gastos sob controle" : "Gastos em alta",
+                text: before.expense
+                  ? `Os gastos pagos estão ${Math.abs(Math.round(expenseDelta))}% ${expenseDelta <= 0 ? "abaixo" : "acima"} do mês anterior.`
+                  : `Gastos pagos neste mês: ${cash(now.expense)}.`,
+              },
+              {
+                tone: b.pending > 0 ? "attention" : "good",
+                icon: CalendarDays,
+                title: b.pending > 0 ? "Há compromissos pendentes" : "Contas do período em dia",
+                text: b.pending > 0 ? `${cash(b.pending)} ainda estão reservados para contas pendentes.` : "Não há contas pendentes até este mês.",
+              },
+            ];
+            return (
+              <>
+                <section className="profile-hero">
+                  <div>
+                    <p className="eyebrow">RAIO-X FINANCEIRO</p>
+                    <h2>{actorName(actor)}, esta é a evolução do planejamento</h2>
+                    <p>Sem pontuação ou medalhas: apenas os números que mostram o que está avançando e o que merece atenção.</p>
+                  </div>
+                  <button className="secondary" onClick={onLogout}><LogOut size={16} /> Trocar perfil ou sair</button>
+                </section>
+
+                <section className="profile-metrics">
+                  <article>
+                    <span className="metric-icon"><PiggyBank size={19} /></span>
+                    <small>Patrimônio protegido</small>
+                    <strong>{cash(protectedTotal)}</strong>
+                    <p>Nosso Patrimônio + Patrimônio Manuela</p>
+                  </article>
+                  <article>
+                    <span className="metric-icon"><TrendingUp size={19} /></span>
+                    <small>Guardado neste mês</small>
+                    <strong>{cash(now.saved)}</strong>
+                    <p>Aportes destinados aos dois patrimônios</p>
+                  </article>
+                  <article>
+                    <span className="metric-icon"><Activity size={19} /></span>
+                    <small>Resultado do mês</small>
+                    <strong>{cash(now.income - now.expense)}</strong>
+                    <p>Aportes menos gastos pagos</p>
+                  </article>
+                  <article>
+                    <span className="metric-icon"><Wallet size={19} /></span>
+                    <small>Patrimônio externo</small>
+                    <strong>{cash(externalTotal)}</strong>
+                    <p>Bens e valores informados fora da conta</p>
+                  </article>
+                </section>
+
+                <section className="profile-grid">
+                  <div className="panel evolution-panel">
+                    <header className="section-heading">
+                      <div><h2>Evolução de aportes aos patrimônios</h2><p>Últimos seis meses</p></div>
+                    </header>
+                    <div className="evolution-bars">
+                      {history.map((item) => (
+                        <div key={item.month}>
+                          <span className="evolution-value">{item.saved ? cash(item.saved) : "—"}</span>
+                          <span className="evolution-track"><i style={{ height: `${Math.max(item.saved ? 8 : 2, (item.saved / maxSaved) * 100)}%` }} /></span>
+                          <small>{item.month.slice(5)}/{item.month.slice(2, 4)}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="panel insights-panel">
+                    <header className="section-heading"><div><h2>Leitura do momento</h2><p>Baseada no histórico registrado</p></div></header>
+                    {insights.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <div className={`insight-row ${item.tone}`} key={item.title}>
+                          <span><Icon size={17} /></span>
+                          <div><strong>{item.title}</strong><p>{item.text}</p></div>
+                        </div>
+                      );
+                    })}
+                    {unallocated > 0 && (
+                      <div className="insight-row neutral">
+                        <span><Sparkles size={17} /></span>
+                        <div><strong>Há dinheiro sem destino</strong><p>{cash(unallocated)} ainda podem ser direcionados para patrimônio, metas ou potes.</p></div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            );
+          })()}
           {view === "settings" && (
             <>
               <section className="panel account-panel">
@@ -1639,7 +1742,7 @@ export default function FinanceCenterView({
           )}
         </main>
         <nav className="mobile-nav">
-          {(Object.keys(labels) as View[]).map((v) => {
+          {navViews.map((v) => {
             const Icon = icons[v];
             return (
               <button
@@ -1660,39 +1763,6 @@ export default function FinanceCenterView({
           })}
         </nav>
       </div>
-      {paymentUndo && (
-        <div className="notice payment-undo" role="status">
-          <span>Pagamento de {paymentUndo.before.description} registrado.</span>
-          <button
-            className="text-button"
-            disabled={saving}
-            onClick={undoPayment}
-          >
-            Desfazer pagamento
-          </button>
-        </div>
-      )}
-      {payment && (
-        <PaymentDialog
-          bill={payment}
-          saving={saving}
-          potName={potName(payment.pot)}
-          error={localError}
-          close={() => {
-            if (!saving) setPayment(null);
-          }}
-          confirm={async (cents, date) => {
-            const ok = await change(
-              (s) => payBill(s, payment.id, cents, date),
-              "Pagamento registrado",
-            );
-            if (ok) {
-              setPaymentUndo({ before: payment, cents, date });
-              setPayment(null);
-            }
-          }}
-        />
-      )}
       {(toast || undo) && (
         <div className="toast" role="status">
           <Check size={17} />
@@ -1743,9 +1813,9 @@ export default function FinanceCenterView({
             saving={saving}
             cash={cash}
             close={() => setModal(null)}
-            commit={async (fn) => {
+            commit={async (fn, keepOpen = false) => {
               const ok = await change(fn);
-              if (ok) setModal(null);
+              if (ok && !keepOpen) setModal(null);
               return ok;
             }}
           />
@@ -1757,7 +1827,6 @@ export default function FinanceCenterView({
 function PotCard({
   pot: p,
   balance,
-  committed,
   funded,
   spent,
   cash,
@@ -1765,13 +1834,11 @@ function PotCard({
 }: {
   pot: Pot;
   balance: number;
-  committed: number;
   funded: number;
   spent: number;
   cash: (v: number) => string;
   onEdit: () => void;
 }) {
-  const available = balance - committed;
   const budget = balance + spent;
   const used =
     budget > 0 ? (spent / budget) * 100 : balance <= 0 && spent > 0 ? 100 : 0;
@@ -1793,31 +1860,15 @@ function PotCard({
           <Pencil size={14} />
         </button>
       </header>
-      <div className="pot-circle" style={{ borderColor: p.color }}>
+      <div className="pot-art">
         <PotSymbol symbol={potSymbol(p)} />
-        <strong title={cash(Math.max(0, available))}>
-          {cash(Math.max(0, available))}
-        </strong>
-        <small>{p.reserve ? "Guardado" : "Pode gastar"}</small>
+        <span className="pot-percentage">
+          {p.mode === "percent" ? `${p.value}%` : "Fixo"}
+        </span>
       </div>
       <h3>{p.name}</h3>
-      <small className="pot-availability-label">
-        {p.reserve ? "Guardado após compromissos" : "Disponível para gastar"}
-      </small>
-      <div className="pot-commitments">
-        <span>
-          Saldo do pote <b>{cash(balance)}</b>
-        </span>
-        <span>
-          Comprometido <b>{cash(committed)}</b>
-        </span>
-        <small>Contas vencidas e do mês atual</small>
-        {available < 0 && (
-          <span className="overdue">
-            Faltam {cash(-available)} para cobrir os compromissos.
-          </span>
-        )}
-      </div>
+      <strong>{cash(balance)}</strong>
+      <small>{p.reserve ? "Reservado" : "Disponível no pote"}</small>
       <div className="spending-bar">
         <span
           style={{
@@ -1854,12 +1905,15 @@ function FinanceModal({
   saving: boolean;
   cash: (v: number) => string;
   close: () => void;
-  commit: (fn: (s: Finance) => Finance) => Promise<boolean>;
+  commit: (fn: (s: Finance) => Finance, keepOpen?: boolean) => Promise<boolean>;
 }) {
   const old = modal.type === "entry" ? modal.existing : null;
   const p = modal.type === "pot" ? modal.existing : null;
   const r = modal.type === "bill" ? modal.existing : null;
   const g = modal.type === "goal" ? modal.existing : null;
+  const defaultExpensePot = f.pots.find(
+    (x) => x.active && !x.reserve && potAllocationBase(x) === "remainder",
+  )?.id || "free";
   const [description, setDescription] = useState(
     old?.description || p?.name || r?.name || g?.name || "",
   );
@@ -1877,10 +1931,17 @@ function FinanceModal({
   const [date, setDate] = useState(
     old?.date || r?.start || g?.deadline || today(),
   );
-  const [pot, setPot] = useState(old?.pot || r?.pot || g?.pot || "free"),
-    [dest, setDest] = useState(old?.destination || "");
-  const [status, setStatus] = useState(old?.status || "paid"),
-    [mode, setMode] = useState<"percent" | "fixed">(p?.mode || "percent"),
+  const [pot, setPot] = useState(
+    old?.pot ||
+      r?.pot ||
+      g?.pot ||
+      (modal.type === "entry" ? modal.presetPot : undefined) ||
+      (modal.type === "entry" && modal.kind === "expense" ? defaultExpensePot : "free"),
+  ),
+    [dest, setDest] = useState(
+      old?.destination || (modal.type === "entry" ? modal.presetDest : undefined) || "",
+    );
+  const [mode, setMode] = useState<"percent" | "fixed">(p?.mode || "percent"),
     [reserve, setReserve] = useState(p?.reserve || false),
     [rollover, setRollover] = useState(p?.rollover ?? true),
     [priority, setPriority] = useState(p?.priority ?? f.pots.length),
@@ -1894,18 +1955,42 @@ function FinanceModal({
   const [ruleText, setRuleText] = useState(""),
     [formError, setFormError] = useState(""),
     [suggestion, setSuggestion] = useState("");
-  const [setupPots, setSetupPots] = useState<Pot[]>(structuredClone(f.pots));
+  const [setupPots, setSetupPots] = useState<Pot[]>(
+    structuredClone(f.pots).map((p) => ({
+      ...p,
+      mode: "percent" as const,
+      value: Math.max(0, Math.min(100, Math.round(p.value / 2) * 2)),
+      allocationBase: potAllocationBase(p),
+    })),
+  );
+  const [setupStep, setSetupStep] = useState(0);
+  const [setupSelected, setSetupSelected] = useState(0);
+  const [setupBills, setSetupBills] = useState<Recurrence[]>([]);
+  const [setupBillName, setSetupBillName] = useState("");
+  const [setupBillValue, setSetupBillValue] = useState("");
+  const [setupBillMonths, setSetupBillMonths] = useState(0);
+  const [setupBillStart, setSetupBillStart] = useState(today());
+  useEffect(() => {
+    if (modal.type !== "setup" || setupStep !== 3) return;
+    const timer = window.setTimeout(close, 2200);
+    return () => window.clearTimeout(timer);
+  }, [modal.type, setupStep, close]);
   const existingPolicy = old?.id && old.policy.length ? old.policy : f.pots;
   let preview: Record<string, number> = {};
   try {
-    if (
-      (modal.type === "entry" && modal.kind === "income") ||
-      modal.type === "setup"
-    )
-      preview = allocate(
+    if (modal.type === "entry" && modal.kind === "income") {
+      preview = allocateContribution(
         parseMoney(value),
-        modal.type === "setup" ? setupPots : existingPolicy,
+        existingPolicy,
+        pendingCommitmentsForMonth(f, date),
       );
+    }
+    if (modal.type === "setup" && value.trim()) {
+      const commitments = setupBills
+        .filter((r) => r.start.slice(0, 7) <= date.slice(0, 7))
+        .reduce((sum, r) => sum + r.cents, 0);
+      preview = allocateContribution(parseMoney(value), setupPots, commitments);
+    }
   } catch {}
   const title =
     modal.type === "entry"
@@ -1923,7 +2008,13 @@ function FinanceModal({
               ? "Editar meta"
               : "Nova meta"
             : modal.type === "setup"
-              ? "Seu primeiro aporte"
+              ? setupStep === 0
+                ? "Contas fixas e dívidas"
+                : setupStep === 1
+                  ? "Aporte inicial"
+                  : setupStep === 2
+                    ? "Monte seu plano financeiro"
+                    : "Planejamento pronto"
               : modal.type === "asset"
                 ? "Adicionar patrimônio externo"
                 : "Nova regra de categoria";
@@ -1949,13 +2040,81 @@ function FinanceModal({
       );
     } else setSuggestion("");
   }
+  function addSetupBill() {
+    setFormError("");
+    try {
+      if (!setupBillName.trim()) throw new Error("Informe o nome da conta.");
+      const cents = parseMoney(setupBillValue);
+      if (!Number.isInteger(setupBillMonths) || setupBillMonths < 0 || setupBillMonths > 1200)
+        throw new Error("Informe de 0 a 1.200 meses.");
+      const bill: Recurrence = {
+        id: uid(),
+        name: setupBillName.trim(),
+        cents,
+        pot: "free",
+        start: setupBillStart,
+        count: setupBillMonths,
+        active: true,
+      };
+      setSetupBills((items) => [...items, bill]);
+      setSetupBillName("");
+      setSetupBillValue("");
+      setSetupBillMonths(0);
+    } catch (e) {
+      setFormError((e as Error).message);
+    }
+  }
   async function submit(ev: FormEvent) {
     ev.preventDefault();
     setFormError("");
     try {
-      const amount = ["entry", "setup", "bill", "goal", "asset"].includes(
-        modal.type,
-      )
+      if (modal.type === "setup") {
+        if (setupStep === 0) {
+          setSetupStep(1);
+          return;
+        }
+        if (setupStep === 1) {
+          parseMoney(value);
+          setSetupStep(2);
+          return;
+        }
+        if (setupStep === 2) {
+          validatePots(setupPots);
+          const amount = parseMoney(value);
+          const grossAllocated = Object.entries(allocateContribution(amount, setupPots, 0))
+            .filter(([id]) => id !== "free" && potAllocationBase(setupPots.find((p) => p.id === id)!) === "gross")
+            .reduce((sum, [, cents]) => sum + cents, 0);
+          if (setupMonthlyCommitment > Math.max(0, amount - grossAllocated))
+            throw new Error(
+              `O aporte não cobre os patrimônios e as contas deste período. Faltam ${cash(setupMonthlyCommitment - Math.max(0, amount - grossAllocated))}.`,
+            );
+          let next: Finance = {
+            ...f,
+            configured: false,
+            pots: setupPots,
+            recurrences: [...f.recurrences, ...setupBills],
+          };
+          next = generateRecurring(next);
+          const commitments = pendingCommitmentsForMonth(next, date);
+          const first = entry(
+            {
+              id: uid(),
+              kind: "income",
+              description: "Aporte inicial",
+              cents: amount,
+              date,
+            },
+            setupPots,
+          );
+          first.allocations = allocateContribution(amount, setupPots, commitments);
+          next = { ...next, configured: true, entries: [...next.entries, first] };
+          const ok = await commit(() => next, true);
+          if (ok) setSetupStep(3);
+          return;
+        }
+        return;
+      }
+      const amount = ["entry", "bill", "goal", "asset"].includes(modal.type)
         ? parseMoney(value)
         : 0;
       if (modal.type === "entry") {
@@ -1979,12 +2138,19 @@ function FinanceModal({
             pot,
             destination: dest,
             status:
-              modal.kind === "expense" ? (status as Entry["status"]) : "paid",
+              modal.kind === "expense" ? (old?.status || "paid") : "paid",
             policy: modal.kind === "income" ? existingPolicy : [],
             source: old?.id ? old.source : "",
           },
           f.pots,
         );
+        if (modal.kind === "income") {
+          candidate.allocations = allocateContribution(
+            amount,
+            existingPolicy,
+            pendingCommitmentsForMonth(f, date),
+          );
+        }
         const duplicates = f.entries.some(
           (e) =>
             !e.deleted &&
@@ -2002,16 +2168,35 @@ function FinanceModal({
         )
           return;
 
-        if (
-          modal.kind === "transfer" &&
-          (balances(
+        if (modal.kind === "expense" && candidate.status === "paid") {
+          const selectedPot = f.pots.find((x) => x.id === pot);
+          if (!selectedPot || selectedPot.reserve || pot === "free")
+            throw new Error("Escolha o pote correto para este gasto.");
+          const available = balances(
             { ...f, entries: f.entries.filter((e) => e.id !== candidate.id) },
             date,
-          ).buckets[pot] || 0) < amount
-        )
-          throw new Error(
-            "O saldo do pote de origem na data escolhida não cobre a transferência.",
+          ).buckets[pot] || 0;
+          if (available < amount)
+            throw new Error(
+              `Este pote tem apenas ${cash(Math.max(0, available))} disponível. O gasto não pode usar saldo de outro pote.`,
+            );
+        }
+        if (modal.kind === "transfer") {
+          const transferBalances = balances(
+            { ...f, entries: f.entries.filter((e) => e.id !== candidate.id) },
+            date,
           );
+          const available =
+            pot === "free"
+              ? Math.max(0, (transferBalances.buckets.free || 0) - transferBalances.pending)
+              : transferBalances.buckets[pot] || 0;
+          if (available < amount)
+            throw new Error(
+              pot === "free"
+                ? `Há apenas ${cash(available)} de saldo realmente livre. O valor reservado para contas não pode ser transferido.`
+                : "O saldo do pote de origem na data escolhida não cobre a transferência.",
+            );
+        }
         await commit((s) => ({
           ...s,
           entries: [
@@ -2028,38 +2213,20 @@ function FinanceModal({
           id: p?.id || uid(),
           name: description.trim(),
           value: number,
-          mode,
+          mode: p && potAllocationBase(p) === "gross" ? "percent" : mode,
           reserve,
           rollover,
           priority,
           active,
           color: p?.color || "#8296bb",
           icon: symbol,
+          allocationBase: p ? potAllocationBase(p) : "remainder",
         };
         const next = [...f.pots.filter((x) => x.id !== updated.id), updated];
         validatePots(next);
         await commit((s) => ({
           ...s,
           pots: [...s.pots.filter((x) => x.id !== updated.id), updated],
-        }));
-      }
-      if (modal.type === "setup") {
-        validatePots(setupPots);
-        const first = entry(
-          {
-            id: uid(),
-            kind: "income",
-            description: "Aporte inicial",
-            cents: amount,
-            date,
-          },
-          setupPots,
-        );
-        await commit((s) => ({
-          ...s,
-          configured: true,
-          pots: setupPots,
-          entries: [...s.entries, first],
         }));
       }
       if (modal.type === "bill") {
@@ -2074,7 +2241,7 @@ function FinanceModal({
           id: r?.id || uid(),
           name: description.trim(),
           cents: amount,
-          pot,
+          pot: "free",
           start: date,
           count,
           active,
@@ -2099,6 +2266,7 @@ function FinanceModal({
             rollover: true,
             priority: f.pots.length,
             color: "#8472a0",
+            allocationBase: "remainder" as const,
           }),
           name: description.trim(),
           mode: "percent",
@@ -2141,11 +2309,11 @@ function FinanceModal({
       setFormError((e as Error).message);
     }
   }
-  const options = (
+  const destinationOptions = (
     <>
       <option value="free">Sem distribuição</option>
       {f.pots
-        .filter((p) => p.active || p.id === pot || p.id === dest)
+        .filter((p) => p.active || p.id === dest)
         .map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -2153,6 +2321,40 @@ function FinanceModal({
         ))}
     </>
   );
+  const transferSourceOptions = (
+    <>
+      <option value="free">Saldo sem distribuição</option>
+      {f.pots
+        .filter((p) => (p.active || p.id === pot) && !p.reserve)
+        .map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+    </>
+  );
+  const ruleOptions = f.pots
+    .filter((p) => p.active && !p.reserve && potAllocationBase(p) === "remainder")
+    .map((p) => (
+      <option key={p.id} value={p.id}>{p.name}</option>
+    ));
+  const expenseOptions = f.pots
+    .filter((p) => p.active && !p.reserve && potAllocationBase(p) === "remainder")
+    .map((p) => (
+      <option key={p.id} value={p.id}>
+        {p.name} · {cash(Math.max(0, balances(f, date).buckets[p.id] || 0))}
+      </option>
+    ));
+  const selectedSetupPot = setupPots[setupSelected] || setupPots[0];
+  const setupMonthlyCommitment = setupBills
+    .filter((r) => r.start.slice(0, 7) <= date.slice(0, 7))
+    .reduce((sum, r) => sum + r.cents, 0);
+  const setupGrossPct = setupPots
+    .filter((p) => p.active && p.mode === "percent" && potAllocationBase(p) === "gross")
+    .reduce((sum, p) => sum + p.value, 0);
+  const setupRemainderPct = setupPots
+    .filter((p) => p.active && p.mode === "percent" && potAllocationBase(p) === "remainder")
+    .reduce((sum, p) => sum + p.value, 0);
   return (
     <ModalShell title={title} onClose={close}>
       <form onSubmit={submit} className="modal-form">
@@ -2162,41 +2364,257 @@ function FinanceModal({
           </div>
         )}
         {modal.type === "setup" && (
-          <>
-            <p className="muted">
-              Defina a distribuição e informe o dinheiro que já está na conta.
-              Não há valor estimado obrigatório.
-            </p>
-            <div className="setup-pots">
-              {setupPots.map((p, i) => (
-                <div className="setup-pot" key={p.id}>
-                  <PotSymbol symbol={potSymbol(p)} />
-                  <PercentageControl
-                    label={`${p.name} percentual`}
-                    value={p.value}
-                    color={p.color}
-                    maxAllowed={
-                      100 -
-                      setupPots
-                        .filter((_, j) => j !== i)
-                        .reduce((sum, p) => sum + p.value, 0)
-                    }
-                    onChange={(value) =>
-                      setSetupPots(
-                        setupPots.map((x, j) =>
-                          j === i ? { ...x, value } : x,
-                        ),
-                      )
-                    }
-                  />
+          <div className="setup-wizard">
+            <div className="setup-progress" aria-label="Etapas da configuração">
+              {["Contas", "Aporte", "Potes", "Pronto"].map((label, i) => (
+                <div key={label} className={i <= setupStep ? "active" : ""}>
+                  <span>{i + 1}</span>
+                  <small>{label}</small>
                 </div>
               ))}
             </div>
-            <p className="muted">
-              Total: {setupPots.reduce((s, p) => s + p.value, 0)}% · O restante
-              fica sem distribuição.
-            </p>
-          </>
+
+            {setupStep === 0 && (
+              <section className="setup-step">
+                <div className="setup-intro">
+                  <span className="setup-icon"><CalendarDays size={21} /></span>
+                  <div>
+                    <h3>Primeiro, o que já sai todo mês?</h3>
+                    <p>Cadastre contas fixas e dívidas. Elas serão separadas antes da distribuição dos potes.</p>
+                  </div>
+                </div>
+                <div className="setup-bill-editor">
+                  <Field label="Conta ou dívida">
+                    <input
+                      value={setupBillName}
+                      onChange={(e) => setSetupBillName(e.target.value)}
+                      placeholder="Ex.: Aluguel, luz, parcela do carro"
+                    />
+                  </Field>
+                  <Field label="Valor mensal (R$)">
+                    <input
+                      inputMode="decimal"
+                      value={setupBillValue}
+                      onChange={(e) => setSetupBillValue(e.target.value)}
+                      placeholder="0,00"
+                    />
+                  </Field>
+                  <Field label="Por quantos meses?">
+                    <input
+                      type="number"
+                      min="0"
+                      max="1200"
+                      value={setupBillMonths}
+                      onChange={(e) => setSetupBillMonths(Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Primeiro vencimento">
+                    <input
+                      type="date"
+                      value={setupBillStart}
+                      onChange={(e) => setSetupBillStart(e.target.value)}
+                    />
+                  </Field>
+                  <button type="button" className="secondary setup-add-bill" onClick={addSetupBill}>
+                    <Plus size={16} /> Adicionar conta
+                  </button>
+                  <small className="muted">Use 0 meses para uma conta recorrente sem prazo, como aluguel, água ou internet.</small>
+                </div>
+                <div className="setup-bill-list">
+                  {setupBills.map((bill) => (
+                    <div key={bill.id} className="setup-bill-row">
+                      <span>
+                        <strong>{bill.name}</strong>
+                        <small>{bill.count ? `${bill.count} meses` : "Recorrente"} · vence a partir de {displayDate(bill.start)}</small>
+                      </span>
+                      <b>{cash(bill.cents)}</b>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Remover ${bill.name}`}
+                        onClick={() => setSetupBills((items) => items.filter((x) => x.id !== bill.id))}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  {!setupBills.length && <p className="muted">Nenhuma conta adicionada ainda. Você pode continuar se não tiver compromissos fixos.</p>}
+                </div>
+                <div className="setup-total-line">
+                  <span>Total mensal cadastrado</span>
+                  <strong>{cash(setupBills.reduce((sum, x) => sum + x.cents, 0))}</strong>
+                </div>
+              </section>
+            )}
+
+            {setupStep === 1 && (
+              <section className="setup-step setup-contribution-step">
+                <div className="setup-intro">
+                  <span className="setup-icon"><Wallet size={21} /></span>
+                  <div>
+                    <h3>Agora informe o aporte inicial</h3>
+                    <p>É o valor bruto disponível hoje. O app separa patrimônios, contas e depois distribui o restante.</p>
+                  </div>
+                </div>
+                <Field label="Aporte inicial (R$)">
+                  <input
+                    autoFocus
+                    inputMode="decimal"
+                    required
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="0,00"
+                  />
+                </Field>
+                <Field label="Data do aporte">
+                  <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+                </Field>
+                <div className="setup-math-card">
+                  <span><small>Contas do período</small><b>{cash(setupMonthlyCommitment)}</b></span>
+                  <span><small>Patrimônios</small><b>calculados sobre o bruto</b></span>
+                  <p>Depois desses valores, os demais potes dividem somente o saldo restante.</p>
+                </div>
+              </section>
+            )}
+
+            {setupStep === 2 && selectedSetupPot && (
+              <section className="setup-step setup-pots-stage">
+                <div className="setup-intro">
+                  <span className="setup-icon"><Target size={21} /></span>
+                  <div>
+                    <h3>Monte o seu plano financeiro</h3>
+                    <p>Use as setas para trocar de pote e arraste o marcador ao redor do círculo. As porcentagens avançam de 2 em 2.</p>
+                  </div>
+                </div>
+
+                <div className="setup-plan-summary">
+                  <div><small>Patrimônios · aporte bruto</small><strong>{setupGrossPct}%</strong></div>
+                  <div><small>Outros potes · saldo restante</small><strong>{setupRemainderPct}%</strong></div>
+                </div>
+
+                <div className="setup-orbit" aria-label="Visão circular dos potes">
+                  <div className="setup-orbit-center">
+                    <strong>100%</strong>
+                    <small>limite por base</small>
+                  </div>
+                  {setupPots.map((item, i) => {
+                    const angle = (-90 + (i * 360) / Math.max(1, setupPots.length)) * (Math.PI / 180);
+                    const left = 50 + Math.cos(angle) * 39;
+                    const top = 50 + Math.sin(angle) * 39;
+                    return (
+                      <button
+                        type="button"
+                        key={`orbit-${item.id}`}
+                        className={`setup-orbit-pot ${i === setupSelected ? "selected" : ""}`}
+                        style={{ left: `${left}%`, top: `${top}%`, "--pot-color": item.color } as any}
+                        onClick={() => setSetupSelected(i)}
+                        aria-label={`${item.name}: ${item.value}%`}
+                      >
+                        <PotSymbol symbol={potSymbol(item)} />
+                        <span>{item.id === "patrimonio_manuela" ? "Manuela" : item.name.replace("Desfrute ", "")}</span>
+                        <b>{item.value}%</b>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="setup-selected-pot">
+                  <div className="setup-pot-identity">
+                    <PotSymbol symbol={potSymbol(selectedSetupPot)} />
+                    <span>
+                      <small>{potAllocationBase(selectedSetupPot) === "gross" ? "Calculado sobre o aporte bruto" : "Calculado após contas e patrimônios"}</small>
+                      <strong>{selectedSetupPot.id === "patrimonio_manuela" ? "Patrimônio Manuela" : selectedSetupPot.name}</strong>
+                    </span>
+                  </div>
+                  <PercentageControl
+                    label={`${selectedSetupPot.name} percentual`}
+                    value={selectedSetupPot.value}
+                    color={selectedSetupPot.color}
+                    step={2}
+                    amountLabel={preview[selectedSetupPot.id] != null ? cash(preview[selectedSetupPot.id]) : undefined}
+                    maxAllowed={
+                      100 - setupPots
+                        .filter((x, i) =>
+                          i !== setupSelected &&
+                          x.active &&
+                          x.mode === "percent" &&
+                          potAllocationBase(x) === potAllocationBase(selectedSetupPot),
+                        )
+                        .reduce((sum, x) => sum + x.value, 0)
+                    }
+                    onChange={(nextValue) =>
+                      setSetupPots((items) => items.map((x, i) => i === setupSelected ? { ...x, value: nextValue } : x))
+                    }
+                  />
+                </div>
+
+                <div className="setup-carousel-row">
+                  <button
+                    type="button"
+                    className="icon-button carousel-arrow"
+                    aria-label="Pote anterior"
+                    onClick={() => setSetupSelected((setupSelected - 1 + setupPots.length) % setupPots.length)}
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div className="setup-pot-carousel" role="listbox" aria-label="Escolher pote">
+                    {setupPots.map((item, i) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={i === setupSelected}
+                        key={item.id}
+                        className={i === setupSelected ? "selected" : ""}
+                        onClick={() => setSetupSelected(i)}
+                        onPointerDown={(e) => { e.currentTarget.dataset.startY = String(e.clientY); }}
+                        onPointerUp={(e) => {
+                          const startY = Number(e.currentTarget.dataset.startY || e.clientY);
+                          if (startY - e.clientY > 28) setSetupSelected(i);
+                        }}
+                      >
+                        <PotSymbol symbol={potSymbol(item)} />
+                        <span>{item.id === "patrimonio_manuela" ? "Manuela" : item.name}</span>
+                        <b>{item.value}%</b>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button carousel-arrow"
+                    aria-label="Próximo pote"
+                    onClick={() => setSetupSelected((setupSelected + 1) % setupPots.length)}
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+                <small className="muted setup-swipe-hint">Passe pelas opções e arraste um pote para cima para focar nele.</small>
+
+                {Object.keys(preview).length > 0 && (
+                  <div className="allocation-preview setup-preview">
+                    <strong>Como esse aporte será separado</strong>
+                    {Object.entries(preview)
+                      .filter(([, amount]) => amount > 0)
+                      .map(([id, amount]) => (
+                        <div key={id}>
+                          <span>{setupPots.find((x) => x.id === id)?.name || (id === "free" ? "Contas + saldo não alocado" : "Sem distribuição")}</span>
+                          <b>{cash(amount)}</b>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {setupStep === 3 && (
+              <section className="setup-ready" aria-live="polite">
+                <div className="ready-check"><Check size={34} /></div>
+                <span className="eyebrow">PLANO CONFIGURADO</span>
+                <h2>Seu planejamento está pronto.</h2>
+                <p>Patrimônios, contas e potes já foram calculados. Você será levado ao dashboard.</p>
+                <button type="button" className="primary" onClick={close}>Ir para o Dashboard</button>
+              </section>
+            )}
+          </div>
         )}
         {modal.type !== "setup" && modal.type !== "rule" && (
           <Field label={modal.type === "entry" ? "Descrição" : "Nome"}>
@@ -2234,14 +2652,19 @@ function FinanceModal({
               100 -
               f.pots
                 .filter(
-                  (x) => x.active && x.mode === "percent" && x.id !== p?.id,
+                  (x) =>
+                    x.active &&
+                    x.mode === "percent" &&
+                    x.id !== p?.id &&
+                    potAllocationBase(x) === (p ? potAllocationBase(p) : "remainder"),
                 )
                 .reduce((sum, x) => sum + x.value, 0)
             }
+            step={2}
             onChange={(n) => setValue(String(n))}
           />
         ) : (
-          modal.type !== "rule" && (
+          modal.type !== "rule" && modal.type !== "setup" && (
             <Field
               label={
                 modal.type === "pot"
@@ -2265,7 +2688,9 @@ function FinanceModal({
             </Field>
           )
         )}
-        {["entry", "setup", "bill", "goal"].includes(modal.type) && (
+        {((modal.type === "entry" && modal.kind !== "expense") ||
+          modal.type === "bill" ||
+          modal.type === "goal") && (
           <Field
             label={
               modal.type === "bill"
@@ -2284,13 +2709,14 @@ function FinanceModal({
           </Field>
         )}
         {(modal.type === "rule" ||
-          modal.type === "bill" ||
           (modal.type === "entry" && modal.kind !== "income")) && (
           <Field
             label={
               modal.type === "entry" && modal.kind === "transfer"
                 ? "Pote de origem"
-                : "Pote"
+                : modal.type === "entry" && modal.kind === "expense"
+                  ? "De qual pote saiu?"
+                  : "Pote"
             }
           >
             <select
@@ -2300,22 +2726,15 @@ function FinanceModal({
                 setSuggestion("");
               }}
             >
-              {options}
+              {modal.type === "entry" && modal.kind === "expense"
+                ? expenseOptions
+                : modal.type === "entry" && modal.kind === "transfer"
+                  ? transferSourceOptions
+                  : ruleOptions}
             </select>
           </Field>
         )}
         {suggestion && <small className="muted">{suggestion}</small>}
-        {modal.type === "entry" && modal.kind === "expense" && (
-          <Field label="Situação">
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as "paid" | "pending")}
-            >
-              <option value="paid">Pago</option>
-              <option value="pending">Pendente</option>
-            </select>
-          </Field>
-        )}
         {modal.type === "entry" && modal.kind === "transfer" && (
           <>
             <Field label="Pote de destino">
@@ -2325,7 +2744,7 @@ function FinanceModal({
                 onChange={(e) => setDest(e.target.value)}
               >
                 <option value="">Escolha o destino</option>
-                {options}
+                {destinationOptions}
               </select>
             </Field>
             <p className="muted">
@@ -2349,11 +2768,18 @@ function FinanceModal({
           <>
             <Field label="Forma de distribuição">
               <select
-                value={mode}
+                value={p && potAllocationBase(p) === "gross" ? "percent" : mode}
+                disabled={!!p && potAllocationBase(p) === "gross"}
                 onChange={(e) => setMode(e.target.value as "percent" | "fixed")}
               >
-                <option value="percent">Porcentagem do restante</option>
-                <option value="fixed">Valor fixo por aporte</option>
+                <option value="percent">
+                  {p && potAllocationBase(p) === "gross"
+                    ? "Porcentagem do aporte bruto"
+                    : "Porcentagem do restante"}
+                </option>
+                {(!p || potAllocationBase(p) === "remainder") && (
+                  <option value="fixed">Valor fixo por aporte</option>
+                )}
               </select>
             </Field>
             <div
@@ -2428,6 +2854,7 @@ function FinanceModal({
                       priority,
                       active,
                       color: "#13765e",
+                      allocationBase: p ? potAllocationBase(p) : "remainder",
                     },
                   ];
                   const parts = allocate(100000, next);
@@ -2451,7 +2878,7 @@ function FinanceModal({
         )}
         {modal.type === "bill" && (
           <>
-            <Field label="Número de parcelas (0 = mensal contínua)">
+            <Field label="Por quantos meses? (0 = recorrente)">
               <input
                 type="number"
                 min="0"
@@ -2485,10 +2912,15 @@ function FinanceModal({
                 100 -
                 f.pots
                   .filter(
-                    (p) => p.active && p.mode === "percent" && p.id !== g?.pot,
+                    (p) =>
+                      p.active &&
+                      p.mode === "percent" &&
+                      p.id !== g?.pot &&
+                      potAllocationBase(p) === "remainder",
                   )
                   .reduce((sum, p) => sum + p.value, 0)
               }
+              step={2}
               onChange={setGoalPct}
             />
             <Field label="Saldo anterior externo à conta (R$)">
@@ -2505,13 +2937,13 @@ function FinanceModal({
             </div>
           </>
         )}
-        {Object.keys(preview).length > 0 && (
+        {modal.type !== "setup" && Object.keys(preview).length > 0 && (
           <div className="allocation-preview">
             <strong>Distribuição deste aporte</strong>
             {Object.entries(preview).map(([id, v]) => (
               <div key={id}>
                 <span>
-                  {(modal.type === "setup" ? setupPots : existingPolicy).find(
+                  {existingPolicy.find(
                     (p) => p.id === id,
                   )?.name || "Sem distribuição"}
                 </span>
@@ -2520,18 +2952,30 @@ function FinanceModal({
             ))}
           </div>
         )}
-        <footer className="modal-footer">
-          <button type="button" className="secondary" onClick={close}>
-            Cancelar
-          </button>
-          <button className="primary" type="submit" disabled={saving}>
-            {saving
-              ? "Salvando…"
-              : modal.type === "setup"
-                ? "Começar com este aporte"
-                : "Salvar"}
-          </button>
-        </footer>
+        {modal.type === "setup" ? (
+          setupStep < 3 && (
+            <footer className="modal-footer setup-footer">
+              {setupStep === 0 ? (
+                <button type="button" className="secondary" onClick={close}>Cancelar</button>
+              ) : (
+                <button type="button" className="secondary" onClick={() => setSetupStep((s) => Math.max(0, s - 1))}>
+                  <ChevronLeft size={16} /> Voltar
+                </button>
+              )}
+              <button className="primary" type="submit" disabled={saving}>
+                {saving ? "Salvando…" : setupStep === 2 ? "Finalizar planejamento" : "Continuar"}
+                {!saving && <ChevronRight size={16} />}
+              </button>
+            </footer>
+          )
+        ) : (
+          <footer className="modal-footer">
+            <button type="button" className="secondary" onClick={close}>Cancelar</button>
+            <button className="primary" type="submit" disabled={saving}>
+              {saving ? "Salvando…" : "Salvar"}
+            </button>
+          </footer>
+        )}
       </form>
     </ModalShell>
   );
@@ -2590,151 +3034,5 @@ function ResetDialog({
         </footer>
       </form>
     </ModalShell>
-  );
-}
-
-function PaymentDialog({
-  bill,
-  saving,
-  potName,
-  error,
-  close,
-  confirm,
-}: {
-  bill: Entry;
-  saving: boolean;
-  potName: string;
-  error: string;
-  close: () => void;
-  confirm: (cents: number, date: string) => Promise<void>;
-}) {
-  const [value, setValue] = useState(decimal(bill.cents));
-  const [date, setDate] = useState(today());
-  const [validation, setValidation] = useState("");
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (saving) return;
-    setValidation("");
-    try {
-      await confirm(parseMoney(value), date);
-    } catch (err) {
-      setValidation((err as Error).message);
-    }
-  }
-  return (
-    <ModalShell title="Confirmar pagamento" onClose={close}>
-      <form onSubmit={submit}>
-        <p>
-          <strong>{bill.description}</strong>
-        </p>
-        <p className="muted">
-          Vencimento: {displayDate(bill.date)} · Pote: {potName}
-        </p>
-        <Field label="Valor pago (R$)">
-          <input
-            inputMode="decimal"
-            value={value}
-            required
-            disabled={saving}
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </Field>
-        <Field label="Data do pagamento">
-          <input
-            type="date"
-            value={date}
-            max={today()}
-            required
-            disabled={saving}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </Field>
-        <p className="muted">
-          O pagamento desconta do saldo do pote e retira a conta dos
-          compromissos, sem descontar duas vezes.
-        </p>
-        {(validation || error) && (
-          <div className="notice danger" role="alert">
-            {validation || error}
-          </div>
-        )}
-        <button className="primary" type="submit" disabled={saving}>
-          {saving ? "Salvando…" : "Confirmar pagamento"}
-        </button>
-        <button
-          className="text-button"
-          type="button"
-          disabled={saving}
-          onClick={close}
-        >
-          Cancelar
-        </button>
-      </form>
-    </ModalShell>
-  );
-}
-
-function CofferCard({
-  pot,
-  balance,
-  received,
-  committed,
-  cash,
-  onEdit,
-  onAdd,
-}: {
-  pot: Pot;
-  balance: number;
-  received: number;
-  committed: number;
-  cash: (v: number) => string;
-  onEdit: () => void;
-  onAdd: () => void;
-}) {
-  const child =
-    pot.id.includes("manuela") || pot.name.toLowerCase().includes("manuela");
-  return (
-    <article className={`coffer-card ${child ? "coffer-child" : ""}`}>
-      <header>
-        <span className="coffer-emblem">
-          <PotSymbol symbol="pig" />
-        </span>
-        <div>
-          <span className="eyebrow">
-            {child ? "FUTURO DA MANUELA" : "FUTURO DA FAMÍLIA"}
-          </span>
-          <h3>{pot.name}</h3>
-        </div>
-        <button
-          className="icon-button"
-          aria-label={`Configurar cofrinho ${pot.name}`}
-          onClick={onEdit}
-        >
-          <Pencil size={16} />
-        </button>
-      </header>
-      <span className="coffer-label">Valor guardado</span>
-      <strong className="coffer-balance">{cash(balance)}</strong>
-      <div className="coffer-month">
-        <span>Recebeu neste mês</span>
-        <b>{cash(received)}</b>
-      </div>
-      {committed > 0 && (
-        <p className="muted">
-          {cash(committed)} comprometidos em contas até este mês.
-        </p>
-      )}
-      <footer>
-        <span className="coffer-rule">
-          <ShieldCheck size={15} />
-          {pot.mode === "percent"
-            ? `${pot.value}% de cada aporte após valores fixos`
-            : `${money(Math.round(pot.value * 100))} por aporte, conforme saldo`}
-        </span>
-        <button className="text-button" onClick={onAdd}>
-          Guardar mais <Plus size={15} />
-        </button>
-      </footer>
-    </article>
   );
 }

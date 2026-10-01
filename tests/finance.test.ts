@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   empty,
   allocate,
+  allocateContribution,
   balances,
   entry,
   migrate,
@@ -13,6 +14,8 @@ import {
   parseMoney,
   today,
   Pot,
+  validatePots,
+  pendingCommitmentsForMonth,
 } from "../src/finance/model";
 const pot = (id: string, value: number, extra: Partial<Pot> = {}): Pot => ({
   id,
@@ -25,6 +28,43 @@ const pot = (id: string, value: number, extra: Partial<Pot> = {}): Pot => ({
   active: true,
   color: "#000000",
   ...extra,
+});
+
+test("aporte bruto separa patrimônios, contas e só então distribui os demais potes", () => {
+  const pots = [
+    pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
+    pot("patrimonio_manuela", 5, { reserve: true, allocationBase: "gross" }),
+    pot("mercado", 60, { allocationBase: "remainder" }),
+    pot("transporte", 40, { allocationBase: "remainder" }),
+  ];
+  const a = allocateContribution(300000, pots, 80000);
+  assert.equal(a.nosso_patrimonio, 30000);
+  assert.equal(a.patrimonio_manuela, 15000);
+  assert.equal(a.mercado, 105000);
+  assert.equal(a.transporte, 70000);
+  assert.equal(a.free, 80000);
+  assert.equal(Object.values(a).reduce((sum, cents) => sum + cents, 0), 300000);
+});
+
+test("percentuais são validados por base e compromissos pendentes podem ser calculados no mês", () => {
+  assert.throws(() =>
+    validatePots([
+      pot("nosso_patrimonio", 60, { reserve: true, allocationBase: "gross" }),
+      pot("patrimonio_manuela", 42, { reserve: true, allocationBase: "gross" }),
+    ]),
+  );
+  assert.throws(() =>
+    validatePots([
+      pot("a", 60, { allocationBase: "remainder" }),
+      pot("b", 42, { allocationBase: "remainder" }),
+    ]),
+  );
+  const f = empty();
+  f.entries = [
+    entry({ kind: "expense", cents: 30000, date: "2026-09-10", description: "Aluguel", status: "pending", pot: "free" }, f.pots),
+    entry({ kind: "expense", cents: 10000, date: "2026-10-10", description: "Internet", status: "pending", pot: "free" }, f.pots),
+  ];
+  assert.equal(pendingCommitmentsForMonth(f, "2026-09-20"), 30000);
 });
 test("aporte uma vez; reservas não retiram dinheiro da conta; gasto pago e pendência têm efeitos distintos", () => {
   const f = empty();
