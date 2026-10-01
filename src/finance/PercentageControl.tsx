@@ -6,7 +6,7 @@ export function PercentageControl({
   onChange,
   maxAllowed = 100,
   color = "#8296bb",
-  step = 2,
+  step = 1,
   amountLabel,
 }: {
   label: string;

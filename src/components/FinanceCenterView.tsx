@@ -1964,7 +1964,7 @@ function FinanceModal({
     structuredClone(f.pots).map((p) => ({
       ...p,
       mode: "percent" as const,
-      value: Math.max(0, Math.min(100, Math.round(p.value / 2) * 2)),
+      value: Math.max(0, Math.min(100, Math.round(p.value))),
       allocationBase: potAllocationBase(p),
     })),
   );
@@ -2488,7 +2488,7 @@ function FinanceModal({
                   <span className="setup-icon"><Target size={21} /></span>
                   <div>
                     <h3>Monte o seu plano financeiro</h3>
-                    <p>Use as setas para trocar de pote e arraste o marcador ao redor do círculo. As porcentagens avançam de 2 em 2.</p>
+                    <p>Use as setas para trocar de pote e arraste o marcador ao redor do círculo. As porcentagens avançam de 1 em 1.</p>
                   </div>
                 </div>
 
@@ -2535,7 +2535,7 @@ function FinanceModal({
                     label={`${selectedSetupPot.name} percentual`}
                     value={selectedSetupPot.value}
                     color={selectedSetupPot.color}
-                    step={2}
+                    step={1}
                     amountLabel={preview[selectedSetupPot.id] != null ? cash(preview[selectedSetupPot.id]) : undefined}
                     maxAllowed={
                       100 - setupPots
@@ -2665,7 +2665,7 @@ function FinanceModal({
                 )
                 .reduce((sum, x) => sum + x.value, 0)
             }
-            step={2}
+            step={1}
             onChange={(n) => setValue(String(n))}
           />
         ) : (
@@ -2925,7 +2925,7 @@ function FinanceModal({
                   )
                   .reduce((sum, p) => sum + p.value, 0)
               }
-              step={2}
+              step={1}
               onChange={setGoalPct}
             />
             <Field label="Saldo anterior externo à conta (R$)">
