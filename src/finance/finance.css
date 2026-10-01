@@ -1975,14 +1975,14 @@ button {
 }
 
 .patrimony-strip {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  margin: 0 0 18px;
-  overflow: hidden;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
 }
+
+.two-columns {
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+  gap: 18px;
+}
+
 .patrimony-strip > div {
   display: grid;
   grid-template-columns: 36px 1fr 24px;
