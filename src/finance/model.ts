@@ -2,9 +2,9 @@ export type Actor = "voce" | "esposa";
 export type RecordActor = Actor | "sistema" | "anterior";
 export const actorName = (actor?: RecordActor) =>
   actor === "voce"
-    ? "Você"
+    ? "Rhuan"
     : actor === "esposa"
-      ? "Esposa"
+      ? "Anne"
       : actor === "sistema"
         ? "Sistema"
         : "Registro anterior";

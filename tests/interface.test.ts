@@ -224,45 +224,28 @@ test("interface: conta recorrente gera pendência, pagamento afeta saldo e trans
   }
 });
 
-test("interface: escolha de perfil e senha numérica, sem acesso Google", async () => {
+test("interface: escolha direta entre Rhuan e Anne, sem senha e sem acesso Google", async () => {
   const dom = await openApp(null);
   try {
     assert.match(dom.window.document.body.textContent || "", /Quem está/);
     assert.doesNotMatch(dom.window.document.body.textContent || "", /Google/);
+    assert.doesNotMatch(dom.window.document.body.textContent || "", /Senha numérica/);
+    assert.match(dom.window.document.body.textContent || "", /Rhuan/);
+    assert.match(dom.window.document.body.textContent || "", /Anne/);
     (
       dom.window.document.querySelector(
         ".profile-picker button:nth-child(2)",
       ) as HTMLElement
     ).click();
     await sleep();
-    fill(dom, "Senha numérica", "111");
-    await sleep();
-    dom.window.document
-      .querySelector("form")!
-      .dispatchEvent(
-        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
-      );
-    await sleep();
-    assert.match(
-      dom.window.document.body.textContent || "",
-      /quatro números da senha/,
-    );
-    fill(dom, "Senha numérica", "5729");
-    await sleep();
-    dom.window.document
-      .querySelector("form")!
-      .dispatchEvent(
-        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
-      );
-    await sleep();
     await sleep();
     assert.match(
       dom.window.document.querySelector(".account-chip")?.textContent || "",
-      /Esposa/,
+      /Anne/,
     );
     click(dom, "Registrar aporte");
     await sleep();
-    fill(dom, "Descrição", "Aporte da esposa");
+    fill(dom, "Descrição", "Aporte da Anne");
     fill(dom, "Valor (R$)", "100,00");
     await sleep();
     dom.window.document
@@ -274,11 +257,11 @@ test("interface: escolha de perfil e senha numérica, sem acesso Google", async 
     await sleep();
     const f = JSON.parse(dom.window.localStorage.getItem("imperio_demo")!);
     assert.equal(
-      f.entries.find((e: any) => e.description === "Aporte da esposa")
+      f.entries.find((e: any) => e.description === "Aporte da Anne")
         .createdBy,
       "esposa",
     );
-    assert.match(dom.window.document.body.textContent || "", /Por Esposa/);
+    assert.match(dom.window.document.body.textContent || "", /Por Anne/);
     (
       dom.window.document.querySelector(
         '[aria-label="Trocar perfil"]',
@@ -336,7 +319,7 @@ test("interface: edição pela esposa preserva autor original e identifica últi
     assert.equal(e.updatedBy, "esposa");
     assert.match(
       second.window.document.body.textContent || "",
-      /Última alteração: Esposa/,
+      /Última alteração: Anne/,
     );
   } finally {
     second.window.close();

@@ -4,11 +4,11 @@ Entrega: 30/09/2026, versão 2.1.
 
 Meu Império Financeiro, código GitHub, hospedagem Vercel, dados Firebase. Base: ZIP original do minerador, commit de origem `e8e57f0c25df595e8f53ba071321984bf319bc1d`.
 
-Escopo autorizado: melhorar primeiro o financeiro; aporte único com data; preservar configuração inicial; automatizações, novo design, sem Google; escolha Você/Esposa com senha numérica; autoria no extrato; tema escuro mais neutro; prioridade de uso iOS; símbolos com volume nos potes; sliders de porcentagem; reset para reconfigurar do zero.
+Escopo autorizado: melhorar primeiro o financeiro; aporte único com data; preservar configuração inicial; automatizações, novo design, sem Google; escolha Rhuan/Anne sem senha; autoria no extrato; tema escuro mais neutro; prioridade de uso iOS; símbolos com volume nos potes; sliders de porcentagem; reset para reconfigurar do zero.
 
-Senha real: somente na variável APP_PIN da Vercel. Chave administrativa Firebase: somente na variável FIREBASE_SERVICE_ACCOUNT_JSON da Vercel. Nenhum valor privado fica cadastrado neste documento.
+Chave administrativa Firebase: somente na variável FIREBASE_SERVICE_ACCOUNT_JSON da Vercel. O app não usa senha de acesso. Nenhum valor privado fica cadastrado neste documento.
 
-Sessões: `imperio-familia-voce` e `imperio-familia-esposa`, com claims familyFinance e actor. Perfil representa a seleção feita no login, já que a senha é compartilhada. Identificação anterior desconhecida fica marcada como anterior; pendências geradas automaticamente como sistema.
+Sessões: `imperio-familia-voce` e `imperio-familia-esposa`, com claims familyFinance e actor. Perfil representa a seleção Rhuan/Anne feita na entrada. Identificação anterior desconhecida fica marcada como anterior; pendências geradas automaticamente como sistema.
 
 Dados: `imperio_finance/familia_imperio`, estrutura `financeV2`, valores inteiros em centavos, política registrada por aporte. Reset preserva snapshot em `imperio_finance_backups` antes da substituição. Campos legados permanecem intactos e não são reutilizados depois de um reset v2.
 

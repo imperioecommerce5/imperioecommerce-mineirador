@@ -593,7 +593,7 @@ export default function FinanceCenterView({
               onClick={() => setView("profile")}
               aria-label="Abrir meu perfil financeiro"
             >
-              <span className="avatar">{actor === "voce" ? "V" : "E"}</span>
+              <span className="avatar">{actor === "voce" ? "R" : "A"}</span>
               <span>{actorName(actor)}</span>
             </button>
           </div>
@@ -953,8 +953,8 @@ export default function FinanceCenterView({
                   onChange={(e) => setActorFilter(e.target.value)}
                 >
                   <option value="all">Todos os perfis</option>
-                  <option value="voce">Você</option>
-                  <option value="esposa">Esposa</option>
+                  <option value="voce">Rhuan</option>
+                  <option value="esposa">Anne</option>
                   <option value="sistema">Sistema</option>
                 </select>
                 <label className="checkbox">

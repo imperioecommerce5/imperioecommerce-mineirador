@@ -1,6 +1,6 @@
 # Meu Império Financeiro — versão 2.2
 
-Financeiro familiar com aporte único, potes, metas, contas e extrato. Esta versão prioriza o uso no iPhone e substitui o login Google pelo acesso com perfil e senha numérica.
+Financeiro familiar com aporte único, potes, metas, contas e extrato. O acesso é direto por perfil: Rhuan ou Anne, sem senha, mantendo a autoria de cada movimentação.
 
 ## Mudanças desta versão
 
@@ -15,11 +15,11 @@ Financeiro familiar com aporte único, potes, metas, contas e extrato. Esta vers
 - Tema escuro mantém a identidade, mas usa grafite, azul e verde/sálvia para criar hierarquia entre fundos, cartões e ações.
 - Microanimações em dashboard, potes, perfil e finalização do planejamento; respeita `prefers-reduced-motion`.
 - A barra inferior móvel permanece com a mesma estrutura de navegação. O perfil é acessado pelo chip do usuário no topo.
-- Escolha de perfil Você / Sua esposa e senha numérica validada no servidor, autoria de movimentações, backup e reset recuperável continuam preservados.
+- Escolha direta entre Rhuan e Anne, sem senha; autoria de movimentações, backup e reset recuperável continuam preservados.
 
 ## Como publicar
 
-Leia primeiro **CONFIGURAR-ACESSO.md**. Esta atualização exige duas variáveis privadas na Vercel, APP_PIN e FIREBASE_SERVICE_ACCOUNT_JSON, além das regras Firestore novas. Não publique esperando que o login Google ou o PIN do código antigo continuem funcionando.
+Leia primeiro **CONFIGURAR-ACESSO.md**. Esta atualização usa somente `FIREBASE_SERVICE_ACCOUNT_JSON` na Vercel para criar as sessões dos perfis Rhuan e Anne. `APP_PIN` não é mais necessário.
 
 Guarde a versão anterior e exporte o documento `imperio_finance/familia_imperio` pela sua rotina de backup antes de atualizar. Coloque os conteúdos desta pasta na raiz do repositório existente. A Vercel usa Vite, `npm ci`, `npm run build` e saída `dist`; a rota `/api/login` é atendida pela função de servidor, sem ser reescrita para a página principal.
 
@@ -82,7 +82,7 @@ Não foram testados nesta entrega: emissão real de tokens com sua conta de serv
 
 - `src/App.tsx`: perfil e login numérico.
 - `api/login.ts`: função Vercel e autenticação Firebase por token personalizado.
-- `server/login-handler.ts`: validação de senha, origem e limite de tentativas.
+- `server/login-handler.ts`: validação do perfil e da origem antes de emitir a sessão Firebase.
 - `src/finance/model.ts`: cálculos, migração, autoria e reset.
 - `src/finance/useFinance.ts`: sincronização, transações e cópias de reset.
 - `src/finance/PotSymbol.tsx`: símbolos vetoriais com volume.
