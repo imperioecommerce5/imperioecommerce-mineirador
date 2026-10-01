@@ -33,10 +33,12 @@ export default function App() {
           body: JSON.stringify({ profile }),
           credentials: "same-origin",
         });
-        const data = await response.json().catch(() => ({
-          error:
-            "O acesso aos perfis não está disponível. Confira a configuração na Vercel.",
-        }));
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json"))
+          throw new Error(
+            "A função de acesso não respondeu corretamente. Faça um novo deploy desta versão na Vercel.",
+          );
+        const data = await response.json();
         if (!response.ok || !data.token)
           throw new Error(data.error || "Não foi possível entrar.");
         await setPersistence(auth, browserSessionPersistence);

@@ -2,6 +2,13 @@
 
 O acesso não usa senha. Na tela inicial há apenas dois perfis: **Rhuan** e **Anne**. Ao tocar em um deles, o servidor cria uma sessão Firebase específica para aquele perfil. As duas pessoas acessam o mesmo planejamento e cada movimentação registra quem fez a ação.
 
+
+## Correção da versão 2.4
+
+A versão 2.4 remove o rewrite genérico da SPA que podia fazer `/api/login` responder com `index.html` em vez da função da Vercel. O acesso continua sem senha e usa apenas a variável `FIREBASE_SERVICE_ACCOUNT_JSON`.
+
+Se a tela disser que a função de acesso não respondeu corretamente, publique novamente esta versão e confirme em **Vercel → Functions** que existe uma função em `/api/login`.
+
 ## Variável necessária
 
 Na Vercel, mantenha somente a variável privada:

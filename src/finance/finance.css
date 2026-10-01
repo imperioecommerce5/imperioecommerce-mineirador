@@ -3117,3 +3117,83 @@ button {
     font-size: 14px;
   }
 }
+
+/* v2.4 — círculo garantido e controles contidos dentro do pote */
+.pot-card {
+  width: min(100%, 286px) !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  box-sizing: border-box;
+  overflow: hidden !important;
+  min-width: 0;
+  min-height: 0;
+}
+.pot-card header {
+  top: 22px;
+  left: 48px;
+  right: 48px;
+  width: auto;
+}
+.pot-card .pot-edit-button {
+  position: absolute;
+  z-index: 4;
+  top: 32px;
+  right: 40px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--surface) 86%, var(--soft));
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 10px rgba(28, 43, 37, .08);
+}
+.pot-card .pot-edit-button svg {
+  width: 13px;
+  height: 13px;
+}
+.pot-card .pot-art,
+.pot-card h3,
+.pot-card > strong,
+.pot-card > small,
+.pot-card .spending-bar,
+.pot-card footer {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 800px),
+  (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .pot-card {
+    width: min(100%, 206px) !important;
+    border-radius: 50% !important;
+  }
+  .pot-card header {
+    top: 12px;
+    left: 34px;
+    right: 34px;
+  }
+  .pot-card .pot-edit-button {
+    top: 22px;
+    right: 25px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+  }
+}
+
+@media (max-width: 390px) {
+  .pot-card .pot-edit-button {
+    top: 18px;
+    right: 20px;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    min-height: 26px;
+  }
+}

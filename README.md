@@ -1,4 +1,4 @@
-# Meu Império Financeiro — versão 2.2
+# Meu Império Financeiro — versão 2.4
 
 Financeiro familiar com aporte único, potes, metas, contas e extrato. O acesso é direto por perfil: Rhuan ou Anne, sem senha, mantendo a autoria de cada movimentação.
 
@@ -19,7 +19,7 @@ Financeiro familiar com aporte único, potes, metas, contas e extrato. O acesso 
 
 ## Como publicar
 
-Leia primeiro **CONFIGURAR-ACESSO.md**. Esta atualização usa somente `FIREBASE_SERVICE_ACCOUNT_JSON` na Vercel para criar as sessões dos perfis Rhuan e Anne. `APP_PIN` não é mais necessário.
+Leia primeiro **CONFIGURAR-ACESSO.md**. Esta atualização usa somente `FIREBASE_SERVICE_ACCOUNT_JSON` na Vercel para criar as sessões dos perfis Rhuan e Anne. `APP_PIN` não é mais necessário. A configuração de SPA que podia interceptar `/api/login` foi removida, pois o aplicativo não usa rotas por pathname; assim a função de login fica livre para ser atendida pela Vercel.
 
 Guarde a versão anterior e exporte o documento `imperio_finance/familia_imperio` pela sua rotina de backup antes de atualizar. Coloque os conteúdos desta pasta na raiz do repositório existente. A Vercel usa Vite, `npm ci`, `npm run build` e saída `dist`; a rota `/api/login` é atendida pela função de servidor, sem ser reescrita para a página principal.
 

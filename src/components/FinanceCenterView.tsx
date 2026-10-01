@@ -1852,14 +1852,14 @@ function PotCard({
             ? `${p.value}%`
             : money(Math.round(p.value * 100)) + " / aporte"}
         </span>
-        <button
-          className="icon-button"
-          aria-label={`Editar ${p.name}`}
-          onClick={onEdit}
-        >
-          <Pencil size={14} />
-        </button>
       </header>
+      <button
+        className="icon-button pot-edit-button"
+        aria-label={`Editar ${p.name}`}
+        onClick={onEdit}
+      >
+        <Pencil size={14} />
+      </button>
       <div className="pot-art">
         <PotSymbol symbol={potSymbol(p)} />
         <span className="pot-percentage">
