@@ -40,7 +40,12 @@ export default function App() {
           );
         const data = await response.json();
         if (!response.ok || !data.token)
-          throw new Error(data.error || "Não foi possível entrar.");
+          throw new Error(
+            data.error ||
+              (response.status === 503
+                ? "Este deploy não recebeu a configuração de acesso do Firebase."
+                : "Não foi possível entrar."),
+          );
         await setPersistence(auth, browserSessionPersistence);
         await signInWithCustomToken(auth, data.token);
       }

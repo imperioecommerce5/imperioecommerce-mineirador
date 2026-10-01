@@ -19,7 +19,7 @@ Financeiro familiar com aporte único, potes, metas, contas e extrato. O acesso 
 
 ## Como publicar
 
-Leia primeiro **CONFIGURAR-ACESSO.md**. Esta atualização usa somente `FIREBASE_SERVICE_ACCOUNT_JSON` na Vercel para criar as sessões dos perfis Rhuan e Anne. `APP_PIN` não é mais necessário. A configuração de SPA que podia interceptar `/api/login` foi removida, pois o aplicativo não usa rotas por pathname; assim a função de login fica livre para ser atendida pela Vercel.
+Leia primeiro **CONFIGURAR-ACESSO.md**. A versão final mantém o acesso direto por Rhuan ou Anne, sem senha. O backend aceita `FIREBASE_SERVICE_ACCOUNT_JSON` e nomes alternativos documentados em **CONFIGURAR-ACESSO.md**. Publique no mesmo projeto Vercel que já contém a credencial; projetos novos não herdam variáveis privadas automaticamente.
 
 Guarde a versão anterior e exporte o documento `imperio_finance/familia_imperio` pela sua rotina de backup antes de atualizar. Coloque os conteúdos desta pasta na raiz do repositório existente. A Vercel usa Vite, `npm ci`, `npm run build` e saída `dist`; a rota `/api/login` é atendida pela função de servidor, sem ser reescrita para a página principal.
 
@@ -74,7 +74,7 @@ npm run dev
 
 `npm run test` compila e executa os testes financeiros, do fluxo de login e da interface em DOM simulado. `npm run demo` cria `demonstracao.html` com dados fictícios. O Vite local não fornece `/api/login`; use `vercel dev` com as variáveis privadas para testar o backend completo ou uma implantação Preview da Vercel. Para testar apenas as telas no Vite, use `?demo=1`.
 
-Verificações: autoria, edição por outro perfil, PIN inválido, perfil inválido, limite de tentativas, origem recusada, ausência de configuração, sliders, reset/recuperação, centavos, migração, transferências e recorrências. A validação do backend usou serviços simulados, sem acessar a base de produção.
+Verificações existentes cobrem autoria, perfil inválido, ausência de configuração, sliders, reset/recuperação, centavos, migração, transferências e recorrências. Esta revisão final também recebeu validação sintática dos arquivos TypeScript/TSX alterados; o backend não acessou a base de produção durante a preparação do pacote.
 
 Não foram testados nesta entrega: emissão real de tokens com sua conta de serviço, regras no seu projeto, transações na base de produção e interface em navegador gráfico. Nenhum deploy foi realizado.
 

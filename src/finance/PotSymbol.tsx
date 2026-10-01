@@ -77,8 +77,13 @@ export function PotSymbol({
           <stop stopColor="#0a1225" stopOpacity=".26" />
           <stop offset="1" stopColor="#0a1225" stopOpacity="0" />
         </radialGradient>
+        <filter id={`${id}-premium`} x="-28%" y="-28%" width="156%" height="170%" colorInterpolationFilters="sRGB">
+          <feDropShadow dx="0" dy="4" stdDeviation="3.2" floodColor="#07121c" floodOpacity=".30" />
+          <feDropShadow dx="-1" dy="-1" stdDeviation="1.1" floodColor="#ffffff" floodOpacity=".22" />
+        </filter>
       </defs>
-      <ellipse cx="61" cy="96" rx="43" ry="9" fill={ref("shadow")} />
+      <ellipse cx="61" cy="97" rx="42" ry="8" fill={ref("shadow")} opacity=".82" />
+      <g filter={ref("premium")} className="pot-symbol-object">
       {symbol === "pig" && (
         <g>
           <path
@@ -362,6 +367,7 @@ export function PotSymbol({
           />
         </g>
       ) : null}
+      </g>
     </svg>
   );
 }

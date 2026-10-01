@@ -1,34 +1,27 @@
-# Configurar o acesso por perfil na Vercel
+# Acesso por perfil — versão final
 
-O acesso não usa senha. Na tela inicial há apenas dois perfis: **Rhuan** e **Anne**. Ao tocar em um deles, o servidor cria uma sessão Firebase específica para aquele perfil. As duas pessoas acessam o mesmo planejamento e cada movimentação registra quem fez a ação.
+O aplicativo não pede senha. Na entrada existem somente os perfis **Rhuan** e **Anne**. O perfil selecionado é gravado como autor das movimentações e os dois acessam o mesmo planejamento no Firebase.
 
+## Importante ao publicar na Vercel
 
-## Correção da versão 2.4
+Publique a atualização **no mesmo projeto Vercel que já está funcionando com o Firebase**. Criar um projeto Vercel diferente não copia automaticamente as variáveis privadas do projeto anterior.
 
-A versão 2.4 remove o rewrite genérico da SPA que podia fazer `/api/login` responder com `index.html` em vez da função da Vercel. O acesso continua sem senha e usa apenas a variável `FIREBASE_SERVICE_ACCOUNT_JSON`.
+O backend da versão final procura a credencial nestes nomes, nesta ordem:
 
-Se a tela disser que a função de acesso não respondeu corretamente, publique novamente esta versão e confirme em **Vercel → Functions** que existe uma função em `/api/login`.
+- `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `FIREBASE_SERVICE_ACCOUNT`
+- `FIREBASE_SERVICE`
+- `GOOGLE_SERVICE_ACCOUNT_JSON`
 
-## Variável necessária
+Se você já usa `FIREBASE_SERVICE_ACCOUNT_JSON`, não precisa trocar o conteúdo da variável.
 
-Na Vercel, mantenha somente a variável privada:
+A função `/api/login` foi reescrita como função Node padrão da Vercel. Ela aceita o JSON da conta de serviço normal, JSON salvo como string e também JSON em Base64.
 
-- `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON completo da conta de serviço do projeto Firebase `imperioecommerce-mineirador`.
+## Como conferir depois do deploy
 
-A variável `APP_PIN` não é mais usada e pode ser removida da Vercel.
+1. Abra **Vercel → seu projeto existente → Settings → Environment Variables** e confirme que a variável de serviço continua presente para o ambiente em que você publicou.
+2. Em **Functions**, confirme a rota `/api/login`.
+3. Abra o app e toque em **Rhuan** ou **Anne**. Não existe PIN ou senha.
+4. Registre uma movimentação como Rhuan, saia, entre como Anne e confira no extrato a autoria.
 
-## Como a autoria funciona
-
-Internamente os perfis continuam usando os identificadores `voce` e `esposa` para manter compatibilidade com o histórico existente. Na interface eles aparecem como **Rhuan** e **Anne**. Assim, lançamentos antigos continuam válidos e os novos extratos mostram os nomes corretos.
-
-As sessões Firebase continuam sendo `imperio-familia-voce` e `imperio-familia-esposa`, com as claims `familyFinance` e `actor` exigidas pelas regras do Firestore.
-
-## Teste depois do deploy
-
-1. Entre como Rhuan e registre uma movimentação de teste.
-2. Saia do perfil.
-3. Entre como Anne.
-4. Confira se o mesmo extrato aparece e se a autoria da movimentação mostra Rhuan.
-5. Registre outra movimentação como Anne e confira a identificação.
-
-A demonstração `?demo=1` usa dados fictícios locais e também entra apenas tocando em Rhuan ou Anne.
+As sessões Firebase continuam usando `imperio-familia-voce` e `imperio-familia-esposa`, preservando compatibilidade com os dados e regras existentes.

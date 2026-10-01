@@ -1,4 +1,5 @@
 import { PotSymbol, potSymbol, symbols } from "../finance/PotSymbol";
+import { AnimatedMoney } from "../finance/AnimatedMoney";
 import { PercentageControl } from "../finance/PercentageControl";
 import { storage } from "../finance/storage";
 import { useMemo, useState, FormEvent, useEffect, useRef } from "react";
@@ -687,7 +688,7 @@ export default function FinanceCenterView({
               <section className="balance-grid">
                 <div className="balance-main">
                   <span className="eyebrow">LIVRE PARA GASTAR</span>
-                  <strong>{cash(b.free)}</strong>
+                  <AnimatedMoney cents={b.free} hidden={hidden} tag="strong" />
                   <p>
                     Saldo em conta menos reservas e contas pendentes até este
                     mês.
@@ -699,28 +700,28 @@ export default function FinanceCenterView({
                 </div>
                 <div className="balance-card">
                   <span>Saldo em conta</span>
-                  <strong>{cash(b.account)}</strong>
+                  <AnimatedMoney cents={b.account} hidden={hidden} tag="strong" />
                   <small>Entradas menos pagamentos realizados</small>
                   <hr />
                   <div>
                     <span>Reservado nos potes</span>
-                    <b>{cash(b.reserved)}</b>
+                    <AnimatedMoney cents={b.reserved} hidden={hidden} tag="b" />
                   </div>
                   <div>
                     <span>Contas pendentes até este mês</span>
-                    <b>{cash(b.pending)}</b>
+                    <AnimatedMoney cents={b.pending} hidden={hidden} tag="b" />
                   </div>
                 </div>
               </section>
               <section className="patrimony-strip" aria-label="Patrimônios protegidos">
                 <div>
                   <span className="patrimony-icon"><PiggyBank size={18} /></span>
-                  <span><small>Nosso Patrimônio</small><strong>{cash(Math.max(0, b.buckets.nosso_patrimonio || 0))}</strong></span>
+                  <span><small>Nosso Patrimônio</small><AnimatedMoney cents={Math.max(0, b.buckets.nosso_patrimonio || 0)} hidden={hidden} tag="strong" /></span>
                   <ShieldCheck size={16} />
                 </div>
                 <div>
                   <span className="patrimony-icon"><PiggyBank size={18} /></span>
-                  <span><small>Patrimônio Manuela</small><strong>{cash(Math.max(0, b.buckets.patrimonio_manuela || 0))}</strong></span>
+                  <span><small>Patrimônio Manuela</small><AnimatedMoney cents={Math.max(0, b.buckets.patrimonio_manuela || 0)} hidden={hidden} tag="strong" /></span>
                   <ShieldCheck size={16} />
                 </div>
               </section>
@@ -735,7 +736,7 @@ export default function FinanceCenterView({
                     <span className="surplus-icon"><Sparkles size={18} /></span>
                     <div>
                       <small>SALDO NÃO ALOCADO</small>
-                      <strong>{cash(unallocated)}</strong>
+                      <AnimatedMoney cents={unallocated} hidden={hidden} tag="strong" />
                       <p>Esse valor ainda não tem destino. Você decide se quer guardar, usar em uma meta ou manter livre.</p>
                     </div>
                   </div>
@@ -879,6 +880,7 @@ export default function FinanceCenterView({
                             .reduce((s, e) => s + e.cents, 0)
                     }
                     cash={cash}
+                    hidden={hidden}
                     onEdit={() => open({ type: "pot", existing: p })}
                   />
                 ))}
@@ -1073,6 +1075,7 @@ export default function FinanceCenterView({
                             .reduce((s, e) => s + e.cents, 0)
                     }
                     cash={cash}
+                    hidden={hidden}
                     onEdit={() => open({ type: "pot", existing: p })}
                   />
                 ))}
@@ -1830,6 +1833,7 @@ function PotCard({
   funded,
   spent,
   cash,
+  hidden,
   onEdit,
 }: {
   pot: Pot;
@@ -1837,6 +1841,7 @@ function PotCard({
   funded: number;
   spent: number;
   cash: (v: number) => string;
+  hidden: boolean;
   onEdit: () => void;
 }) {
   const budget = balance + spent;
@@ -1867,7 +1872,7 @@ function PotCard({
         </span>
       </div>
       <h3>{p.name}</h3>
-      <strong>{cash(balance)}</strong>
+      <AnimatedMoney cents={balance} hidden={hidden} tag="strong" />
       <small>{p.reserve ? "Reservado" : "Disponível no pote"}</small>
       <div className="spending-bar">
         <span

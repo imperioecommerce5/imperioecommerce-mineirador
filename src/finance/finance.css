@@ -3197,3 +3197,248 @@ button {
     min-height: 26px;
   }
 }
+
+/* Final polish — only the approved adjustments: pot controls, premium symbols, iPad and motion. */
+.pot-card .pot-edit-button {
+  top: 38px;
+  right: 48px;
+  box-shadow: 0 5px 16px rgba(20, 35, 31, .10);
+}
+.pot-card .pot-edit-button:hover {
+  transform: translateY(-1px);
+}
+.pot-card .pot-symbol {
+  overflow: visible;
+  filter: saturate(1.06) contrast(1.03);
+  transform: translateZ(0);
+}
+.pot-card .pot-art {
+  overflow: visible;
+}
+.dark .pot-card .pot-symbol {
+  filter: saturate(1.08) brightness(1.04) contrast(1.03);
+}
+
+@media (max-width: 800px),
+  (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .pot-card .pot-edit-button {
+    top: 24px;
+    right: 36px;
+  }
+}
+
+@media (max-width: 390px) {
+  .pot-card .pot-edit-button {
+    top: 20px;
+    right: 32px;
+  }
+}
+
+/* iPad / touch tablet layout: preserve the current visual identity and bottom navigation. */
+@media (min-width: 768px) and (max-width: 1366px) and (hover: none) and (pointer: coarse) {
+  .sidebar {
+    display: none;
+  }
+  .main-shell {
+    margin-left: 0;
+  }
+  .topbar {
+    height: calc(68px + env(safe-area-inset-top));
+    padding-left: max(30px, env(safe-area-inset-left));
+    padding-right: max(30px, env(safe-area-inset-right));
+  }
+  .breadcrumb {
+    display: none;
+  }
+  .mobile-brand {
+    display: block;
+    font-family: "Manrope", sans-serif;
+    letter-spacing: 2px;
+    font-size: 16px;
+    font-weight: 800;
+  }
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 20;
+    padding: 10px max(22px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+  }
+  .mobile-nav button {
+    min-height: 52px;
+    background: transparent;
+    color: var(--muted);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 10px;
+  }
+  .mobile-nav button.active {
+    color: var(--green);
+  }
+  .content {
+    width: 100%;
+    max-width: 1180px;
+    padding: 30px max(30px, env(safe-area-inset-right)) calc(120px + env(safe-area-inset-bottom)) max(30px, env(safe-area-inset-left));
+  }
+  .page-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+    margin-bottom: 28px;
+  }
+  .heading-actions {
+    max-width: none;
+    margin-top: 0;
+    flex-wrap: nowrap;
+  }
+  .heading-actions button {
+    width: auto;
+    min-width: 168px;
+  }
+  .balance-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    gap: 18px;
+  }
+  .balance-main,
+  .balance-card {
+    min-height: 190px;
+    padding: 25px 27px;
+  }
+  .balance-main > strong {
+    font-size: clamp(34px, 4.6vw, 44px);
+  }
+  .patrimony-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+  .patrimony-strip > div + div {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+  .two-columns {
+    grid-template-columns: 1.05fr .95fr;
+    gap: 18px;
+  }
+  .pot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .pot-card {
+    width: min(100%, 226px) !important;
+    padding: 20px 17px 16px;
+  }
+  .pot-card header {
+    top: 14px;
+    left: 38px;
+    right: 38px;
+  }
+  .pot-card .pot-edit-button {
+    top: 27px;
+    right: 39px;
+    width: 29px;
+    height: 29px;
+    min-width: 29px;
+    min-height: 29px;
+  }
+  .pot-card .pot-art {
+    height: 66px;
+    margin-top: 12px;
+  }
+  .pot-card .pot-symbol {
+    width: 72px;
+    height: 66px;
+  }
+  .pot-card .pot-percentage {
+    right: 18px;
+    top: 7px;
+  }
+  .pot-card h3,
+  .pot-card > h3 {
+    font-size: 12px;
+  }
+  .pot-card > strong {
+    font-size: 20px;
+  }
+  .pot-card > small {
+    display: block;
+    font-size: 9px;
+  }
+  .pot-card footer {
+    display: flex;
+    width: 72%;
+    font-size: 7.5px;
+  }
+  .pot-card .spending-bar {
+    width: 64%;
+    margin: 8px auto 6px;
+  }
+  .goal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .modal-backdrop {
+    align-items: center;
+    padding: 32px;
+  }
+  .modal {
+    width: min(680px, calc(100vw - 64px));
+    max-width: 680px;
+    max-height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 16px;
+  }
+  .modal-form {
+    padding: 24px 28px 28px;
+  }
+  .setup-orbit {
+    width: min(410px, 52vw);
+  }
+  .setup-selected-pot {
+    grid-template-columns: minmax(160px, .8fr) minmax(240px, 1.2fr);
+    gap: 24px;
+  }
+  .setup-pot-identity {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .circular-dial {
+    width: min(250px, 28vw);
+  }
+  .toast {
+    left: 50%;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1366px) and (hover: none) and (pointer: coarse) {
+  .login-page {
+    grid-template-columns: minmax(300px, .88fr) minmax(440px, 1.12fr);
+  }
+  .login-story {
+    min-height: 100dvh;
+    padding: max(54px, env(safe-area-inset-top)) 10%;
+  }
+  .login-story h1 {
+    font-size: clamp(40px, 4.4vw, 52px);
+  }
+  .login-story p:not(.eyebrow),
+  .login-foot {
+    display: block;
+  }
+  .login-form {
+    padding: 56px 10%;
+    align-items: center;
+  }
+  .profile-picker button {
+    min-height: 124px;
+  }
+}
