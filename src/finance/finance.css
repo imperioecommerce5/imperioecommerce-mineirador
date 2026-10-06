@@ -3442,3 +3442,51 @@ button {
     min-height: 124px;
   }
 }
+/* =========================================================
+   ALINHAMENTO EXATO DO DASHBOARD
+   Livre para gastar = Nosso Patrimônio = Próximos pagamentos
+   Saldo em conta = Patrimônio Manuela = Movimento do mês
+   ========================================================= */
+
+/* Desktop */
+@media (min-width: 801px) {
+  .patrimony-strip {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    column-gap: 14px;
+  }
+
+  .patrimony-strip > div:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .patrimony-strip > div + div {
+    border-left: 0;
+  }
+
+  .two-columns {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+
+/* iPad / Tablet */
+@media (min-width: 768px) and (max-width: 1366px) and (hover: none) and (pointer: coarse) {
+  .patrimony-strip {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    column-gap: 18px;
+  }
+
+  .patrimony-strip > div:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .patrimony-strip > div + div {
+    border-left: 0;
+    border-top: 0;
+  }
+
+  .two-columns {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    gap: 18px;
+  }
+}
