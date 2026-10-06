@@ -440,13 +440,20 @@ export function balances(f: Finance, through = today()) {
         e.date.slice(0, 7) <= month,
     )
     .reduce((s, e) => s + e.cents, 0);
+  // O "Livre para gastar" respeita a separação dos potes: contas pendentes
+  // só consomem o saldo sem distribuição (free), nunca o saldo de outro pote.
+  const spendablePots = f.pots
+    .filter((p) => !p.reserve)
+    .reduce((sum, p) => sum + Math.max(0, buckets[p.id] || 0), 0);
+  const unallocatedAvailable = Math.max(0, (buckets.free || 0) - pending);
+
   return {
     account,
     reserved,
     personalReserved,
     marketplace,
     pending,
-    free: account - reserved - pending,
+    free: spendablePots + unallocatedAvailable,
     buckets,
     funded,
     spent,

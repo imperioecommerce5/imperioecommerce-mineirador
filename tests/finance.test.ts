@@ -107,8 +107,43 @@ test("aporte uma vez; reservas não retiram dinheiro da conta; gasto pago e pend
   assert.equal(b.account, 190000);
   assert.equal(b.reserved, 40000);
   assert.equal(b.pending, 25000);
-  assert.equal(b.free, 125000);
+  assert.equal(b.free, 150000);
   assert.equal(b.buckets.food, 150000);
+});
+
+test("contas pendentes nunca consomem saldo de potes de uso", () => {
+  const f = empty();
+  f.pots = [
+    pot("reserve", 10, { reserve: true, allocationBase: "gross" }),
+    pot("family", 100, { allocationBase: "remainder" }),
+  ];
+  f.entries = [
+    entry(
+      {
+        kind: "income",
+        cents: 100000,
+        date: "2026-10-01",
+        description: "Aporte",
+        allocations: { reserve: 10000, free: 20000, family: 70000 },
+      },
+      f.pots,
+    ),
+    entry(
+      {
+        kind: "expense",
+        cents: 30000,
+        date: "2026-10-20",
+        description: "Conta futura",
+        status: "pending",
+        pot: "free",
+      },
+      f.pots,
+    ),
+  ];
+  const b = balances(f, "2026-10-06");
+  assert.equal(b.buckets.family, 70000);
+  assert.equal(b.pending, 30000);
+  assert.equal(b.free, 70000);
 });
 test("mudar percentuais não altera aportes existentes; editar aporte mantém a política original", () => {
   const f = empty();
