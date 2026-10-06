@@ -3490,3 +3490,41 @@ button {
     gap: 18px;
   }
 }
+/* =========================================================
+   PATRIMÔNIOS COMO CARDS SEPARADOS
+   Mesmo alinhamento e espaçamento dos blocos do dashboard
+   ========================================================= */
+
+.patrimony-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 14px;
+
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+
+  margin-bottom: 18px;
+}
+
+.patrimony-strip > div {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+
+  min-width: 0;
+}
+
+.patrimony-strip > div + div {
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+}
+
+/* iPad / Tablet */
+@media (min-width: 768px) and (max-width: 1366px) and (hover: none) and (pointer: coarse) {
+  .patrimony-strip {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    gap: 18px;
+  }
+}
