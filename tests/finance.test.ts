@@ -18,6 +18,8 @@ import {
   pendingCommitmentsForMonth,
   MARKETPLACE_ID,
   contributionPolicy,
+  marketplacePolicyPot,
+  validateMarketplace,
 } from "../src/finance/model";
 const pot = (id: string, value: number, extra: Partial<Pot> = {}): Pot => ({
   id,
@@ -117,17 +119,18 @@ test("contas pendentes nunca consomem saldo de potes de uso", () => {
     pot("reserve", 10, { reserve: true, allocationBase: "gross" }),
     pot("family", 100, { allocationBase: "remainder" }),
   ];
+  const contribution = entry(
+    {
+      kind: "income",
+      cents: 100000,
+      date: "2026-10-01",
+      description: "Aporte",
+    },
+    f.pots,
+  );
+  contribution.allocations = { reserve: 10000, free: 20000, family: 70000 };
   f.entries = [
-    entry(
-      {
-        kind: "income",
-        cents: 100000,
-        date: "2026-10-01",
-        description: "Aporte",
-        allocations: { reserve: 10000, free: 20000, family: 70000 },
-      },
-      f.pots,
-    ),
+    contribution,
     entry(
       {
         kind: "expense",
@@ -437,18 +440,74 @@ test("Mercado Livre migra do pote para reserva empresarial sem alterar saldo his
   );
 });
 
-test("novos aportes separam Mercado Livre no bruto e transferência para planejamento não retorna ao Mercado Livre", () => {
+test("novos aportes calculam Mercado Livre depois de patrimônios e contas, sem voltar ao Mercado Livre", () => {
   const f = empty();
   f.marketplace.percent = 20;
   f.pots = [
     pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
     pot("familia", 100, { allocationBase: "remainder" }),
   ];
-  const normal = allocateContribution(100000, contributionPolicy(f), 0);
-  assert.equal(normal[MARKETPLACE_ID], 20000);
+
+  // R$ 1.000 - R$ 100 patrimônio - R$ 400 contas = R$ 500.
+  // Mercado Livre recebe 20% de R$ 500 = R$ 100; o pote recebe os R$ 400 restantes.
+  const normal = allocateContribution(100000, contributionPolicy(f), 40000);
   assert.equal(normal.nosso_patrimonio, 10000);
-  assert.equal(normal.familia, 70000);
+  assert.equal(normal[MARKETPLACE_ID], 10000);
+  assert.equal(normal.familia, 40000);
+  assert.equal(normal.free, 40000);
+
+  // Dinheiro levado do Mercado Livre ao planejamento não volta ao Mercado Livre.
   const fromMarket = allocateContribution(100000, f.pots, 0);
   assert.equal(fromMarket[MARKETPLACE_ID], undefined);
   assert.equal(Object.values(fromMarket).reduce((s, v) => s + v, 0), 100000);
+});
+
+test("primeiro aporte aceita Mercado Livre como valor fixo depois de patrimônios e contas", () => {
+  const f = empty();
+  f.pots = [
+    pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
+    pot("familia", 100, { allocationBase: "remainder" }),
+  ];
+  const firstMarketplace = {
+    ...marketplacePolicyPot(f.marketplace),
+    mode: "fixed" as const,
+    value: 200,
+    active: true,
+    allocationBase: "remainder" as const,
+  };
+  const first = allocateContribution(100000, [...f.pots, firstMarketplace], 40000);
+  assert.equal(first.nosso_patrimonio, 10000);
+  assert.equal(first[MARKETPLACE_ID], 20000);
+  assert.equal(first.familia, 30000);
+  assert.equal(first.free, 40000);
+});
+
+test("percentual do Mercado Livre não participa do limite de 100% dos potes", () => {
+  const f = empty();
+  f.marketplace.percent = 100;
+  f.pots = [
+    pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
+    pot("familia", 100, { allocationBase: "remainder" }),
+  ];
+  assert.doesNotThrow(() => validateMarketplace(f.marketplace, f.pots));
+  const parts = allocateContribution(100000, contributionPolicy(f), 0);
+  assert.equal(parts.nosso_patrimonio, 10000);
+  assert.equal(parts[MARKETPLACE_ID], 90000);
+  assert.equal(parts.familia, 0);
+});
+
+test("política histórica do Mercado Livre no bruto continua reproduzindo o aporte antigo", () => {
+  const f = empty();
+  const legacyMarketplace = {
+    ...marketplacePolicyPot({ ...f.marketplace, percent: 20 }),
+    allocationBase: "gross" as const,
+  };
+  const parts = allocateContribution(100000, [
+    pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
+    pot("familia", 100, { allocationBase: "remainder" }),
+    legacyMarketplace,
+  ], 0);
+  assert.equal(parts[MARKETPLACE_ID], 20000);
+  assert.equal(parts.nosso_patrimonio, 10000);
+  assert.equal(parts.familia, 70000);
 });

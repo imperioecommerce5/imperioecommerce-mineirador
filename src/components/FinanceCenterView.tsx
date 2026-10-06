@@ -108,6 +108,11 @@ const kindNames = {
   transfer: "Transferência",
 };
 const displayDate = (s: string) => s.split("-").reverse().join("/");
+const parseOptionalMoney = (value: string) => {
+  const raw = value.trim();
+  if (!raw || /^0+(?:[,.]0{1,2})?$/.test(raw)) return 0;
+  return parseMoney(raw);
+};
 function Field({ label, children }: { label: string; children: any }) {
   return (
     <label className="field">
@@ -755,7 +760,7 @@ export default function FinanceCenterView({
                 <span className="marketplace-copy">
                   <small>RESERVA EMPRESARIAL</small>
                   <strong>Mercado Livre</strong>
-                  <span>{f.marketplace.active ? `${f.marketplace.percent}% dos novos aportes` : "Percentual automático pausado"}</span>
+                  <span>{f.marketplace.active ? `${f.marketplace.percent}% da sobra após patrimônios e contas` : "Percentual automático pausado"}</span>
                 </span>
                 <span className="marketplace-balance">
                   <small>Saldo reservado</small>
@@ -1096,7 +1101,7 @@ export default function FinanceCenterView({
                 <span>
                   <small>FORA DOS POTES · RESERVA EMPRESARIAL</small>
                   <strong>Mercado Livre</strong>
-                  <p>{f.marketplace.active ? `${f.marketplace.percent}% do aporte bruto é separado automaticamente.` : "Separação automática pausada."}</p>
+                  <p>{f.marketplace.active ? `${f.marketplace.percent}% do saldo após patrimônios e contas é separado automaticamente.` : "Separação automática pausada."}</p>
                 </span>
                 <span className="marketplace-allocation-value">
                   <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="strong" />
@@ -1986,15 +1991,7 @@ function MarketplaceDialog({
   const [active, setActive] = useState(f.marketplace.active);
   const [formError, setFormError] = useState("");
   const current = balances(f);
-  const grossPersonalPct = f.pots
-    .filter(
-      (p) =>
-        p.active &&
-        p.mode === "percent" &&
-        potAllocationBase(p) === "gross",
-    )
-    .reduce((sum, p) => sum + p.value, 0);
-  const maxPercent = Math.max(0, 100 - grossPersonalPct);
+  const maxPercent = 100;
   const marketEntries = f.entries
     .filter(
       (e) =>
@@ -2181,7 +2178,7 @@ function MarketplaceDialog({
           <div className="section-heading">
             <div>
               <h3>Percentual automático</h3>
-              <p>É calculado sobre o aporte bruto e não transforma o Mercado Livre em um pote.</p>
+              <p>É calculado sobre o saldo que restou depois dos patrimônios e das contas. Não entra no limite de 100% dos potes.</p>
             </div>
           </div>
           <PercentageControl
@@ -2389,6 +2386,7 @@ function FinanceModal({
   const [setupBillStart, setSetupBillStart] = useState(today());
   const [setupMarketplacePct, setSetupMarketplacePct] = useState(f.marketplace.percent);
   const [setupMarketplaceActive, setSetupMarketplaceActive] = useState(f.marketplace.active);
+  const [setupMarketplaceInitial, setSetupMarketplaceInitial] = useState("");
   useEffect(() => {
     if (modal.type !== "setup" || setupStep !== 3) return;
     const timer = window.setTimeout(close, 2200);
@@ -2400,11 +2398,10 @@ function FinanceModal({
     percent: setupMarketplacePct,
     active: setupMarketplaceActive,
   };
-  const setupMarketplaceTarget = marketplacePolicyPot(setupMarketplaceConfig);
-  const setupTargets = [
-    ...setupPots,
-    ...(setupMarketplaceActive ? [setupMarketplaceTarget] : []),
-  ];
+  // No primeiro planejamento o Mercado Livre NÃO participa como porcentagem.
+  // O valor inicial é informado manualmente depois de patrimônios + contas.
+  const setupTargets = setupPots;
+  let setupMarketplaceAvailable = 0;
   let preview: Record<string, number> = {};
   try {
     if (modal.type === "entry" && modal.kind === "income") {
@@ -2415,10 +2412,34 @@ function FinanceModal({
       );
     }
     if (modal.type === "setup" && value.trim()) {
+      const amount = parseMoney(value);
       const commitments = setupBills
         .filter((r) => r.start.slice(0, 7) <= date.slice(0, 7))
         .reduce((sum, r) => sum + r.cents, 0);
-      preview = allocateContribution(parseMoney(value), setupTargets, commitments);
+      const withoutMarketplace = allocateContribution(amount, setupPots, 0);
+      const grossAllocated = setupPots
+        .filter((p) => p.active && potAllocationBase(p) === "gross")
+        .reduce((sum, p) => sum + (withoutMarketplace[p.id] || 0), 0);
+      setupMarketplaceAvailable = Math.max(
+        0,
+        amount - grossAllocated - Math.min(commitments, amount - grossAllocated),
+      );
+      const firstMarketplaceCents = parseOptionalMoney(setupMarketplaceInitial);
+      const firstPolicy: Pot[] = [
+        ...setupPots,
+        ...(firstMarketplaceCents > 0
+          ? [
+              {
+                ...marketplacePolicyPot(setupMarketplaceConfig),
+                mode: "fixed" as const,
+                value: firstMarketplaceCents / 100,
+                active: true,
+                allocationBase: "remainder" as const,
+              },
+            ]
+          : []),
+      ];
+      preview = allocateContribution(amount, firstPolicy, commitments);
     }
   } catch {}
   const title =
@@ -2511,12 +2532,19 @@ function FinanceModal({
           validatePots(setupPots);
           validateMarketplace(setupMarketplaceConfig, setupPots);
           const amount = parseMoney(value);
-          const grossAllocated = Object.entries(allocateContribution(amount, setupTargets, 0))
-            .filter(([id]) => id !== "free" && potAllocationBase(setupTargets.find((p) => p.id === id)!) === "gross")
-            .reduce((sum, [, cents]) => sum + cents, 0);
+          const baseAllocation = allocateContribution(amount, setupPots, 0);
+          const grossAllocated = setupPots
+            .filter((p) => p.active && potAllocationBase(p) === "gross")
+            .reduce((sum, p) => sum + (baseAllocation[p.id] || 0), 0);
           if (setupMonthlyCommitment > Math.max(0, amount - grossAllocated))
             throw new Error(
               `O aporte não cobre os patrimônios e as contas deste período. Faltam ${cash(setupMonthlyCommitment - Math.max(0, amount - grossAllocated))}.`,
+            );
+          const firstMarketplaceCents = parseOptionalMoney(setupMarketplaceInitial);
+          const marketplaceLimit = Math.max(0, amount - grossAllocated - setupMonthlyCommitment);
+          if (firstMarketplaceCents > marketplaceLimit)
+            throw new Error(
+              `Depois de patrimônios e contas, há ${cash(marketplaceLimit)} disponível para o Mercado Livre.`,
             );
           let next: Finance = {
             ...f,
@@ -2527,6 +2555,20 @@ function FinanceModal({
           };
           next = generateRecurring(next);
           const commitments = pendingCommitmentsForMonth(next, date);
+          const firstPolicy: Pot[] = [
+            ...structuredClone(setupPots),
+            ...(firstMarketplaceCents > 0
+              ? [
+                  {
+                    ...marketplacePolicyPot(setupMarketplaceConfig),
+                    mode: "fixed" as const,
+                    value: firstMarketplaceCents / 100,
+                    active: true,
+                    allocationBase: "remainder" as const,
+                  },
+                ]
+              : []),
+          ];
           const first = entry(
             {
               id: uid(),
@@ -2535,10 +2577,10 @@ function FinanceModal({
               cents: amount,
               date,
             },
-            setupTargets,
+            firstPolicy,
           );
-          first.policy = structuredClone(setupTargets);
-          first.allocations = allocateContribution(amount, setupTargets, commitments);
+          first.policy = structuredClone(firstPolicy);
+          first.allocations = allocateContribution(amount, firstPolicy, commitments);
           next = { ...next, configured: true, entries: [...next.entries, first] };
           const ok = await commit(() => next, true);
           if (ok) setSetupStep(3);
@@ -2886,7 +2928,7 @@ function FinanceModal({
                   <span className="setup-icon"><Wallet size={21} /></span>
                   <div>
                     <h3>Agora informe o aporte inicial</h3>
-                    <p>É o valor bruto disponível hoje. O app separa patrimônios, contas e depois distribui o restante.</p>
+                    <p>É o valor bruto disponível hoje. O app separa patrimônios e contas; depois você define manualmente quanto vai para o Mercado Livre.</p>
                   </div>
                 </div>
                 <Field label="Aporte inicial (R$)">
@@ -2905,7 +2947,7 @@ function FinanceModal({
                 <div className="setup-math-card">
                   <span><small>Contas do período</small><b>{cash(setupMonthlyCommitment)}</b></span>
                   <span><small>Patrimônios</small><b>calculados sobre o bruto</b></span>
-                  <p>Depois desses valores, os demais potes dividem somente o saldo restante.</p>
+                  <p>Na próxima etapa você escolhe o valor inicial do Mercado Livre. Só depois os potes dividem o saldo restante.</p>
                 </div>
               </section>
             )}
@@ -2921,8 +2963,54 @@ function FinanceModal({
                 </div>
 
                 <div className="setup-plan-summary">
-                  <div><small>Patrimônios + Mercado Livre · aporte bruto</small><strong>{setupGrossPct}%</strong></div>
-                  <div><small>Outros potes · saldo restante</small><strong>{setupRemainderPct}%</strong></div>
+                  <div><small>Patrimônios · aporte bruto</small><strong>{setupGrossPct}%</strong></div>
+                  <div><small>Outros potes · depois das contas e do Mercado Livre</small><strong>{setupRemainderPct}%</strong></div>
+                </div>
+
+                <div className="setup-marketplace-first">
+                  <div className="setup-marketplace-head">
+                    <span className="marketplace-icon"><Store size={20} /></span>
+                    <span>
+                      <small>PRIMEIRO APORTE · VALOR MANUAL</small>
+                      <strong>Mercado Livre</strong>
+                      <p>Primeiro são separados patrimônios e contas. Você escolhe quanto da sobra vai para a operação.</p>
+                    </span>
+                    <span className="setup-marketplace-limit">
+                      <small>Disponível antes dos potes</small>
+                      <strong>{cash(setupMarketplaceAvailable)}</strong>
+                    </span>
+                  </div>
+                  <div className="setup-marketplace-fields">
+                    <Field label="Valor inicial para Mercado Livre (R$)">
+                      <input
+                        inputMode="decimal"
+                        value={setupMarketplaceInitial}
+                        onChange={(e) => setSetupMarketplaceInitial(e.target.value)}
+                        placeholder="0,00"
+                      />
+                    </Field>
+                    <div className="setup-marketplace-future">
+                      <PercentageControl
+                        label="Percentual para os próximos aportes"
+                        value={setupMarketplacePct}
+                        maxAllowed={100}
+                        step={1}
+                        color={f.marketplace.color}
+                        onChange={setSetupMarketplacePct}
+                      />
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={setupMarketplaceActive}
+                          onChange={(e) => setSetupMarketplaceActive(e.target.checked)}
+                        />{" "}
+                        Aplicar automaticamente nos próximos aportes
+                      </label>
+                    </div>
+                  </div>
+                  <small className="muted">
+                    O percentual futuro é independente dos 100% dos potes e será calculado somente sobre o que restar depois de patrimônios e contas.
+                  </small>
                 </div>
 
                 <div className="setup-orbit" aria-label="Visão circular dos potes">
@@ -2955,7 +3043,7 @@ function FinanceModal({
                   <div className="setup-pot-identity">
                     <PotSymbol symbol={potSymbol(selectedSetupPot)} />
                     <span>
-                      <small>{selectedSetupPot.id === MARKETPLACE_ID ? "Reserva empresarial · calculada sobre o aporte bruto" : potAllocationBase(selectedSetupPot) === "gross" ? "Calculado sobre o aporte bruto" : "Calculado após contas e patrimônios"}</small>
+                      <small>{potAllocationBase(selectedSetupPot) === "gross" ? "Calculado sobre o aporte bruto" : "Calculado depois de contas, patrimônios e Mercado Livre"}</small>
                       <strong>{selectedSetupPot.id === "patrimonio_manuela" ? "Patrimônio Manuela" : selectedSetupPot.name}</strong>
                     </span>
                   </div>
@@ -3037,7 +3125,7 @@ function FinanceModal({
                       .filter(([, amount]) => amount > 0)
                       .map(([id, amount]) => (
                         <div key={id}>
-                          <span>{setupTargets.find((x) => x.id === id)?.name || (id === "free" ? "Contas + saldo não alocado" : "Sem distribuição")}</span>
+                          <span>{id === MARKETPLACE_ID ? "Mercado Livre" : setupTargets.find((x) => x.id === id)?.name || (id === "free" ? "Contas + saldo não alocado" : "Sem distribuição")}</span>
                           <b>{cash(amount)}</b>
                         </div>
                       ))}
@@ -3051,7 +3139,7 @@ function FinanceModal({
                 <div className="ready-check"><Check size={34} /></div>
                 <span className="eyebrow">PLANO CONFIGURADO</span>
                 <h2>Seu planejamento está pronto.</h2>
-                <p>Patrimônios, contas e potes já foram calculados. Você será levado ao dashboard.</p>
+                <p>Patrimônios, contas, Mercado Livre e potes já foram calculados. Você será levado ao dashboard.</p>
                 <button type="button" className="primary" onClick={close}>Ir para o Dashboard</button>
               </section>
             )}
@@ -3099,10 +3187,7 @@ function FinanceModal({
                     x.id !== p?.id &&
                     potAllocationBase(x) === (p ? potAllocationBase(p) : "remainder"),
                 )
-                .reduce((sum, x) => sum + x.value, 0) -
-              ((p ? potAllocationBase(p) : "remainder") === "gross" && f.marketplace.active
-                ? f.marketplace.percent
-                : 0)
+                .reduce((sum, x) => sum + x.value, 0)
             }
             step={1}
             onChange={(n) => setValue(String(n))}

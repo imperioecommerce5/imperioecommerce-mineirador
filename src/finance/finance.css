@@ -3781,3 +3781,88 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v2.6.2 — primeiro aporte do Mercado Livre só após patrimônios + contas */
+.setup-marketplace-first {
+  display: grid;
+  gap: 15px;
+  padding: 16px;
+  margin: 2px 0 20px;
+  border: 1px solid #e7dba9;
+  border-left: 4px solid #d9b52e;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fffdf5, #fffaf0);
+}
+.setup-marketplace-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+}
+.setup-marketplace-head > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.setup-marketplace-head > span:nth-child(2) > small {
+  color: #8a7114;
+  font-size: 9px;
+  letter-spacing: 1.1px;
+  font-weight: 700;
+}
+.setup-marketplace-head > span:nth-child(2) > strong {
+  font-size: 14px;
+}
+.setup-marketplace-head > span:nth-child(2) > p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.setup-marketplace-limit {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  white-space: nowrap;
+}
+.setup-marketplace-limit small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.setup-marketplace-limit strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 16px;
+}
+.setup-marketplace-fields {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+  gap: 16px;
+  align-items: start;
+}
+.setup-marketplace-future {
+  display: grid;
+  gap: 7px;
+}
+.dark .setup-marketplace-first {
+  background: linear-gradient(135deg, #282719, #24251c);
+  border-color: #5f572e;
+  border-left-color: #d9b52e;
+}
+.dark .setup-marketplace-head > span:nth-child(2) > small {
+  color: #d9c76d;
+}
+@media (max-width: 800px),
+  (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .setup-marketplace-head {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+  .setup-marketplace-limit {
+    grid-column: 1 / -1;
+    justify-items: start;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .setup-marketplace-fields {
+    grid-template-columns: 1fr;
+  }
+}

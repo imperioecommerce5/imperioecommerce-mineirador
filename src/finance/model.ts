@@ -189,7 +189,9 @@ export const marketplacePolicyPot = (marketplace: Marketplace): Pot => ({
   active: marketplace.active,
   color: marketplace.color,
   icon: "wallet",
-  allocationBase: "gross",
+  // Mercado Livre é uma reserva empresarial separada. Nos novos aportes,
+  // sua porcentagem incide somente depois de patrimônios + contas do período.
+  allocationBase: "remainder",
 });
 
 export const contributionPolicy = (
@@ -252,7 +254,12 @@ export function validatePots(pots: Pot[]) {
     throw new Error("Confira os nomes, valores e prioridades dos potes.");
   for (const base of ["gross", "remainder"] as const) {
     const total = active
-      .filter((p) => p.mode === "percent" && potAllocationBase(p) === base)
+      .filter(
+        (p) =>
+          p.id !== MARKETPLACE_ID &&
+          p.mode === "percent" &&
+          potAllocationBase(p) === base,
+      )
       .reduce((s, p) => s + Math.round(p.value * 100), 0);
     if (total > 10000)
       throw new Error(
@@ -275,19 +282,18 @@ export function validateMarketplace(marketplace: Marketplace, pots: Pot[] = []) 
     marketplace.percent > 100
   )
     throw new Error("Configuração do Mercado Livre inválida.");
-  validatePots([
-    ...pots,
-    ...(marketplace.active && marketplace.percent > 0
-      ? [marketplacePolicyPot(marketplace)]
-      : []),
-  ]);
+  // O percentual do Mercado Livre é independente dos 100% dos potes.
+  // Ele é retirado antes da distribuição dos potes comuns, portanto não entra
+  // na soma de limites das porcentagens pessoais.
+  validatePots(pots);
 }
 
 /**
- * Distribui um aporte em duas bases independentes:
- * 1) patrimônio calculado diretamente sobre o aporte bruto;
- * 2) contas comprometidas ficam no saldo sem distribuição;
- * 3) os demais potes recebem percentuais sobre o que restou depois de patrimônio + compromissos.
+ * Distribui um aporte em etapas independentes:
+ * 1) patrimônios calculados diretamente sobre o aporte bruto;
+ * 2) contas comprometidas ficam reservadas no saldo sem distribuição;
+ * 3) Mercado Livre, quando presente na política nova, recebe valor fixo ou percentual da sobra;
+ * 4) os demais potes recebem percentuais sobre o que restou depois dessas etapas.
  * O dinheiro comprometido não some: permanece em `free` até a conta ser paga.
  */
 export function allocateContribution(
@@ -303,8 +309,21 @@ export function allocateContribution(
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
   const result: Allocation = {};
 
-  // Patrimônios: sempre sobre o bruto, uma única vez.
-  const grossPots = active.filter((p) => potAllocationBase(p) === "gross");
+  const marketplaceTarget = active.find((p) => p.id === MARKETPLACE_ID);
+  const legacyMarketplaceOnGross =
+    marketplaceTarget && potAllocationBase(marketplaceTarget) === "gross"
+      ? marketplaceTarget
+      : null;
+
+  // Patrimônios continuam sendo calculados sobre o aporte bruto.
+  // Políticas históricas antigas podem conter Mercado Livre no bruto; nesse
+  // caso preservamos essa regra SOMENTE para não alterar aportes já gravados
+  // caso o usuário edite um lançamento antigo.
+  const grossPots = active.filter(
+    (p) =>
+      potAllocationBase(p) === "gross" &&
+      (p.id !== MARKETPLACE_ID || legacyMarketplaceOnGross),
+  );
   let grossAllocated = 0;
   for (const p of grossPots.filter((p) => p.mode === "fixed")) {
     const amount = Math.min(cents - grossAllocated, Math.round(p.value * 100));
@@ -319,9 +338,28 @@ export function allocateContribution(
   }
   grossAllocated = Math.min(cents, grossAllocated);
 
+  // As contas selecionadas/pendentes são reservadas antes do Mercado Livre.
   const committed = Math.max(0, Math.min(committedCents, cents - grossAllocated));
   let remainder = Math.max(0, cents - grossAllocated - committed);
-  const regular = active.filter((p) => potAllocationBase(p) === "remainder");
+
+  // Nova regra do Mercado Livre: depois de patrimônios + contas e antes dos
+  // potes comuns. No primeiro planejamento pode vir como valor fixo; nos
+  // aportes seguintes vem como percentual da sobra real.
+  if (marketplaceTarget && !legacyMarketplaceOnGross) {
+    const requested =
+      marketplaceTarget.mode === "fixed"
+        ? Math.round(marketplaceTarget.value * 100)
+        : Math.floor(
+            (remainder * Math.round(marketplaceTarget.value * 100)) / 10000,
+          );
+    const marketplaceAmount = Math.max(0, Math.min(remainder, requested));
+    result[MARKETPLACE_ID] = marketplaceAmount;
+    remainder -= marketplaceAmount;
+  }
+
+  const regular = active.filter(
+    (p) => p.id !== MARKETPLACE_ID && potAllocationBase(p) === "remainder",
+  );
 
   // Valores fixos dos potes comuns são atendidos primeiro.
   for (const p of regular.filter((p) => p.mode === "fixed")) {
@@ -330,7 +368,7 @@ export function allocateContribution(
     remainder -= amount;
   }
 
-  // Percentuais dos potes comuns incidem sobre a base restante após contas + patrimônios.
+  // Percentuais dos potes comuns incidem sobre o que restou APÓS Mercado Livre.
   const percentBase = remainder;
   let normalAllocated = 0;
   for (const p of regular.filter((p) => p.mode === "percent")) {
@@ -626,7 +664,7 @@ export function migrate(raw: any): Finance {
         ...(original.migrationNotes || []),
         ...(!original.marketplace && marketplaceLegacyPot
           ? [
-              "Mercado Livre foi separado dos potes. O saldo e o histórico existentes foram preservados integralmente; o percentual anterior foi mantido e, nos próximos aportes, passa a ser calculado sobre o aporte bruto.",
+              "Mercado Livre foi separado dos potes. O saldo e o histórico existentes foram preservados integralmente; o percentual anterior foi mantido e, nos próximos aportes, passa a ser calculado sobre o saldo após patrimônios e contas.",
             ]
           : []),
       ],
