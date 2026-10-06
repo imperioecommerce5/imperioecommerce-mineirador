@@ -16,6 +16,8 @@ import {
   Pot,
   validatePots,
   pendingCommitmentsForMonth,
+  MARKETPLACE_ID,
+  contributionPolicy,
 } from "../src/finance/model";
 const pot = (id: string, value: number, extra: Partial<Pot> = {}): Pot => ({
   id,
@@ -371,4 +373,47 @@ test("autoria: criada por um perfil, alterada pelo outro, original preservado e 
   assert.equal(reset.configured, false);
   assert.equal(edited.entries.length, 1);
   assert.equal(reset.pots.length, 7);
+});
+
+
+test("Mercado Livre migra do pote para reserva empresarial sem alterar saldo histórico", () => {
+  const legacyMarketId = "ml-antigo";
+  const f = empty();
+  delete (f as any).marketplace;
+  f.pots = [
+    pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
+    pot(legacyMarketId, 35, { name: "Mercado Livre", allocationBase: "remainder" }),
+    pot("familia", 65, { allocationBase: "remainder" }),
+  ];
+  const contribution = entry(
+    { kind: "income", cents: 100000, date: "2026-10-01", description: "Aporte" },
+    f.pots,
+  );
+  const raw = { financeV2: f };
+  const before = contribution.allocations[legacyMarketId];
+  f.entries = [contribution];
+  const migrated = migrate(raw);
+  assert.equal(migrated.marketplace.percent, 35);
+  assert.equal(migrated.pots.some((p) => p.name === "Mercado Livre"), false);
+  assert.equal(balances(migrated, "2026-10-02").marketplace, before);
+  assert.equal(
+    migrated.entries[0].allocations[MARKETPLACE_ID],
+    contribution.allocations[legacyMarketId],
+  );
+});
+
+test("novos aportes separam Mercado Livre no bruto e transferência para planejamento não retorna ao Mercado Livre", () => {
+  const f = empty();
+  f.marketplace.percent = 20;
+  f.pots = [
+    pot("nosso_patrimonio", 10, { reserve: true, allocationBase: "gross" }),
+    pot("familia", 100, { allocationBase: "remainder" }),
+  ];
+  const normal = allocateContribution(100000, contributionPolicy(f), 0);
+  assert.equal(normal[MARKETPLACE_ID], 20000);
+  assert.equal(normal.nosso_patrimonio, 10000);
+  assert.equal(normal.familia, 70000);
+  const fromMarket = allocateContribution(100000, f.pots, 0);
+  assert.equal(fromMarket[MARKETPLACE_ID], undefined);
+  assert.equal(Object.values(fromMarket).reduce((s, v) => s + v, 0), 100000);
 });

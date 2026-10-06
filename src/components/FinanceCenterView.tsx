@@ -36,6 +36,7 @@ import {
   Activity,
   Sparkles,
   User,
+  Store,
 } from "lucide-react";
 import { useFinance } from "../finance/useFinance";
 import {
@@ -64,6 +65,10 @@ import {
   Actor,
   actorName,
   resetFinance,
+  MARKETPLACE_ID,
+  contributionPolicy,
+  marketplacePolicyPot,
+  validateMarketplace,
 } from "../finance/model";
 import "../finance/finance.css";
 type View = "home" | "ledger" | "pots" | "bills" | "goals" | "settings" | "profile";
@@ -76,6 +81,7 @@ type Modal =
   | { type: "rule" }
   | { type: "asset" }
   | { type: "setup" }
+  | { type: "marketplace" }
   | { type: "reset" }
   | null;
 const labels = {
@@ -259,7 +265,9 @@ export default function FinanceCenterView({
   const potName = (id: string) =>
     id === "free"
       ? "Sem distribuição"
-      : f.pots.find((p) => p.id === id)?.name || "Categoria anterior";
+      : id === MARKETPLACE_ID
+        ? "Mercado Livre"
+        : f.pots.find((p) => p.id === id)?.name || "Categoria anterior";
   const pending = f.entries
     .filter((e) => !e.deleted && e.kind === "expense" && e.status === "pending")
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -268,12 +276,20 @@ export default function FinanceCenterView({
   );
   const income = currentEntries
     .filter(
-      (e) => e.kind === "income" && e.status === "paid" && e.date <= today(),
+      (e) =>
+        e.kind === "income" &&
+        e.status === "paid" &&
+        e.date <= today() &&
+        !e.source.startsWith("marketplace:"),
     )
     .reduce((s, e) => s + e.cents, 0);
   const expense = currentEntries
     .filter(
-      (e) => e.kind === "expense" && e.status === "paid" && e.date <= today(),
+      (e) =>
+        e.kind === "expense" &&
+        e.status === "paid" &&
+        e.date <= today() &&
+        !e.source.startsWith("marketplace:"),
     )
     .reduce((s, e) => s + e.cents, 0);
   const filtered = f.entries
@@ -704,8 +720,12 @@ export default function FinanceCenterView({
                   <small>Entradas menos pagamentos realizados</small>
                   <hr />
                   <div>
-                    <span>Reservado nos potes</span>
-                    <AnimatedMoney cents={b.reserved} hidden={hidden} tag="b" />
+                    <span>Reservas pessoais</span>
+                    <AnimatedMoney cents={b.personalReserved} hidden={hidden} tag="b" />
+                  </div>
+                  <div>
+                    <span>Reserva Mercado Livre</span>
+                    <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="b" />
                   </div>
                   <div>
                     <span>Contas pendentes até este mês</span>
@@ -725,6 +745,24 @@ export default function FinanceCenterView({
                   <ShieldCheck size={16} />
                 </div>
               </section>
+              <button
+                type="button"
+                className="marketplace-card"
+                onClick={() => open({ type: "marketplace" })}
+                aria-label="Gerenciar Mercado Livre"
+              >
+                <span className="marketplace-icon"><Store size={20} /></span>
+                <span className="marketplace-copy">
+                  <small>RESERVA EMPRESARIAL</small>
+                  <strong>Mercado Livre</strong>
+                  <span>{f.marketplace.active ? `${f.marketplace.percent}% dos novos aportes` : "Percentual automático pausado"}</span>
+                </span>
+                <span className="marketplace-balance">
+                  <small>Saldo reservado</small>
+                  <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="strong" />
+                </span>
+                <ChevronRight size={18} />
+              </button>
               {b.free < 0 && (
                 <div className="notice danger">
                   As reservas e contas pendentes superam o saldo em conta. Revise os compromissos antes de gastar.
@@ -943,6 +981,7 @@ export default function FinanceCenterView({
                 >
                   <option value="all">Todos os potes</option>
                   <option value="free">Sem distribuição</option>
+                  <option value={MARKETPLACE_ID}>Mercado Livre</option>
                   {f.pots.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -1047,11 +1086,24 @@ export default function FinanceCenterView({
                 <span className="muted">
                   {pots
                     .filter((p) => p.mode === "percent" && potAllocationBase(p) === "gross")
-                    .reduce((s, p) => s + p.value, 0)}% patrimônios · {pots
+                    .reduce((s, p) => s + p.value, 0)}% patrimônios · {f.marketplace.percent}% Mercado Livre · {pots
                     .filter((p) => p.mode === "percent" && potAllocationBase(p) === "remainder")
                     .reduce((s, p) => s + p.value, 0)}% demais potes
                 </span>
               </div>
+              <button type="button" className="marketplace-allocation-card" onClick={() => open({ type: "marketplace" })}>
+                <span className="marketplace-icon"><Store size={19} /></span>
+                <span>
+                  <small>FORA DOS POTES · RESERVA EMPRESARIAL</small>
+                  <strong>Mercado Livre</strong>
+                  <p>{f.marketplace.active ? `${f.marketplace.percent}% do aporte bruto é separado automaticamente.` : "Separação automática pausada."}</p>
+                </span>
+                <span className="marketplace-allocation-value">
+                  <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="strong" />
+                  <small>Gerenciar</small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
               <section className="pot-grid">
                 {pots.map((p) => (
                   <PotCard
@@ -1730,7 +1782,8 @@ export default function FinanceCenterView({
                 <p className="muted">
                   Aporte aumenta o saldo em conta. Gasto pago diminui o saldo.
                   Reserva e transferência entre potes não retiram dinheiro da
-                  conta. Contas pendentes até o mês atual reduzem o valor livre
+                  conta. A reserva Mercado Livre também fica fora do valor livre
+                  para gastar. Contas pendentes até o mês atual reduzem o valor livre
                   para gastar. Aportes futuros aparecem no extrato, mas só
                   entram nos saldos na data informada.
                 </p>
@@ -1806,6 +1859,18 @@ export default function FinanceCenterView({
               setView("home");
               setUndo(null);
             }
+          }}
+        />
+      ) : modal?.type === "marketplace" ? (
+        <MarketplaceDialog
+          f={f}
+          saving={saving}
+          cash={cash}
+          close={() => setModal(null)}
+          commit={async (fn, keepOpen = false) => {
+            const ok = await change(fn);
+            if (ok && !keepOpen) setModal(null);
+            return ok;
           }}
         />
       ) : (
@@ -1897,6 +1962,353 @@ function PotCard({
     </article>
   );
 }
+function MarketplaceDialog({
+  f,
+  saving,
+  cash,
+  close,
+  commit,
+}: {
+  f: Finance;
+  saving: boolean;
+  cash: (v: number) => string;
+  close: () => void;
+  commit: (fn: (s: Finance) => Finance, keepOpen?: boolean) => Promise<boolean>;
+}) {
+  type Action = "income" | "expense" | "planning";
+  const [action, setAction] = useState<Action>("income");
+  const [description, setDescription] = useState("");
+  const [value, setValue] = useState("");
+  const [date, setDate] = useState(today());
+  const [distribution, setDistribution] = useState<"automatic" | "single">("automatic");
+  const [destination, setDestination] = useState("nosso_patrimonio");
+  const [percent, setPercent] = useState(f.marketplace.percent);
+  const [active, setActive] = useState(f.marketplace.active);
+  const [formError, setFormError] = useState("");
+  const current = balances(f);
+  const grossPersonalPct = f.pots
+    .filter(
+      (p) =>
+        p.active &&
+        p.mode === "percent" &&
+        potAllocationBase(p) === "gross",
+    )
+    .reduce((sum, p) => sum + p.value, 0);
+  const maxPercent = Math.max(0, 100 - grossPersonalPct);
+  const marketEntries = f.entries
+    .filter(
+      (e) =>
+        !e.deleted &&
+        ((e.allocations?.[MARKETPLACE_ID] || 0) > 0 ||
+          e.pot === MARKETPLACE_ID ||
+          e.destination === MARKETPLACE_ID),
+    )
+    .sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) || b.recordedAt.localeCompare(a.recordedAt),
+    )
+    .slice(0, 10);
+
+  const marketEffect = (e: Entry) => {
+    if (e.kind === "income") return e.allocations?.[MARKETPLACE_ID] || 0;
+    if (e.kind === "expense" && e.pot === MARKETPLACE_ID) return -e.cents;
+    if (e.kind === "transfer") {
+      if (e.pot === MARKETPLACE_ID) return -e.cents;
+      if (e.destination === MARKETPLACE_ID) return e.cents;
+    }
+    return 0;
+  };
+
+  async function savePercentage() {
+    setFormError("");
+    try {
+      const nextMarketplace = {
+        ...f.marketplace,
+        percent,
+        active,
+      };
+      validateMarketplace(nextMarketplace, f.pots);
+      await commit(
+        (s) => ({ ...s, marketplace: { ...s.marketplace, percent, active } }),
+        true,
+      );
+    } catch (e) {
+      setFormError((e as Error).message);
+    }
+  }
+
+  async function submitMovement(ev: FormEvent) {
+    ev.preventDefault();
+    setFormError("");
+    try {
+      const amount = parseMoney(value);
+      if (!description.trim()) throw new Error("Informe uma descrição.");
+      if (f.closedMonths.some((m) => date.slice(0, 7) <= m))
+        throw new Error("Reabra o mês antes de registrar esta movimentação.");
+      const atDate = balances(f, date).marketplace;
+      if (action !== "income" && atDate < amount)
+        throw new Error(
+          `O Mercado Livre tem apenas ${cash(Math.max(0, atDate))} disponível nesta data.`,
+        );
+
+      let additions: Entry[] = [];
+      if (action === "income") {
+        const policy = [
+          {
+            ...marketplacePolicyPot(f.marketplace),
+            value: 100,
+            active: true,
+          },
+        ];
+        const movement = entry(
+          {
+            id: uid(),
+            kind: "income",
+            description: description.trim(),
+            cents: amount,
+            date,
+            policy,
+            source: "marketplace:income",
+          },
+          policy,
+        );
+        movement.allocations = { [MARKETPLACE_ID]: amount };
+        additions = [movement];
+      }
+
+      if (action === "expense") {
+        additions = [
+          entry(
+            {
+              id: uid(),
+              kind: "expense",
+              description: description.trim(),
+              cents: amount,
+              date,
+              pot: MARKETPLACE_ID,
+              source: "marketplace:expense",
+            },
+            f.pots,
+          ),
+        ];
+      }
+
+      if (action === "planning") {
+        const groupId = uid();
+        if (distribution === "automatic") {
+          const parts = allocateContribution(
+            amount,
+            f.pots,
+            pendingCommitmentsForMonth(f, date),
+          );
+          additions = Object.entries(parts).flatMap(([dest, cents]) => {
+            if (cents <= 0) return [];
+            const targetName =
+              dest === "free"
+                ? "Contas + saldo livre"
+                : f.pots.find((p) => p.id === dest)?.name || "Planejamento";
+            return [
+              entry(
+                {
+                  id: uid(),
+                  kind: "transfer",
+                  description: `${description.trim()} · ${targetName}`,
+                  cents,
+                  date,
+                  pot: MARKETPLACE_ID,
+                  destination: dest,
+                  source: `marketplace:planning:${groupId}`,
+                },
+                f.pots,
+              ),
+            ];
+          });
+        } else {
+          if (
+            destination !== "free" &&
+            !f.pots.some((p) => p.id === destination)
+          )
+            throw new Error("Escolha um destino válido.");
+          additions = [
+            entry(
+              {
+                id: uid(),
+                kind: "transfer",
+                description: description.trim(),
+                cents: amount,
+                date,
+                pot: MARKETPLACE_ID,
+                destination,
+                source: `marketplace:planning:${groupId}`,
+              },
+              f.pots,
+            ),
+          ];
+        }
+      }
+
+      const ok = await commit(
+        (s) => ({ ...s, entries: [...s.entries, ...additions] }),
+        true,
+      );
+      if (ok) {
+        setDescription("");
+        setValue("");
+      }
+    } catch (e) {
+      setFormError((e as Error).message);
+    }
+  }
+
+  return (
+    <ModalShell title="Mercado Livre" onClose={close}>
+      <div className="marketplace-dialog">
+        {formError && (
+          <div className="notice danger" role="alert">
+            {formError}
+          </div>
+        )}
+        <section className="marketplace-hero">
+          <span className="marketplace-icon marketplace-icon-large"><Store size={25} /></span>
+          <div>
+            <small>RESERVA EMPRESARIAL</small>
+            <strong>{cash(current.marketplace)}</strong>
+            <p>Entradas e gastos do Mercado Livre ficam separados do dinheiro da família.</p>
+          </div>
+        </section>
+
+        <section className="marketplace-config">
+          <div className="section-heading">
+            <div>
+              <h3>Percentual automático</h3>
+              <p>É calculado sobre o aporte bruto e não transforma o Mercado Livre em um pote.</p>
+            </div>
+          </div>
+          <PercentageControl
+            label="Mercado Livre percentual"
+            value={percent}
+            maxAllowed={maxPercent}
+            step={1}
+            color={f.marketplace.color}
+            onChange={setPercent}
+          />
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />{" "}
+            Separar Mercado Livre nos próximos aportes
+          </label>
+          <button type="button" className="secondary" disabled={saving} onClick={savePercentage}>
+            Salvar percentual
+          </button>
+        </section>
+
+        <section className="marketplace-actions">
+          <div className="marketplace-action-tabs" role="tablist" aria-label="Movimentação Mercado Livre">
+            <button type="button" className={action === "income" ? "active" : ""} onClick={() => setAction("income")}>Entrada</button>
+            <button type="button" className={action === "expense" ? "active" : ""} onClick={() => setAction("expense")}>Gasto</button>
+            <button type="button" className={action === "planning" ? "active" : ""} onClick={() => setAction("planning")}>Levar ao planejamento</button>
+          </div>
+          <form className="marketplace-movement-form" onSubmit={submitMovement}>
+            <Field label="Descrição">
+              <input
+                autoFocus
+                required
+                maxLength={120}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={
+                  action === "income"
+                    ? "Ex.: Vendas da semana"
+                    : action === "expense"
+                      ? "Ex.: Reposição de estoque"
+                      : "Ex.: Retirada para planejamento familiar"
+                }
+              />
+            </Field>
+            <div className="marketplace-form-grid">
+              <Field label="Valor (R$)">
+                <input
+                  required
+                  inputMode="decimal"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="0,00"
+                />
+              </Field>
+              <Field label="Data">
+                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+              </Field>
+            </div>
+            {action === "planning" && (
+              <>
+                <Field label="Como distribuir">
+                  <select value={distribution} onChange={(e) => setDistribution(e.target.value as "automatic" | "single")}>
+                    <option value="automatic">Distribuir conforme meu planejamento</option>
+                    <option value="single">Escolher um destino</option>
+                  </select>
+                </Field>
+                {distribution === "automatic" ? (
+                  <div className="notice marketplace-plan-note">
+                    Patrimônios, contas e potes recebem o valor pelas regras atuais. O percentual do Mercado Livre não é aplicado novamente nesta transferência.
+                  </div>
+                ) : (
+                  <Field label="Destino">
+                    <select value={destination} onChange={(e) => setDestination(e.target.value)}>
+                      <option value="free">Saldo livre / contas</option>
+                      {f.pots.filter((p) => p.active).map((p) => (
+                        <option value={p.id} key={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+              </>
+            )}
+            <button className="primary" type="submit" disabled={saving}>
+              {saving
+                ? "Salvando…"
+                : action === "income"
+                  ? "Registrar entrada"
+                  : action === "expense"
+                    ? "Registrar gasto"
+                    : "Transferir para o planejamento"}
+            </button>
+          </form>
+        </section>
+
+        <section className="marketplace-history">
+          <header className="section-heading">
+            <div>
+              <h3>Movimentações do Mercado Livre</h3>
+              <p>Últimos lançamentos que alteraram esta reserva</p>
+            </div>
+          </header>
+          {marketEntries.map((e) => {
+            const effect = marketEffect(e);
+            return (
+              <div className="marketplace-history-row" key={e.id}>
+                <span>
+                  <strong>{e.description}</strong>
+                  <small>{displayDate(e.date)} · {actorName(e.createdBy)}</small>
+                </span>
+                <b className={effect >= 0 ? "positive" : ""}>
+                  {effect >= 0 ? "+" : "−"}{cash(Math.abs(effect)).replace(/^R\$\s*/, "R$ ")}
+                </b>
+              </div>
+            );
+          })}
+          {!marketEntries.length && <div className="empty-state">Nenhuma movimentação do Mercado Livre ainda.</div>}
+        </section>
+        <footer className="modal-footer marketplace-footer">
+          <button type="button" className="secondary" onClick={close}>Fechar</button>
+        </footer>
+      </div>
+    </ModalShell>
+  );
+}
+
 function FinanceModal({
   modal,
   f,
@@ -1905,7 +2317,7 @@ function FinanceModal({
   close,
   commit,
 }: {
-  modal: Exclude<Modal, null | { type: "reset" }>;
+  modal: Exclude<Modal, null | { type: "reset" } | { type: "marketplace" }>;
   f: Finance;
   saving: boolean;
   cash: (v: number) => string;
@@ -1975,12 +2387,24 @@ function FinanceModal({
   const [setupBillValue, setSetupBillValue] = useState("");
   const [setupBillMonths, setSetupBillMonths] = useState(0);
   const [setupBillStart, setSetupBillStart] = useState(today());
+  const [setupMarketplacePct, setSetupMarketplacePct] = useState(f.marketplace.percent);
+  const [setupMarketplaceActive, setSetupMarketplaceActive] = useState(f.marketplace.active);
   useEffect(() => {
     if (modal.type !== "setup" || setupStep !== 3) return;
     const timer = window.setTimeout(close, 2200);
     return () => window.clearTimeout(timer);
   }, [modal.type, setupStep, close]);
-  const existingPolicy = old?.id && old.policy.length ? old.policy : f.pots;
+  const existingPolicy = old?.id && old.policy.length ? old.policy : contributionPolicy(f);
+  const setupMarketplaceConfig = {
+    ...f.marketplace,
+    percent: setupMarketplacePct,
+    active: setupMarketplaceActive,
+  };
+  const setupMarketplaceTarget = marketplacePolicyPot(setupMarketplaceConfig);
+  const setupTargets = [
+    ...setupPots,
+    ...(setupMarketplaceActive ? [setupMarketplaceTarget] : []),
+  ];
   let preview: Record<string, number> = {};
   try {
     if (modal.type === "entry" && modal.kind === "income") {
@@ -1994,7 +2418,7 @@ function FinanceModal({
       const commitments = setupBills
         .filter((r) => r.start.slice(0, 7) <= date.slice(0, 7))
         .reduce((sum, r) => sum + r.cents, 0);
-      preview = allocateContribution(parseMoney(value), setupPots, commitments);
+      preview = allocateContribution(parseMoney(value), setupTargets, commitments);
     }
   } catch {}
   const title =
@@ -2085,9 +2509,10 @@ function FinanceModal({
         }
         if (setupStep === 2) {
           validatePots(setupPots);
+          validateMarketplace(setupMarketplaceConfig, setupPots);
           const amount = parseMoney(value);
-          const grossAllocated = Object.entries(allocateContribution(amount, setupPots, 0))
-            .filter(([id]) => id !== "free" && potAllocationBase(setupPots.find((p) => p.id === id)!) === "gross")
+          const grossAllocated = Object.entries(allocateContribution(amount, setupTargets, 0))
+            .filter(([id]) => id !== "free" && potAllocationBase(setupTargets.find((p) => p.id === id)!) === "gross")
             .reduce((sum, [, cents]) => sum + cents, 0);
           if (setupMonthlyCommitment > Math.max(0, amount - grossAllocated))
             throw new Error(
@@ -2097,6 +2522,7 @@ function FinanceModal({
             ...f,
             configured: false,
             pots: setupPots,
+            marketplace: setupMarketplaceConfig,
             recurrences: [...f.recurrences, ...setupBills],
           };
           next = generateRecurring(next);
@@ -2109,9 +2535,10 @@ function FinanceModal({
               cents: amount,
               date,
             },
-            setupPots,
+            setupTargets,
           );
-          first.allocations = allocateContribution(amount, setupPots, commitments);
+          first.policy = structuredClone(setupTargets);
+          first.allocations = allocateContribution(amount, setupTargets, commitments);
           next = { ...next, configured: true, entries: [...next.entries, first] };
           const ok = await commit(() => next, true);
           if (ok) setSetupStep(3);
@@ -2229,6 +2656,7 @@ function FinanceModal({
         };
         const next = [...f.pots.filter((x) => x.id !== updated.id), updated];
         validatePots(next);
+        validateMarketplace(f.marketplace, next);
         await commit((s) => ({
           ...s,
           pots: [...s.pots.filter((x) => x.id !== updated.id), updated],
@@ -2350,11 +2778,11 @@ function FinanceModal({
         {p.name} · {cash(Math.max(0, balances(f, date).buckets[p.id] || 0))}
       </option>
     ));
-  const selectedSetupPot = setupPots[setupSelected] || setupPots[0];
+  const selectedSetupPot = setupTargets[setupSelected] || setupTargets[0];
   const setupMonthlyCommitment = setupBills
     .filter((r) => r.start.slice(0, 7) <= date.slice(0, 7))
     .reduce((sum, r) => sum + r.cents, 0);
-  const setupGrossPct = setupPots
+  const setupGrossPct = setupTargets
     .filter((p) => p.active && p.mode === "percent" && potAllocationBase(p) === "gross")
     .reduce((sum, p) => sum + p.value, 0);
   const setupRemainderPct = setupPots
@@ -2493,7 +2921,7 @@ function FinanceModal({
                 </div>
 
                 <div className="setup-plan-summary">
-                  <div><small>Patrimônios · aporte bruto</small><strong>{setupGrossPct}%</strong></div>
+                  <div><small>Patrimônios + Mercado Livre · aporte bruto</small><strong>{setupGrossPct}%</strong></div>
                   <div><small>Outros potes · saldo restante</small><strong>{setupRemainderPct}%</strong></div>
                 </div>
 
@@ -2502,8 +2930,8 @@ function FinanceModal({
                     <strong>100%</strong>
                     <small>limite por base</small>
                   </div>
-                  {setupPots.map((item, i) => {
-                    const angle = (-90 + (i * 360) / Math.max(1, setupPots.length)) * (Math.PI / 180);
+                  {setupTargets.map((item, i) => {
+                    const angle = (-90 + (i * 360) / Math.max(1, setupTargets.length)) * (Math.PI / 180);
                     const left = 50 + Math.cos(angle) * 39;
                     const top = 50 + Math.sin(angle) * 39;
                     return (
@@ -2527,7 +2955,7 @@ function FinanceModal({
                   <div className="setup-pot-identity">
                     <PotSymbol symbol={potSymbol(selectedSetupPot)} />
                     <span>
-                      <small>{potAllocationBase(selectedSetupPot) === "gross" ? "Calculado sobre o aporte bruto" : "Calculado após contas e patrimônios"}</small>
+                      <small>{selectedSetupPot.id === MARKETPLACE_ID ? "Reserva empresarial · calculada sobre o aporte bruto" : potAllocationBase(selectedSetupPot) === "gross" ? "Calculado sobre o aporte bruto" : "Calculado após contas e patrimônios"}</small>
                       <strong>{selectedSetupPot.id === "patrimonio_manuela" ? "Patrimônio Manuela" : selectedSetupPot.name}</strong>
                     </span>
                   </div>
@@ -2538,7 +2966,7 @@ function FinanceModal({
                     step={1}
                     amountLabel={preview[selectedSetupPot.id] != null ? cash(preview[selectedSetupPot.id]) : undefined}
                     maxAllowed={
-                      100 - setupPots
+                      100 - setupTargets
                         .filter((x, i) =>
                           i !== setupSelected &&
                           x.active &&
@@ -2547,9 +2975,17 @@ function FinanceModal({
                         )
                         .reduce((sum, x) => sum + x.value, 0)
                     }
-                    onChange={(nextValue) =>
-                      setSetupPots((items) => items.map((x, i) => i === setupSelected ? { ...x, value: nextValue } : x))
-                    }
+                    onChange={(nextValue) => {
+                      if (selectedSetupPot.id === MARKETPLACE_ID) {
+                        setSetupMarketplacePct(nextValue);
+                      } else {
+                        setSetupPots((items) =>
+                          items.map((x) =>
+                            x.id === selectedSetupPot.id ? { ...x, value: nextValue } : x,
+                          ),
+                        );
+                      }
+                    }}
                   />
                 </div>
 
@@ -2558,12 +2994,12 @@ function FinanceModal({
                     type="button"
                     className="icon-button carousel-arrow"
                     aria-label="Pote anterior"
-                    onClick={() => setSetupSelected((setupSelected - 1 + setupPots.length) % setupPots.length)}
+                    onClick={() => setSetupSelected((setupSelected - 1 + setupTargets.length) % setupTargets.length)}
                   >
                     <ChevronLeft size={20} />
                   </button>
                   <div className="setup-pot-carousel" role="listbox" aria-label="Escolher pote">
-                    {setupPots.map((item, i) => (
+                    {setupTargets.map((item, i) => (
                       <button
                         type="button"
                         role="option"
@@ -2587,7 +3023,7 @@ function FinanceModal({
                     type="button"
                     className="icon-button carousel-arrow"
                     aria-label="Próximo pote"
-                    onClick={() => setSetupSelected((setupSelected + 1) % setupPots.length)}
+                    onClick={() => setSetupSelected((setupSelected + 1) % setupTargets.length)}
                   >
                     <ChevronRight size={20} />
                   </button>
@@ -2601,7 +3037,7 @@ function FinanceModal({
                       .filter(([, amount]) => amount > 0)
                       .map(([id, amount]) => (
                         <div key={id}>
-                          <span>{setupPots.find((x) => x.id === id)?.name || (id === "free" ? "Contas + saldo não alocado" : "Sem distribuição")}</span>
+                          <span>{setupTargets.find((x) => x.id === id)?.name || (id === "free" ? "Contas + saldo não alocado" : "Sem distribuição")}</span>
                           <b>{cash(amount)}</b>
                         </div>
                       ))}
@@ -2663,7 +3099,10 @@ function FinanceModal({
                     x.id !== p?.id &&
                     potAllocationBase(x) === (p ? potAllocationBase(p) : "remainder"),
                 )
-                .reduce((sum, x) => sum + x.value, 0)
+                .reduce((sum, x) => sum + x.value, 0) -
+              ((p ? potAllocationBase(p) : "remainder") === "gross" && f.marketplace.active
+                ? f.marketplace.percent
+                : 0)
             }
             step={1}
             onChange={(n) => setValue(String(n))}
@@ -2862,14 +3301,24 @@ function FinanceModal({
                       allocationBase: p ? potAllocationBase(p) : "remainder",
                     },
                   ];
-                  const parts = allocate(100000, next);
+                  const parts = allocateContribution(
+                    100000,
+                    [
+                      ...next,
+                      ...(f.marketplace.active && f.marketplace.percent > 0
+                        ? [marketplacePolicyPot(f.marketplace)]
+                        : []),
+                    ],
+                    0,
+                  );
                   return Object.entries(parts)
                     .filter(([, v]) => v > 0)
                     .map(([id, v]) => (
                       <div key={id}>
                         <span>
-                          {next.find((p) => p.id === id)?.name ||
-                            "Sem distribuição"}
+                          {id === MARKETPLACE_ID
+                            ? "Mercado Livre"
+                            : next.find((p) => p.id === id)?.name || "Sem distribuição"}
                         </span>
                         <b>{cash(v)}</b>
                       </div>

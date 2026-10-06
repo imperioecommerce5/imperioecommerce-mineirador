@@ -8,6 +8,14 @@ export const actorName = (actor?: RecordActor) =>
       : actor === "sistema"
         ? "Sistema"
         : "Registro anterior";
+export const MARKETPLACE_ID = "mercado_livre";
+export type Marketplace = {
+  id: typeof MARKETPLACE_ID;
+  name: "Mercado Livre";
+  percent: number;
+  active: boolean;
+  color: string;
+};
 export type Pot = {
   id: string;
   name: string;
@@ -63,6 +71,7 @@ export type Finance = {
   revision: number;
   configured: boolean;
   pots: Pot[];
+  marketplace: Marketplace;
   entries: Entry[];
   recurrences: Recurrence[];
   goals: Goal[];
@@ -161,11 +170,44 @@ export const defaults: Pot[] = [
           : "remainder",
     }) as Pot,
 );
+export const defaultMarketplace = (): Marketplace => ({
+  id: MARKETPLACE_ID,
+  name: "Mercado Livre",
+  percent: 0,
+  active: true,
+  color: "#D9B52E",
+});
+
+export const marketplacePolicyPot = (marketplace: Marketplace): Pot => ({
+  id: MARKETPLACE_ID,
+  name: "Mercado Livre",
+  mode: "percent",
+  value: marketplace.percent,
+  reserve: true,
+  rollover: true,
+  priority: -1,
+  active: marketplace.active,
+  color: marketplace.color,
+  icon: "wallet",
+  allocationBase: "gross",
+});
+
+export const contributionPolicy = (
+  f: Pick<Finance, "pots" | "marketplace">,
+  includeMarketplace = true,
+): Pot[] => [
+  ...structuredClone(f.pots),
+  ...(includeMarketplace && f.marketplace.active && f.marketplace.percent > 0
+    ? [marketplacePolicyPot(f.marketplace)]
+    : []),
+];
+
 export const empty = (): Finance => ({
   version: 2,
   revision: 0,
   configured: false,
   pots: defaults,
+  marketplace: defaultMarketplace(),
   entries: [],
   recurrences: [],
   goals: [],
@@ -215,10 +257,30 @@ export function validatePots(pots: Pot[]) {
     if (total > 10000)
       throw new Error(
         base === "gross"
-          ? "Os percentuais de patrimônio ultrapassam 100% do aporte bruto."
+          ? "As reservas calculadas sobre o aporte bruto ultrapassam 100%."
           : "As porcentagens dos potes ultrapassam 100% do valor disponível.",
       );
   }
+}
+
+export function validateMarketplace(marketplace: Marketplace, pots: Pot[] = []) {
+  if (
+    !marketplace ||
+    marketplace.id !== MARKETPLACE_ID ||
+    marketplace.name !== "Mercado Livre" ||
+    typeof marketplace.active !== "boolean" ||
+    typeof marketplace.color !== "string" ||
+    !Number.isFinite(marketplace.percent) ||
+    marketplace.percent < 0 ||
+    marketplace.percent > 100
+  )
+    throw new Error("Configuração do Mercado Livre inválida.");
+  validatePots([
+    ...pots,
+    ...(marketplace.active && marketplace.percent > 0
+      ? [marketplacePolicyPot(marketplace)]
+      : []),
+  ]);
 }
 
 /**
@@ -363,9 +425,11 @@ export function balances(f: Finance, through = today()) {
       buckets[e.destination] = (buckets[e.destination] || 0) + e.cents;
     }
   }
-  const reserved = f.pots
+  const personalReserved = f.pots
     .filter((p) => p.reserve)
     .reduce((s, p) => s + Math.max(0, buckets[p.id] || 0), 0);
+  const marketplace = Math.max(0, buckets[MARKETPLACE_ID] || 0);
+  const reserved = personalReserved + marketplace;
   const month = through.slice(0, 7);
   const pending = f.entries
     .filter(
@@ -379,6 +443,8 @@ export function balances(f: Finance, through = today()) {
   return {
     account,
     reserved,
+    personalReserved,
+    marketplace,
     pending,
     free: account - reserved - pending,
     buckets,
@@ -474,37 +540,89 @@ function legacyDate(s: string) {
 }
 export function migrate(raw: any): Finance {
   if (raw?.financeV2) {
-    const recurrenceIds = new Set<string>(
-      (raw.financeV2.recurrences || []).map((r: Recurrence) => r.id),
+    const original = raw.financeV2;
+    const marketplaceLegacyPot = (original.pots || []).find(
+      (p: Pot) =>
+        p?.id === MARKETPLACE_ID ||
+        String(p?.name || "").trim().toLocaleLowerCase("pt-BR") === "mercado livre",
     );
-    const normalized = {
-      ...raw.financeV2,
-      pots: raw.financeV2.pots.map((p: Pot) => ({
+    const legacyMarketplaceId = marketplaceLegacyPot?.id || MARKETPLACE_ID;
+    const marketplace: Marketplace = original.marketplace
+      ? {
+          ...defaultMarketplace(),
+          ...original.marketplace,
+          id: MARKETPLACE_ID,
+          name: "Mercado Livre",
+          percent: Math.max(0, Math.min(100, Math.round(Number(original.marketplace.percent) || 0))),
+        }
+      : {
+          ...defaultMarketplace(),
+          percent:
+            marketplaceLegacyPot?.mode === "percent"
+              ? Math.max(0, Math.min(100, Math.round(Number(marketplaceLegacyPot.value) || 0)))
+              : 0,
+          active: marketplaceLegacyPot?.active ?? true,
+        };
+    const recurrenceIds = new Set<string>(
+      (original.recurrences || []).map((r: Recurrence) => r.id),
+    );
+    const remapId = (id: string) =>
+      id === legacyMarketplaceId ? MARKETPLACE_ID : id;
+    const normalizePolicy = (policy: Pot[] = []) =>
+      policy.map((p: Pot) => ({
         ...p,
+        id: remapId(p.id),
+        name: p.id === legacyMarketplaceId ? "Mercado Livre" : p.name,
+        color: p.id === legacyMarketplaceId ? marketplace.color : p.color,
         allocationBase: potAllocationBase(p),
-      })),
-      recurrences: (raw.financeV2.recurrences || []).map((r: Recurrence) => ({
-        ...r,
-        // Contas fixas ficam fora dos potes de consumo.
-        pot: "free",
-      })),
-      entries: raw.financeV2.entries.map((e: Entry) => ({
-        ...e,
-        // Pendências geradas por contas recorrentes também usam o saldo reservado de contas.
-        pot:
-          e.kind === "expense" &&
-          e.status === "pending" &&
-          e.source &&
-          recurrenceIds.has(e.source)
-            ? "free"
-            : e.pot,
-        policy: (e.policy || []).map((p: Pot) => ({
+      }));
+    const normalized = {
+      ...original,
+      marketplace,
+      pots: (original.pots || [])
+        .filter((p: Pot) => p.id !== legacyMarketplaceId)
+        .map((p: Pot) => ({
           ...p,
           allocationBase: potAllocationBase(p),
         })),
-        createdBy: e.createdBy || "anterior",
-        updatedBy: e.updatedBy || e.createdBy || "anterior",
+      recurrences: (original.recurrences || []).map((r: Recurrence) => ({
+        ...r,
+        pot: "free",
       })),
+      entries: (original.entries || []).map((e: Entry) => {
+        const allocations: Allocation = {};
+        Object.entries(e.allocations || {}).forEach(([id, value]) => {
+          const target = remapId(id);
+          allocations[target] = (allocations[target] || 0) + Number(value);
+        });
+        return {
+          ...e,
+          allocations,
+          pot:
+            e.kind === "expense" &&
+            e.status === "pending" &&
+            e.source &&
+            recurrenceIds.has(e.source)
+              ? "free"
+              : remapId(e.pot),
+          destination: remapId(e.destination),
+          policy: normalizePolicy(e.policy || []),
+          createdBy: e.createdBy || "anterior",
+          updatedBy: e.updatedBy || e.createdBy || "anterior",
+        };
+      }),
+      rules: (original.rules || []).map((r: Rule) => ({
+        ...r,
+        pot: r.pot === legacyMarketplaceId ? "free" : r.pot,
+      })),
+      migrationNotes: [
+        ...(original.migrationNotes || []),
+        ...(!original.marketplace && marketplaceLegacyPot
+          ? [
+              "Mercado Livre foi separado dos potes. O saldo e o histórico existentes foram preservados integralmente; o percentual anterior foi mantido e, nos próximos aportes, passa a ser calculado sobre o aporte bruto.",
+            ]
+          : []),
+      ],
     };
     validateFinance(normalized);
     return normalized;
@@ -512,21 +630,30 @@ export function migrate(raw: any): Finance {
   const f = empty();
   if (!raw || !Array.isArray(raw.potesAtivos)) return f;
   f.configured = raw.potesAtivos.length > 0;
-  f.pots = raw.potesAtivos.map((p: any, i: number) => ({
-    id: p.id,
-    name: p.nome,
-    value: Number(p.percentual) || 0,
-    mode: "percent",
-    reserve: !!p.retencaoAutomatica,
-    rollover: true,
-    priority: i,
-    active: true,
-    color: p.cor || "#13765e",
-    allocationBase:
-      p.id === "nosso_patrimonio" || p.id === "patrimonio_manuela"
-        ? "gross"
-        : "remainder",
-  }));
+  const legacyMarketplace = (raw.potesAtivos || []).find(
+    (p: any) => String(p?.nome || "").trim().toLocaleLowerCase("pt-BR") === "mercado livre",
+  );
+  if (legacyMarketplace) {
+    f.marketplace.percent = Math.max(0, Math.min(100, Math.round(Number(legacyMarketplace.percentual) || 0)));
+    f.marketplace.active = true;
+  }
+  f.pots = raw.potesAtivos
+    .filter((p: any) => p !== legacyMarketplace)
+    .map((p: any, i: number) => ({
+      id: p.id,
+      name: p.nome,
+      value: Number(p.percentual) || 0,
+      mode: "percent",
+      reserve: !!p.retencaoAutomatica,
+      rollover: true,
+      priority: i,
+      active: true,
+      color: p.cor || "#13765e",
+      allocationBase:
+        p.id === "nosso_patrimonio" || p.id === "patrimonio_manuela"
+          ? "gross"
+          : "remainder",
+    }));
   validatePots(f.pots);
   const initial = toCents(raw.aportePendenteValor);
   const dates = (raw.transacoes || [])
@@ -551,6 +678,7 @@ export function migrate(raw: any): Finance {
     let kind: Entry["kind"] = t.tipo === "entrada" ? "income" : "expense";
     let pot = t.poteId || "free",
       destination = "";
+    if (legacyMarketplace && pot === legacyMarketplace.id) pot = MARKETPLACE_ID;
     if (["geral", "divida_fixa"].includes(pot)) pot = "free";
     if (pot.startsWith("aporte_extra_")) {
       kind = "transfer";
@@ -653,6 +781,7 @@ export function validateFinance(f: any): asserts f is Finance {
     f.version !== 2 ||
     !Array.isArray(f.entries) ||
     !Array.isArray(f.pots) ||
+    !f.marketplace ||
     !Array.isArray(f.goals) ||
     !Array.isArray(f.recurrences) ||
     !Array.isArray(f.rules) ||
@@ -665,6 +794,7 @@ export function validateFinance(f: any): asserts f is Finance {
   )
     throw new Error("Backup inválido ou incompatível.");
   validatePots(f.pots);
+  validateMarketplace(f.marketplace, f.pots);
   if (
     f.closedMonths.some(
       (m: any) => typeof m !== "string" || !/^\d{4}-\d{2}$/.test(m),

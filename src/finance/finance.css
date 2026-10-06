@@ -3528,3 +3528,256 @@ button {
     gap: 18px;
   }
 }
+
+/* =========================================================
+   Mercado Livre — reserva empresarial separada dos potes
+   ========================================================= */
+.marketplace-card,
+.marketplace-allocation-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  color: var(--text);
+  background: linear-gradient(135deg, #fffdf5, #fffaf0);
+  border: 1px solid #e7dba9;
+  border-left: 4px solid #d9b52e;
+  border-radius: 11px;
+  padding: 13px 16px;
+  margin: 0 0 18px;
+}
+.marketplace-card:hover,
+.marketplace-allocation-card:hover {
+  background: linear-gradient(135deg, #fffbea, #fff7df);
+}
+.marketplace-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #6e5a0b;
+  background: #f6df72;
+  border: 1px solid #e6ca4e;
+  box-shadow: inset 0 1px 0 #fff9, 0 3px 8px #8a6d1420;
+}
+.marketplace-copy,
+.marketplace-allocation-card > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.marketplace-copy > small,
+.marketplace-allocation-card > span:nth-child(2) > small,
+.marketplace-hero small {
+  color: #8a7114;
+  font-size: 9px;
+  letter-spacing: 1.15px;
+  font-weight: 700;
+}
+.marketplace-copy > strong,
+.marketplace-allocation-card > span:nth-child(2) > strong {
+  font-size: 14px;
+}
+.marketplace-copy > span,
+.marketplace-allocation-card p {
+  color: var(--muted);
+  font-size: 10px;
+}
+.marketplace-balance,
+.marketplace-allocation-value {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  white-space: nowrap;
+}
+.marketplace-balance small,
+.marketplace-allocation-value small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.marketplace-balance strong,
+.marketplace-allocation-value strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 17px;
+}
+.marketplace-allocation-card {
+  margin-bottom: 22px;
+}
+
+.marketplace-dialog {
+  padding: 22px 25px 26px;
+  display: grid;
+  gap: 20px;
+}
+.marketplace-dialog .notice {
+  margin-bottom: 0;
+}
+.marketplace-hero {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 17px 18px;
+  background: linear-gradient(135deg, #fffdf4, #fff8e2);
+  border: 1px solid #eadca2;
+  border-radius: 13px;
+}
+.marketplace-icon-large {
+  width: 50px;
+  height: 50px;
+}
+.marketplace-hero > div {
+  display: grid;
+  gap: 3px;
+}
+.marketplace-hero strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 28px;
+  letter-spacing: -.7px;
+}
+.marketplace-hero p {
+  color: var(--muted);
+  font-size: 10px;
+}
+.marketplace-config,
+.marketplace-actions,
+.marketplace-history {
+  border-top: 1px solid var(--border);
+  padding-top: 19px;
+}
+.marketplace-config {
+  display: grid;
+  gap: 13px;
+}
+.marketplace-config .section-heading,
+.marketplace-history .section-heading {
+  margin-bottom: 4px;
+}
+.marketplace-action-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 7px;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--soft);
+  margin-bottom: 15px;
+}
+.marketplace-action-tabs button {
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.marketplace-action-tabs button.active {
+  background: var(--surface);
+  color: #7c650d;
+  box-shadow: 0 1px 5px #00000012;
+}
+.marketplace-movement-form {
+  display: grid;
+  gap: 14px;
+}
+.marketplace-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.marketplace-plan-note {
+  border-left: 3px solid #d9b52e;
+}
+.marketplace-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.marketplace-history-row:first-of-type {
+  border-top: 0;
+}
+.marketplace-history-row > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.marketplace-history-row strong {
+  font-size: 11px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.marketplace-history-row small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.marketplace-history-row > b {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.marketplace-footer {
+  margin-top: 0;
+}
+.dark .marketplace-card,
+.dark .marketplace-allocation-card,
+.dark .marketplace-hero {
+  background: linear-gradient(135deg, #252519, #24241d);
+  border-color: #5c5430;
+}
+.dark .marketplace-card,
+.dark .marketplace-allocation-card {
+  border-left-color: #d7b84a;
+}
+.dark .marketplace-card:hover,
+.dark .marketplace-allocation-card:hover {
+  background: linear-gradient(135deg, #2a291a, #29271e);
+}
+.dark .marketplace-icon {
+  color: #f3d96f;
+  background: #4a401d;
+  border-color: #6d5d27;
+  box-shadow: inset 0 1px 0 #ffffff10, 0 3px 8px #0003;
+}
+.dark .marketplace-copy > small,
+.dark .marketplace-allocation-card > span:nth-child(2) > small,
+.dark .marketplace-hero small,
+.dark .marketplace-action-tabs button.active {
+  color: #e4c65b;
+}
+.dark .marketplace-action-tabs button.active {
+  background: #2b2b22;
+}
+
+@media (max-width: 800px),
+  (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .marketplace-card,
+  .marketplace-allocation-card {
+    grid-template-columns: 38px minmax(0, 1fr) 16px;
+    gap: 10px;
+    padding: 12px 13px;
+  }
+  .marketplace-balance,
+  .marketplace-allocation-value {
+    grid-column: 2;
+    justify-items: start;
+  }
+  .marketplace-card > svg,
+  .marketplace-allocation-card > svg {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+  .marketplace-dialog {
+    padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  .marketplace-action-tabs {
+    grid-template-columns: 1fr;
+  }
+  .marketplace-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
