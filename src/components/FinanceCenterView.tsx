@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { FamilyProfile } from "../finance/FamilyProfile";
 import { familyEvolution } from "../finance/evolution";
 import "../finance/refinements.css";
@@ -1943,36 +1944,37 @@ export default function FinanceCenterView({
             </>
           )}
         </main>
-        <nav className="mobile-nav">
-          {navViews.map((v) => {
+        <nav className="mobile-nav" aria-label="Navegação principal">
+          {navViews.map((v, index) => {
             const Icon = icons[v];
             return (
-              <button
-                className={view === v ? "active" : ""}
-                key={v}
-                onClick={() => setView(v)}
-              >
-                <Icon size={19} />
-                <span>
-                  {v === "settings"
-                    ? "Ajustes"
-                    : v === "home"
-                      ? "Início"
-                      : labels[v]}
-                </span>
-              </button>
+              <Fragment key={v}>
+                {index === 3 && (
+                  <button
+                    type="button"
+                    className="nav-new-movement"
+                    aria-label="Nova movimentação"
+                    title="Nova movimentação"
+                    disabled={saving || !f.configured}
+                    onClick={() => setQuickActions(true)}
+                  >
+                    <span className="nav-new-circle"><Plus size={23} /></span>
+                    <span>Adicionar</span>
+                  </button>
+                )}
+                <button
+                  className={view === v ? "active" : ""}
+                  onClick={() => setView(v)}
+                  aria-current={view === v ? "page" : undefined}
+                >
+                  <Icon size={19} />
+                  <span>{v === "settings" ? "Ajustes" : v === "home" ? "Início" : labels[v]}</span>
+                </button>
+              </Fragment>
             );
           })}
         </nav>
       </div>
-      <button
-        className="quick-movement"
-        aria-label="Nova movimentação"
-        disabled={saving || !f.configured}
-        onClick={() => setQuickActions(true)}
-      >
-        <Plus size={25} />
-      </button>
       {quickActions && (
         <ModalShell
           title="Nova movimentação"

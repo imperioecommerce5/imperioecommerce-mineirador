@@ -574,3 +574,59 @@ body,
 .finance-app .xp-earned { display: flex; align-items: center; gap: 5px; color: #b39b62; font-weight: 650; }
 @keyframes pot-segment-reveal { from { opacity: 0; stroke-width: 2; } to { opacity: 1; stroke-width: 5; } }
 @media (prefers-reduced-motion: reduce) { .finance-app .pot-ring-segmented .pot-ring-fill { animation: none; } }
+
+/* V3 — refinamento integral preservando as cores e superfícies originais. */
+.finance-app { --finance-radius: 16px; }
+.finance-app .panel, .finance-app .balance-card, .finance-app .marketplace-card,
+.finance-app .patrimony-tile { border-radius: var(--finance-radius); }
+.finance-app .balance-card, .finance-app .patrimony-tile, .finance-app .marketplace-card {
+  transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+}
+.finance-app .patrimony-tile:hover, .finance-app .marketplace-card:hover { border-color: var(--green); }
+.finance-app .patrimony-tile { grid-template-columns: minmax(0,1fr) auto; }
+.finance-app .patrimony-tile strong {
+  display: block; width: 100%; min-width: 0; max-width: 100%;
+  font-size: clamp(11px, 3.2vw, 23px); line-height: 1.2;
+  letter-spacing: -.035em; white-space: nowrap; overflow: hidden;
+  text-overflow: clip; font-variant-numeric: tabular-nums;
+}
+.finance-app .patrimony-tile small { overflow-wrap: anywhere; }
+.finance-app .rank-emblem { box-shadow: none !important; filter: none !important; }
+.finance-app .rank-emblem svg { filter: none !important; }
+.finance-app .movement-confirmation { box-shadow: 0 8px 26px #0002; }
+.finance-app .nav-new-movement { color: var(--muted); }
+.finance-app .nav-new-circle {
+  width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #b9a071; color: #171c19; box-shadow: none;
+  transition: transform .18s ease, background-color .18s ease;
+}
+.finance-app .nav-new-movement:active .nav-new-circle { transform: scale(.92); }
+.finance-app .nav-new-movement:disabled { opacity: .5; }
+.finance-app .quick-movement { display: none !important; }
+@media (max-width: 800px), (max-width: 1366px) and (pointer: coarse) {
+  .finance-app .mobile-nav {
+    display: grid; grid-template-columns: repeat(7,minmax(0,1fr));
+    align-items: center; gap: 0;
+    padding: 7px max(5px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-left));
+  }
+  .finance-app .mobile-nav button { min-width: 0; width: 100%; min-height: 53px; padding: 3px 0; gap: 5px; font-size: clamp(8px,2vw,10px); }
+  .finance-app .mobile-nav .nav-new-movement { display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  .finance-app .content { padding-bottom: calc(108px + env(safe-area-inset-bottom)); }
+  .finance-app .movement-confirmation { bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .finance-app .patrimony-tile strong { font-size: clamp(11px, 3.45vw, 19px); }
+}
+@media (min-width: 801px) and (pointer: fine) {
+  .finance-app .nav-new-movement { display: none; }
+  .finance-app .quick-movement { display: grid !important; }
+}
+@media (max-width: 360px) {
+  .finance-app .mobile-nav button { font-size: 8px; }
+  .finance-app .mobile-nav button svg { width: 17px; }
+  .finance-app .nav-new-circle { width: 38px; height: 38px; }
+  .finance-app .patrimony-tile { padding: 9px; }
+  .finance-app .patrimony-tile strong { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .finance-app .nav-new-circle { transition: none; }
+}
