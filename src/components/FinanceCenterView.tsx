@@ -268,6 +268,7 @@ export default function FinanceCenterView({
     market: boolean;
     scheduled: boolean;
     medals: string[];
+    xpGained: number;
   } | null>(null);
   const setupPrompted = useRef(false);
   useEffect(() => {
@@ -340,6 +341,7 @@ export default function FinanceCenterView({
           market,
           scheduled: movement.date > today() || movement.status === "pending",
           medals,
+          xpGained: Math.max(0, familyEvolution(saved).xp - (f ? familyEvolution(f).xp : 0)),
         });
         setToast(
           movement.date > today() || movement.status === "pending"
@@ -2093,6 +2095,7 @@ export default function FinanceCenterView({
           <Check size={17} />
           <div>
             <strong>{toast || "Lançamento excluído"}</strong>
+            {toast === "Aporte realizado" && <small className="contribution-celebration">Seu Império está crescendo.</small>}
             {toast && confirmation && (
               <>
                 <p>
@@ -2102,6 +2105,9 @@ export default function FinanceCenterView({
                   {confirmation.scheduled ? "Saldo atual" : "Saldo atualizado"}:{" "}
                   {cash(confirmation.balance)}
                 </small>
+                {confirmation.xpGained > 0 && (
+                  <p className="xp-earned"><Crown size={14} /> +{confirmation.xpGained} XP de evolução</p>
+                )}
                 {confirmation.medals.map((name) => (
                   <p className="medal-unlock" key={name}>
                     <Crown size={14} /> Conquista: {name}
@@ -2199,6 +2205,12 @@ function PotCard({
   const budget = balance + spent;
   const used =
     budget > 0 ? (spent / budget) * 100 : balance <= 0 && spent > 0 ? 100 : 0;
+  const remaining = Math.max(0, Math.min(1, budget > 0 ? balance / budget : balance > 0 ? 1 : 0));
+  const ringSegments = 8;
+  const ringCircumference = 2 * Math.PI * 56;
+  const ringStep = ringCircumference / ringSegments;
+  const ringGap = 7;
+  const ringLength = ringStep - ringGap;
   return (
     <article className="pot-card">
       <header>
@@ -2218,26 +2230,21 @@ function PotCard({
         <Pencil size={14} />
       </button>
       <div className="pot-art">
-        <svg className="pot-ring" viewBox="0 0 120 120" aria-hidden="true">
-          <circle cx="60" cy="60" r="56" />
-          <circle
-            cx="60"
-            cy="60"
-            r="56"
-            stroke={p.color}
-            strokeDasharray="351.86"
-            strokeDashoffset={
-              351.86 *
-              (1 -
-                Math.max(
-                  0,
-                  Math.min(
-                    1,
-                    budget > 0 ? balance / budget : balance > 0 ? 1 : 0,
-                  ),
-                ))
-            }
-          />
+        <svg className="pot-ring pot-ring-segmented" viewBox="0 0 120 120" aria-hidden="true">
+          {Array.from({ length: ringSegments }, (_, i) => {
+            const segmentProgress = Math.max(0, Math.min(1, remaining * ringSegments - i));
+            return (
+              <g key={i}>
+                <circle cx="60" cy="60" r="56" strokeDasharray={`${ringLength} ${ringCircumference}`} strokeDashoffset={-i * ringStep} />
+                {segmentProgress > 0 && (
+                  <circle className="pot-ring-fill" cx="60" cy="60" r="56"
+                    stroke={p.color}
+                    strokeDasharray={`${Math.max(0.01, ringLength * segmentProgress)} ${ringCircumference}`}
+                    strokeDashoffset={-i * ringStep} />
+                )}
+              </g>
+            );
+          })}
         </svg>
         <PotSymbol symbol={potSymbol(p)} />
         <span className="pot-percentage">
