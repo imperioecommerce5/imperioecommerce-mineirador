@@ -90,7 +90,7 @@ export function useFinance(demo: boolean, actor: Actor) {
     if (demo) {
       const raw = storage.getItem("imperio_demo");
       try {
-        receive(raw ? JSON.parse(raw) : demoData());
+        receive(raw ? migrate({ financeV2: JSON.parse(raw) }) : demoData());
       } catch {
         receive(demoData());
       }

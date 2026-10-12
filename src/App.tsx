@@ -10,6 +10,7 @@ import FinanceCenterView from "./components/FinanceCenterView";
 import { ArrowRight, User, Users } from "lucide-react";
 import { Actor } from "./finance/model";
 import "./finance/finance.css";
+import "./finance/refinements.css";
 
 export default function App() {
   const demo =

@@ -1,3 +1,6 @@
+import { FamilyProfile } from "../finance/FamilyProfile";
+import { familyEvolution } from "../finance/evolution";
+import "../finance/refinements.css";
 import { PotSymbol, potSymbol, symbols } from "../finance/PotSymbol";
 import { AnimatedMoney } from "../finance/AnimatedMoney";
 import { PercentageControl } from "../finance/PercentageControl";
@@ -37,6 +40,7 @@ import {
   Sparkles,
   User,
   Store,
+  Crown,
 } from "lucide-react";
 import { useFinance } from "../finance/useFinance";
 import {
@@ -71,10 +75,24 @@ import {
   validateMarketplace,
 } from "../finance/model";
 import "../finance/finance.css";
-type View = "home" | "ledger" | "pots" | "bills" | "goals" | "settings" | "profile";
-const navViews: Exclude<View, "profile">[] = ["home", "ledger", "pots", "bills", "goals", "settings"];
+type View =
+  "home" | "ledger" | "pots" | "bills" | "goals" | "settings" | "profile";
+const navViews: Exclude<View, "profile">[] = [
+  "home",
+  "ledger",
+  "pots",
+  "bills",
+  "goals",
+  "settings",
+];
 type Modal =
-  | { type: "entry"; kind: Entry["kind"]; existing?: Entry; presetPot?: string; presetDest?: string }
+  | {
+      type: "entry";
+      kind: Entry["kind"];
+      existing?: Entry;
+      presetPot?: string;
+      presetDest?: string;
+    }
   | { type: "pot"; existing?: Pot }
   | { type: "bill"; existing?: Recurrence }
   | { type: "goal"; existing?: Goal }
@@ -130,8 +148,41 @@ function ModalShell({
   onClose: () => void;
   children: any;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      document.documentElement.style.setProperty(
+        "--visual-height",
+        `${viewport?.height || window.innerHeight}px`,
+      );
+      document.documentElement.style.setProperty(
+        "--visual-top",
+        `${viewport?.offsetTop || 0}px`,
+      );
+    };
+    updateViewport();
+    viewport?.addEventListener("resize", updateViewport);
+    viewport?.addEventListener("scroll", updateViewport);
+    dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const fn = (e: KeyboardEvent) => {
+      if (e.key === "Tab") {
+        const items = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+          ) || [],
+        );
+        const first = items[0],
+          last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", fn);
@@ -140,12 +191,18 @@ function ModalShell({
     return () => {
       document.removeEventListener("keydown", fn);
       document.body.style.overflow = old;
+      viewport?.removeEventListener("resize", updateViewport);
+      viewport?.removeEventListener("scroll", updateViewport);
+      document.documentElement.style.removeProperty("--visual-height");
+      document.documentElement.style.removeProperty("--visual-top");
+      previouslyFocused?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <section
         className="modal"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -202,6 +259,16 @@ export default function FinanceCenterView({
   const [dark, setDark] = useState(
     () => storage.getItem("imperio_visual") === "dark",
   );
+  const [quickActions, setQuickActions] = useState(false);
+  const [patrimonyDetail, setPatrimonyDetail] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    value: number;
+    balance: number;
+    label: string;
+    market: boolean;
+    scheduled: boolean;
+    medals: string[];
+  } | null>(null);
   const setupPrompted = useRef(false);
   useEffect(() => {
     const color = dark ? "#10171a" : "#f5f6f3";
@@ -230,8 +297,67 @@ export default function FinanceCenterView({
   ) {
     try {
       setLocalError("");
-      await save(fn, backupBefore);
-      setToast(message);
+      const saved = await save(fn, backupBefore);
+      const changed = saved.entries.filter(
+        (e) =>
+          !e.deleted &&
+          (!f?.entries.some((old) => old.id === e.id) ||
+            f.entries.some(
+              (old) =>
+                old.id === e.id &&
+                (old.cents !== e.cents || old.status !== e.status),
+            )),
+      );
+      const movement = changed[changed.length - 1];
+      if (movement) {
+        const after = balances(saved);
+        const market = movement.source.startsWith("marketplace:");
+        const bucket = market
+          ? MARKETPLACE_ID
+          : movement.kind === "transfer"
+            ? movement.destination
+            : movement.kind === "expense"
+              ? movement.pot
+              : "";
+        const label = market
+          ? "Mercado Livre"
+          : bucket
+            ? saved.pots.find((p) => p.id === bucket)?.name ||
+              "Sem distribuição"
+            : "Livre para gastar";
+        const beforeMedals = f
+          ? familyEvolution(f)
+              .medals.filter((m) => m.unlocked)
+              .map((m) => m.id)
+          : [];
+        const medals = familyEvolution(saved)
+          .medals.filter((m) => m.unlocked && !beforeMedals.includes(m.id))
+          .map((m) => m.name);
+        setConfirmation({
+          value: movement.cents,
+          balance: bucket ? after.buckets[bucket] || 0 : after.free,
+          label,
+          market,
+          scheduled: movement.date > today() || movement.status === "pending",
+          medals,
+        });
+        setToast(
+          movement.date > today() || movement.status === "pending"
+            ? "Movimentação agendada"
+            : movement.kind === "expense"
+              ? message.includes("Pagamento")
+                ? "Conta paga"
+                : "Gasto registrado"
+              : movement.kind === "income"
+                ? market
+                  ? "Entrada registrada"
+                  : "Aporte realizado"
+                : "Transferência realizada",
+        );
+      } else {
+        setConfirmation(null);
+        setToast(message);
+      }
       return true;
     } catch (e) {
       setLocalError((e as Error).message);
@@ -254,6 +380,7 @@ export default function FinanceCenterView({
   if (!f || !b)
     return (
       <main className="loading">
+        <Crown className="loading-crown" size={38} strokeWidth={1.3} />
         <span className="wordmark">
           IMPÉRIO<span>FINANCEIRO</span>
         </span>
@@ -369,7 +496,9 @@ export default function FinanceCenterView({
     if (e.pot !== "free") {
       const available = b?.buckets[e.pot] || 0;
       if (available < e.cents) {
-        setLocalError(`O pote ${potName(e.pot)} tem apenas ${cash(Math.max(0, available))}. O pagamento não pode usar saldo de outro pote.`);
+        setLocalError(
+          `O pote ${potName(e.pot)} tem apenas ${cash(Math.max(0, available))}. O pagamento não pode usar saldo de outro pote.`,
+        );
         return;
       }
     }
@@ -407,7 +536,9 @@ export default function FinanceCenterView({
       .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
     const weight = targets.reduce((sum, p) => sum + p.value, 0);
     if (!targets.length || weight <= 0) {
-      setLocalError("Defina percentuais nos potes de uso antes de distribuir o saldo livre.");
+      setLocalError(
+        "Defina percentuais nos potes de uso antes de distribuir o saldo livre.",
+      );
       return;
     }
     if (
@@ -497,6 +628,7 @@ export default function FinanceCenterView({
             <>
               {e.status === "pending" && (
                 <button
+                  disabled={saving}
                   aria-label="Marcar como pago hoje"
                   title="Marcar como pago hoje"
                   onClick={() => pay(e)}
@@ -615,12 +747,14 @@ export default function FinanceCenterView({
               onClick={() => setView("profile")}
               aria-label="Abrir meu perfil financeiro"
             >
-              <span className="avatar">{actor === "voce" ? "R" : "A"}</span>
+              <span className="avatar">
+                <Crown size={16} strokeWidth={1.4} />
+              </span>
               <span>{actorName(actor)}</span>
             </button>
           </div>
         </header>
-        <main className="content">
+        <main className="content view-transition" key={view}>
           <div className="page-heading">
             <div>
               <p className="eyebrow">
@@ -641,26 +775,28 @@ export default function FinanceCenterView({
                         : view === "ledger"
                           ? "Cada movimento conta a história do seu dinheiro."
                           : view === "profile"
-                    ? "Acompanhe a evolução e os pontos que merecem atenção."
-                    : "Seu planejamento funciona do seu jeito."}
+                            ? "Acompanhe a evolução e os pontos que merecem atenção."
+                            : "Seu planejamento funciona do seu jeito."}
               </p>
             </div>
-            {view !== "profile" && <div className="heading-actions">
-              <button
-                className="secondary"
-                disabled={saving || !f.configured}
-                onClick={() => open({ type: "entry", kind: "expense" })}
-              >
-                <Plus size={17} /> Registrar gasto
-              </button>
-              <button
-                className="primary"
-                disabled={saving || !f.configured}
-                onClick={() => open({ type: "entry", kind: "income" })}
-              >
-                <Plus size={17} /> Registrar aporte
-              </button>
-            </div>}
+            {view !== "profile" && (
+              <div className="heading-actions">
+                <button
+                  className="secondary"
+                  disabled={saving || !f.configured}
+                  onClick={() => open({ type: "entry", kind: "expense" })}
+                >
+                  <Plus size={17} /> Registrar gasto
+                </button>
+                <button
+                  className="primary"
+                  disabled={saving || !f.configured}
+                  onClick={() => open({ type: "entry", kind: "income" })}
+                >
+                  <Plus size={17} /> Registrar aporte
+                </button>
+              </div>
+            )}
           </div>
           {!f.configured && (
             <div className="setup-banner">
@@ -721,16 +857,28 @@ export default function FinanceCenterView({
                 </div>
                 <div className="balance-card">
                   <span>Saldo em conta</span>
-                  <AnimatedMoney cents={b.account} hidden={hidden} tag="strong" />
+                  <AnimatedMoney
+                    cents={b.account}
+                    hidden={hidden}
+                    tag="strong"
+                  />
                   <small>Entradas menos pagamentos realizados</small>
                   <hr />
                   <div>
                     <span>Reservas pessoais</span>
-                    <AnimatedMoney cents={b.personalReserved} hidden={hidden} tag="b" />
+                    <AnimatedMoney
+                      cents={b.personalReserved}
+                      hidden={hidden}
+                      tag="b"
+                    />
                   </div>
                   <div>
                     <span>Reserva Mercado Livre</span>
-                    <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="b" />
+                    <AnimatedMoney
+                      cents={b.marketplace}
+                      hidden={hidden}
+                      tag="b"
+                    />
                   </div>
                   <div>
                     <span>Contas pendentes até este mês</span>
@@ -738,17 +886,36 @@ export default function FinanceCenterView({
                   </div>
                 </div>
               </section>
-              <section className="patrimony-strip" aria-label="Patrimônios protegidos">
-                <div>
-                  <span className="patrimony-icon"><PiggyBank size={18} /></span>
-                  <span><small>Nosso Patrimônio</small><AnimatedMoney cents={Math.max(0, b.buckets.nosso_patrimonio || 0)} hidden={hidden} tag="strong" /></span>
-                  <ShieldCheck size={16} />
-                </div>
-                <div>
-                  <span className="patrimony-icon"><PiggyBank size={18} /></span>
-                  <span><small>Patrimônio Manuela</small><AnimatedMoney cents={Math.max(0, b.buckets.patrimonio_manuela || 0)} hidden={hidden} tag="strong" /></span>
-                  <ShieldCheck size={16} />
-                </div>
+              <section
+                className="patrimony-strip"
+                aria-label="Patrimônios protegidos"
+              >
+                {["nosso_patrimonio", "patrimonio_manuela"].map((id) => (
+                  <button
+                    className="patrimony-tile"
+                    key={id}
+                    onClick={() => setPatrimonyDetail(id)}
+                    aria-label={`Ver detalhes de ${id === "nosso_patrimonio" ? "Nosso Patrimônio" : "Patrimônio Manuela"}`}
+                  >
+                    <span className="patrimony-icon">
+                      <PiggyBank size={18} />
+                    </span>
+                    <small>
+                      {id === "nosso_patrimonio"
+                        ? "Nosso Patrimônio"
+                        : "Patrimônio Manuela"}
+                    </small>
+                    <AnimatedMoney
+                      cents={Math.max(0, b.buckets[id] || 0)}
+                      hidden={hidden}
+                      tag="strong"
+                    />
+                    <span className="protected-label">
+                      <ShieldCheck size={12} /> Protegido{" "}
+                      <ChevronRight size={12} />
+                    </span>
+                  </button>
+                ))}
               </section>
               <button
                 type="button"
@@ -756,45 +923,114 @@ export default function FinanceCenterView({
                 onClick={() => open({ type: "marketplace" })}
                 aria-label="Gerenciar Mercado Livre"
               >
-                <span className="marketplace-icon"><Store size={20} /></span>
+                <span className="marketplace-icon">
+                  <Store size={20} />
+                </span>
                 <span className="marketplace-copy">
                   <small>RESERVA EMPRESARIAL</small>
                   <strong>Mercado Livre</strong>
-                  <span>{f.marketplace.active ? `${f.marketplace.percent}% da sobra após patrimônios e contas` : "Percentual automático pausado"}</span>
+                  <span>
+                    {f.marketplace.active
+                      ? `${f.marketplace.percent}% da sobra após patrimônios e contas`
+                      : "Percentual automático pausado"}
+                  </span>
                 </span>
                 <span className="marketplace-balance">
                   <small>Saldo reservado</small>
-                  <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="strong" />
+                  <AnimatedMoney
+                    cents={b.marketplace}
+                    hidden={hidden}
+                    tag="strong"
+                  />
                 </span>
                 <ChevronRight size={18} />
               </button>
               {b.free < 0 && (
                 <div className="notice danger">
-                  As reservas e contas pendentes superam o saldo em conta. Revise os compromissos antes de gastar.
+                  As reservas e contas pendentes superam o saldo em conta.
+                  Revise os compromissos antes de gastar.
                 </div>
               )}
               {unallocated > 0 && !surplusDismissed && (
                 <section className="surplus-card">
                   <div className="surplus-copy">
-                    <span className="surplus-icon"><Sparkles size={18} /></span>
+                    <span className="surplus-icon">
+                      <Sparkles size={18} />
+                    </span>
                     <div>
                       <small>SALDO NÃO ALOCADO</small>
-                      <AnimatedMoney cents={unallocated} hidden={hidden} tag="strong" />
-                      <p>Esse valor ainda não tem destino. Você decide se quer guardar, usar em uma meta ou manter livre.</p>
+                      <AnimatedMoney
+                        cents={unallocated}
+                        hidden={hidden}
+                        tag="strong"
+                      />
+                      <p>
+                        Esse valor ainda não tem destino. Você decide se quer
+                        guardar, usar em uma meta ou manter livre.
+                      </p>
                     </div>
                   </div>
                   <div className="surplus-actions">
-                    <button className="secondary" onClick={() => open({ type: "entry", kind: "transfer", presetPot: "free", presetDest: "nosso_patrimonio" })}>Nosso patrimônio</button>
-                    <button className="secondary" onClick={() => open({ type: "entry", kind: "transfer", presetPot: "free", presetDest: "patrimonio_manuela" })}>Patrimônio Manuela</button>
-                    {f.goals[0] && <button className="secondary" onClick={() => open({ type: "entry", kind: "transfer", presetPot: "free", presetDest: f.goals[0].pot })}>Aportar em meta</button>}
-                    <button className="secondary" onClick={distributeUnallocatedAcrossPots}>Distribuir nos potes</button>
-                    <button className="text-button" onClick={() => setSurplusDismissed(true)}>Manter como saldo livre</button>
+                    <button
+                      className="secondary"
+                      onClick={() =>
+                        open({
+                          type: "entry",
+                          kind: "transfer",
+                          presetPot: "free",
+                          presetDest: "nosso_patrimonio",
+                        })
+                      }
+                    >
+                      Nosso patrimônio
+                    </button>
+                    <button
+                      className="secondary"
+                      onClick={() =>
+                        open({
+                          type: "entry",
+                          kind: "transfer",
+                          presetPot: "free",
+                          presetDest: "patrimonio_manuela",
+                        })
+                      }
+                    >
+                      Patrimônio Manuela
+                    </button>
+                    {f.goals[0] && (
+                      <button
+                        className="secondary"
+                        onClick={() =>
+                          open({
+                            type: "entry",
+                            kind: "transfer",
+                            presetPot: "free",
+                            presetDest: f.goals[0].pot,
+                          })
+                        }
+                      >
+                        Aportar em meta
+                      </button>
+                    )}
+                    <button
+                      className="secondary"
+                      onClick={distributeUnallocatedAcrossPots}
+                    >
+                      Distribuir nos potes
+                    </button>
+                    <button
+                      className="text-button"
+                      onClick={() => setSurplusDismissed(true)}
+                    >
+                      Manter como saldo livre
+                    </button>
                   </div>
                 </section>
               )}
               {b.buckets.free < 0 && (
                 <div className="notice danger">
-                  O saldo sem distribuição está em {cash(b.buckets.free)}. Revise transferências e pagamentos anteriores.
+                  O saldo sem distribuição está em {cash(b.buckets.free)}.
+                  Revise transferências e pagamentos anteriores.
                 </div>
               )}
               <section className="two-columns">
@@ -835,6 +1071,7 @@ export default function FinanceCenterView({
                       <b>{cash(e.cents)}</b>
                       <button
                         className="icon-button"
+                        disabled={saving}
                         aria-label="Registrar pagamento hoje"
                         onClick={() => pay(e)}
                       >
@@ -876,13 +1113,6 @@ export default function FinanceCenterView({
                   <div className="month-stat total">
                     <span>Resultado</span>
                     <b>{cash(income - expense)}</b>
-                  </div>
-                  <div className="spending-bar">
-                    <span
-                      style={{
-                        width: `${income ? Math.min(100, (expense / income) * 100) : 0}%`,
-                      }}
-                    />
                   </div>
                   <p className="muted">
                     {income
@@ -1059,7 +1289,14 @@ export default function FinanceCenterView({
                     Exportar CSV
                   </button>
                 </header>
-                {filtered.map(ledgerRow)}
+                {Array.from(new Set(filtered.map((e) => e.date))).map(
+                  (date) => (
+                    <section className="timeline-day" key={date}>
+                      <h3>{date === today() ? "Hoje" : displayDate(date)}</h3>
+                      {filtered.filter((e) => e.date === date).map(ledgerRow)}
+                    </section>
+                  ),
+                )}
                 {!filtered.length && (
                   <div className="empty-state">
                     Nenhuma movimentação para estes filtros.
@@ -1090,21 +1327,46 @@ export default function FinanceCenterView({
                 </button>
                 <span className="muted">
                   {pots
-                    .filter((p) => p.mode === "percent" && potAllocationBase(p) === "gross")
-                    .reduce((s, p) => s + p.value, 0)}% patrimônios · {f.marketplace.percent}% Mercado Livre · {pots
-                    .filter((p) => p.mode === "percent" && potAllocationBase(p) === "remainder")
-                    .reduce((s, p) => s + p.value, 0)}% demais potes
+                    .filter(
+                      (p) =>
+                        p.mode === "percent" &&
+                        potAllocationBase(p) === "gross",
+                    )
+                    .reduce((s, p) => s + p.value, 0)}
+                  % patrimônios · {f.marketplace.percent}% Mercado Livre ·{" "}
+                  {pots
+                    .filter(
+                      (p) =>
+                        p.mode === "percent" &&
+                        potAllocationBase(p) === "remainder",
+                    )
+                    .reduce((s, p) => s + p.value, 0)}
+                  % demais potes
                 </span>
               </div>
-              <button type="button" className="marketplace-allocation-card" onClick={() => open({ type: "marketplace" })}>
-                <span className="marketplace-icon"><Store size={19} /></span>
+              <button
+                type="button"
+                className="marketplace-allocation-card"
+                onClick={() => open({ type: "marketplace" })}
+              >
+                <span className="marketplace-icon">
+                  <Store size={19} />
+                </span>
                 <span>
                   <small>FORA DOS POTES · RESERVA EMPRESARIAL</small>
                   <strong>Mercado Livre</strong>
-                  <p>{f.marketplace.active ? `${f.marketplace.percent}% do saldo após patrimônios e contas é separado automaticamente.` : "Separação automática pausada."}</p>
+                  <p>
+                    {f.marketplace.active
+                      ? `${f.marketplace.percent}% do saldo após patrimônios e contas é separado automaticamente.`
+                      : "Separação automática pausada."}
+                  </p>
                 </span>
                 <span className="marketplace-allocation-value">
-                  <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="strong" />
+                  <AnimatedMoney
+                    cents={b.marketplace}
+                    hidden={hidden}
+                    tag="strong"
+                  />
                   <small>Gerenciar</small>
                 </span>
                 <ChevronRight size={18} />
@@ -1280,9 +1542,19 @@ export default function FinanceCenterView({
                       <p>
                         de {cash(g.target)} · {pct.toFixed(0)}%
                       </p>
-                      <div className="spending-bar">
-                        <span style={{ width: `${pct}%` }} />
-                      </div>
+                      <ol className="goal-journey" aria-label="Etapas da meta">
+                        {[0, 25, 50, 75, 100].map((step) => (
+                          <li
+                            key={step}
+                            className={pct >= step ? "reached" : ""}
+                          >
+                            <span>
+                              {pct >= step ? <Check size={12} /> : ""}
+                            </span>
+                            <small>{step === 0 ? "Início" : `${step}%`}</small>
+                          </li>
+                        ))}
+                      </ol>
                       <div className="goal-detail">
                         <span>Falta</span>
                         <b>{cash(remaining)}</b>
@@ -1379,142 +1651,9 @@ export default function FinanceCenterView({
               </section>
             </>
           )}
-          {view === "profile" && (() => {
-            const currentMonth = today().slice(0, 7);
-            const previousMonth = monthDate(`${currentMonth}-01`, -1).slice(0, 7);
-            const monthTotals = (m: string) => {
-              const rows = f.entries.filter((e) => !e.deleted && e.status === "paid" && e.date.slice(0, 7) === m && e.date <= today());
-              return {
-                income: rows.filter((e) => e.kind === "income").reduce((sum, e) => sum + e.cents, 0),
-                expense: rows.filter((e) => e.kind === "expense").reduce((sum, e) => sum + e.cents, 0),
-                saved: rows.reduce(
-                  (sum, e) =>
-                    sum +
-                    (e.kind === "income"
-                      ? (e.allocations.nosso_patrimonio || 0) +
-                        (e.allocations.patrimonio_manuela || 0)
-                      : e.kind === "transfer" &&
-                          ["nosso_patrimonio", "patrimonio_manuela"].includes(e.destination)
-                        ? e.cents
-                        : 0),
-                  0,
-                ),
-              };
-            };
-            const now = monthTotals(currentMonth);
-            const before = monthTotals(previousMonth);
-            const protectedTotal = Math.max(0, b.buckets.nosso_patrimonio || 0) + Math.max(0, b.buckets.patrimonio_manuela || 0);
-            const externalTotal = f.assets.reduce((sum, a) => sum + a.cents, 0);
-            const months = Array.from({ length: 6 }, (_, i) => monthDate(`${currentMonth}-01`, i - 5).slice(0, 7));
-            const history = months.map((m) => ({ month: m, ...monthTotals(m) }));
-            const maxSaved = Math.max(1, ...history.map((x) => x.saved));
-            const expenseDelta = before.expense
-              ? ((now.expense - before.expense) / before.expense) * 100
-              : now.expense > 0
-                ? 100
-                : 0;
-            const savedDelta = before.saved ? ((now.saved - before.saved) / before.saved) * 100 : now.saved > 0 ? 100 : 0;
-            const insights = [
-              {
-                tone: savedDelta >= 0 ? "good" : "attention",
-                icon: savedDelta >= 0 ? TrendingUp : TrendingDown,
-                title: savedDelta >= 0 ? "Patrimônio em evolução" : "Patrimônio desacelerou",
-                text: before.saved
-                  ? `Neste mês vocês direcionaram ${Math.abs(Math.round(savedDelta))}% ${savedDelta >= 0 ? "a mais" : "a menos"} para os patrimônios do que no mês anterior.`
-                  : now.saved > 0
-                    ? `Neste mês já foram direcionados ${cash(now.saved)} aos patrimônios.`
-                    : "Ainda não houve aporte para os patrimônios neste mês.",
-              },
-              {
-                tone: expenseDelta <= 0 ? "good" : "attention",
-                icon: expenseDelta <= 0 ? TrendingDown : TrendingUp,
-                title: expenseDelta <= 0 ? "Gastos sob controle" : "Gastos em alta",
-                text: before.expense
-                  ? `Os gastos pagos estão ${Math.abs(Math.round(expenseDelta))}% ${expenseDelta <= 0 ? "abaixo" : "acima"} do mês anterior.`
-                  : `Gastos pagos neste mês: ${cash(now.expense)}.`,
-              },
-              {
-                tone: b.pending > 0 ? "attention" : "good",
-                icon: CalendarDays,
-                title: b.pending > 0 ? "Há compromissos pendentes" : "Contas do período em dia",
-                text: b.pending > 0 ? `${cash(b.pending)} ainda estão reservados para contas pendentes.` : "Não há contas pendentes até este mês.",
-              },
-            ];
-            return (
-              <>
-                <section className="profile-hero">
-                  <div>
-                    <p className="eyebrow">RAIO-X FINANCEIRO</p>
-                    <h2>{actorName(actor)}, esta é a evolução do planejamento</h2>
-                    <p>Sem pontuação ou medalhas: apenas os números que mostram o que está avançando e o que merece atenção.</p>
-                  </div>
-                  <button className="secondary" onClick={onLogout}><LogOut size={16} /> Trocar perfil ou sair</button>
-                </section>
-
-                <section className="profile-metrics">
-                  <article>
-                    <span className="metric-icon"><PiggyBank size={19} /></span>
-                    <small>Patrimônio protegido</small>
-                    <strong>{cash(protectedTotal)}</strong>
-                    <p>Nosso Patrimônio + Patrimônio Manuela</p>
-                  </article>
-                  <article>
-                    <span className="metric-icon"><TrendingUp size={19} /></span>
-                    <small>Guardado neste mês</small>
-                    <strong>{cash(now.saved)}</strong>
-                    <p>Aportes destinados aos dois patrimônios</p>
-                  </article>
-                  <article>
-                    <span className="metric-icon"><Activity size={19} /></span>
-                    <small>Resultado do mês</small>
-                    <strong>{cash(now.income - now.expense)}</strong>
-                    <p>Aportes menos gastos pagos</p>
-                  </article>
-                  <article>
-                    <span className="metric-icon"><Wallet size={19} /></span>
-                    <small>Patrimônio externo</small>
-                    <strong>{cash(externalTotal)}</strong>
-                    <p>Bens e valores informados fora da conta</p>
-                  </article>
-                </section>
-
-                <section className="profile-grid">
-                  <div className="panel evolution-panel">
-                    <header className="section-heading">
-                      <div><h2>Evolução de aportes aos patrimônios</h2><p>Últimos seis meses</p></div>
-                    </header>
-                    <div className="evolution-bars">
-                      {history.map((item) => (
-                        <div key={item.month}>
-                          <span className="evolution-value">{item.saved ? cash(item.saved) : "—"}</span>
-                          <span className="evolution-track"><i style={{ height: `${Math.max(item.saved ? 8 : 2, (item.saved / maxSaved) * 100)}%` }} /></span>
-                          <small>{item.month.slice(5)}/{item.month.slice(2, 4)}</small>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="panel insights-panel">
-                    <header className="section-heading"><div><h2>Leitura do momento</h2><p>Baseada no histórico registrado</p></div></header>
-                    {insights.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <div className={`insight-row ${item.tone}`} key={item.title}>
-                          <span><Icon size={17} /></span>
-                          <div><strong>{item.title}</strong><p>{item.text}</p></div>
-                        </div>
-                      );
-                    })}
-                    {unallocated > 0 && (
-                      <div className="insight-row neutral">
-                        <span><Sparkles size={17} /></span>
-                        <div><strong>Há dinheiro sem destino</strong><p>{cash(unallocated)} ainda podem ser direcionados para patrimônio, metas ou potes.</p></div>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              </>
-            );
-          })()}
+          {view === "profile" && (
+            <FamilyProfile f={f} cash={cash} hidden={hidden} />
+          )}
           {view === "settings" && (
             <>
               <section className="panel account-panel">
@@ -1788,8 +1927,8 @@ export default function FinanceCenterView({
                   Aporte aumenta o saldo em conta. Gasto pago diminui o saldo.
                   Reserva e transferência entre potes não retiram dinheiro da
                   conta. A reserva Mercado Livre também fica fora do valor livre
-                  para gastar. Contas pendentes até o mês atual reduzem o valor livre
-                  para gastar. Aportes futuros aparecem no extrato, mas só
+                  para gastar. Contas pendentes até o mês atual reduzem o valor
+                  livre para gastar. Aportes futuros aparecem no extrato, mas só
                   entram nos saldos na data informada.
                 </p>
                 <p className="muted">
@@ -1824,10 +1963,153 @@ export default function FinanceCenterView({
           })}
         </nav>
       </div>
+      <button
+        className="quick-movement"
+        aria-label="Nova movimentação"
+        disabled={saving || !f.configured}
+        onClick={() => setQuickActions(true)}
+      >
+        <Plus size={25} />
+      </button>
+      {quickActions && (
+        <ModalShell
+          title="Nova movimentação"
+          onClose={() => setQuickActions(false)}
+        >
+          <div className="quick-grid">
+            <button
+              onClick={() => {
+                setQuickActions(false);
+                open({ type: "entry", kind: "income" });
+              }}
+            >
+              <ArrowDownLeft />
+              Adicionar entrada / aporte
+              <small>Distribuir conforme o planejamento</small>
+            </button>
+            <button
+              onClick={() => {
+                setQuickActions(false);
+                open({ type: "entry", kind: "expense" });
+              }}
+            >
+              <ArrowUpRight />
+              Registrar gasto<small>Usar o saldo do pote escolhido</small>
+            </button>
+            <button
+              onClick={() => {
+                setQuickActions(false);
+                open({ type: "entry", kind: "transfer", presetPot: "free" });
+              }}
+            >
+              <PiggyBank />
+              Aportar em um pote<small>Destinar saldo sem distribuição</small>
+            </button>
+            <button
+              onClick={() => {
+                setQuickActions(false);
+                setView("bills");
+              }}
+            >
+              <CalendarDays />
+              Pagar conta<small>Escolher um compromisso pendente</small>
+            </button>
+            <button
+              onClick={() => {
+                setQuickActions(false);
+                open({ type: "marketplace" });
+              }}
+            >
+              <Store />
+              Mercado Livre<small>Movimentar a reserva empresarial</small>
+            </button>
+          </div>
+        </ModalShell>
+      )}
+      {patrimonyDetail && (
+        <ModalShell
+          title={potName(patrimonyDetail)}
+          onClose={() => setPatrimonyDetail(null)}
+        >
+          <div className="patrimony-details">
+            <ShieldCheck size={30} />
+            <small>Saldo protegido</small>
+            <AnimatedMoney
+              cents={Math.max(0, b.buckets[patrimonyDetail] || 0)}
+              hidden={hidden}
+              tag="strong"
+            />
+            <p>Esta reserva permanece separada dos potes de gastos.</p>
+            <h3>Movimentações recentes</h3>
+            {f.entries
+              .filter(
+                (e) =>
+                  !e.deleted &&
+                  ((e.allocations[patrimonyDetail] || 0) > 0 ||
+                    e.destination === patrimonyDetail ||
+                    e.pot === patrimonyDetail),
+              )
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .slice(0, 5)
+              .map((e) => (
+                <div className="simple-row" key={e.id}>
+                  <span>
+                    {e.description}
+                    <small>
+                      {displayDate(e.date)} ·{" "}
+                      {e.status === "pending" || e.date > today()
+                        ? "Agendado"
+                        : "Confirmado"}
+                    </small>
+                  </span>
+                  <b>
+                    {cash(
+                      e.kind === "income"
+                        ? e.allocations[patrimonyDetail]
+                        : e.cents,
+                    )}
+                  </b>
+                </div>
+              ))}
+            <button
+              className="secondary"
+              onClick={() => {
+                setPotFilter(patrimonyDetail);
+                setPatrimonyDetail(null);
+                setView("ledger");
+              }}
+            >
+              Consultar no extrato
+            </button>
+          </div>
+        </ModalShell>
+      )}
       {(toast || undo) && (
-        <div className="toast" role="status">
+        <div
+          className={`toast movement-confirmation ${confirmation?.market ? "market-confirmation" : ""}`}
+          key={toast + f.revision}
+          role="status"
+        >
           <Check size={17} />
-          <span>{toast || "Lançamento excluído"}</span>
+          <div>
+            <strong>{toast || "Lançamento excluído"}</strong>
+            {toast && confirmation && (
+              <>
+                <p>
+                  {cash(confirmation.value)} · {confirmation.label}
+                </p>
+                <small>
+                  {confirmation.scheduled ? "Saldo atual" : "Saldo atualizado"}:{" "}
+                  {cash(confirmation.balance)}
+                </small>
+                {confirmation.medals.map((name) => (
+                  <p className="medal-unlock" key={name}>
+                    <Crown size={14} /> Conquista: {name}
+                  </p>
+                ))}
+              </>
+            )}
+          </div>
           {undo && <button onClick={() => restore(undo)}>Desfazer</button>}
           <button
             aria-label="Fechar aviso"
@@ -1925,7 +2207,7 @@ function PotCard({
           {p.reserve ? "Reserva" : "Gastos"} ·{" "}
           {p.mode === "percent"
             ? `${p.value}%`
-            : money(Math.round(p.value * 100)) + " / aporte"}
+            : cash(Math.round(p.value * 100)) + " / aporte"}
         </span>
       </header>
       <button
@@ -1936,6 +2218,27 @@ function PotCard({
         <Pencil size={14} />
       </button>
       <div className="pot-art">
+        <svg className="pot-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="56" />
+          <circle
+            cx="60"
+            cy="60"
+            r="56"
+            stroke={p.color}
+            strokeDasharray="351.86"
+            strokeDashoffset={
+              351.86 *
+              (1 -
+                Math.max(
+                  0,
+                  Math.min(
+                    1,
+                    budget > 0 ? balance / budget : balance > 0 ? 1 : 0,
+                  ),
+                ))
+            }
+          />
+        </svg>
         <PotSymbol symbol={potSymbol(p)} />
         <span className="pot-percentage">
           {p.mode === "percent" ? `${p.value}%` : "Fixo"}
@@ -1985,7 +2288,9 @@ function MarketplaceDialog({
   const [description, setDescription] = useState("");
   const [value, setValue] = useState("");
   const [date, setDate] = useState(today());
-  const [distribution, setDistribution] = useState<"automatic" | "single">("automatic");
+  const [distribution, setDistribution] = useState<"automatic" | "single">(
+    "automatic",
+  );
   const [destination, setDestination] = useState("nosso_patrimonio");
   const [percent, setPercent] = useState(f.marketplace.percent);
   const [active, setActive] = useState(f.marketplace.active);
@@ -2002,7 +2307,8 @@ function MarketplaceDialog({
     )
     .sort(
       (a, b) =>
-        b.date.localeCompare(a.date) || b.recordedAt.localeCompare(a.recordedAt),
+        b.date.localeCompare(a.date) ||
+        b.recordedAt.localeCompare(a.recordedAt),
     )
     .slice(0, 10);
 
@@ -2166,11 +2472,16 @@ function MarketplaceDialog({
           </div>
         )}
         <section className="marketplace-hero">
-          <span className="marketplace-icon marketplace-icon-large"><Store size={25} /></span>
+          <span className="marketplace-icon marketplace-icon-large">
+            <Store size={25} />
+          </span>
           <div>
             <small>RESERVA EMPRESARIAL</small>
             <strong>{cash(current.marketplace)}</strong>
-            <p>Entradas e gastos do Mercado Livre ficam separados do dinheiro da família.</p>
+            <p>
+              Entradas e gastos do Mercado Livre ficam separados do dinheiro da
+              família.
+            </p>
           </div>
         </section>
 
@@ -2178,7 +2489,10 @@ function MarketplaceDialog({
           <div className="section-heading">
             <div>
               <h3>Percentual automático</h3>
-              <p>É calculado sobre o saldo que restou depois dos patrimônios e das contas. Não entra no limite de 100% dos potes.</p>
+              <p>
+                É calculado sobre o saldo que restou depois dos patrimônios e
+                das contas. Não entra no limite de 100% dos potes.
+              </p>
             </div>
           </div>
           <PercentageControl
@@ -2197,21 +2511,47 @@ function MarketplaceDialog({
             />{" "}
             Separar Mercado Livre nos próximos aportes
           </label>
-          <button type="button" className="secondary" disabled={saving} onClick={savePercentage}>
+          <button
+            type="button"
+            className="secondary"
+            disabled={saving}
+            onClick={savePercentage}
+          >
             Salvar percentual
           </button>
         </section>
 
         <section className="marketplace-actions">
-          <div className="marketplace-action-tabs" role="tablist" aria-label="Movimentação Mercado Livre">
-            <button type="button" className={action === "income" ? "active" : ""} onClick={() => setAction("income")}>Entrada</button>
-            <button type="button" className={action === "expense" ? "active" : ""} onClick={() => setAction("expense")}>Gasto</button>
-            <button type="button" className={action === "planning" ? "active" : ""} onClick={() => setAction("planning")}>Levar ao planejamento</button>
+          <div
+            className="marketplace-action-tabs"
+            role="tablist"
+            aria-label="Movimentação Mercado Livre"
+          >
+            <button
+              type="button"
+              className={action === "income" ? "active" : ""}
+              onClick={() => setAction("income")}
+            >
+              Entrada
+            </button>
+            <button
+              type="button"
+              className={action === "expense" ? "active" : ""}
+              onClick={() => setAction("expense")}
+            >
+              Gasto
+            </button>
+            <button
+              type="button"
+              className={action === "planning" ? "active" : ""}
+              onClick={() => setAction("planning")}
+            >
+              Levar ao planejamento
+            </button>
           </div>
           <form className="marketplace-movement-form" onSubmit={submitMovement}>
             <Field label="Descrição">
               <input
-                autoFocus
                 required
                 maxLength={120}
                 value={description}
@@ -2236,28 +2576,49 @@ function MarketplaceDialog({
                 />
               </Field>
               <Field label="Data">
-                <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
               </Field>
             </div>
             {action === "planning" && (
               <>
                 <Field label="Como distribuir">
-                  <select value={distribution} onChange={(e) => setDistribution(e.target.value as "automatic" | "single")}>
-                    <option value="automatic">Distribuir conforme meu planejamento</option>
+                  <select
+                    value={distribution}
+                    onChange={(e) =>
+                      setDistribution(e.target.value as "automatic" | "single")
+                    }
+                  >
+                    <option value="automatic">
+                      Distribuir conforme meu planejamento
+                    </option>
                     <option value="single">Escolher um destino</option>
                   </select>
                 </Field>
                 {distribution === "automatic" ? (
                   <div className="notice marketplace-plan-note">
-                    Patrimônios, contas e potes recebem o valor pelas regras atuais. O percentual do Mercado Livre não é aplicado novamente nesta transferência.
+                    Patrimônios, contas e potes recebem o valor pelas regras
+                    atuais. O percentual do Mercado Livre não é aplicado
+                    novamente nesta transferência.
                   </div>
                 ) : (
                   <Field label="Destino">
-                    <select value={destination} onChange={(e) => setDestination(e.target.value)}>
+                    <select
+                      value={destination}
+                      onChange={(e) => setDestination(e.target.value)}
+                    >
                       <option value="free">Saldo livre / contas</option>
-                      {f.pots.filter((p) => p.active).map((p) => (
-                        <option value={p.id} key={p.id}>{p.name}</option>
-                      ))}
+                      {f.pots
+                        .filter((p) => p.active)
+                        .map((p) => (
+                          <option value={p.id} key={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
                     </select>
                   </Field>
                 )}
@@ -2288,18 +2649,27 @@ function MarketplaceDialog({
               <div className="marketplace-history-row" key={e.id}>
                 <span>
                   <strong>{e.description}</strong>
-                  <small>{displayDate(e.date)} · {actorName(e.createdBy)}</small>
+                  <small>
+                    {displayDate(e.date)} · {actorName(e.createdBy)}
+                  </small>
                 </span>
                 <b className={effect >= 0 ? "positive" : ""}>
-                  {effect >= 0 ? "+" : "−"}{cash(Math.abs(effect)).replace(/^R\$\s*/, "R$ ")}
+                  {effect >= 0 ? "+" : "−"}
+                  {cash(Math.abs(effect)).replace(/^R\$\s*/, "R$ ")}
                 </b>
               </div>
             );
           })}
-          {!marketEntries.length && <div className="empty-state">Nenhuma movimentação do Mercado Livre ainda.</div>}
+          {!marketEntries.length && (
+            <div className="empty-state">
+              Nenhuma movimentação do Mercado Livre ainda.
+            </div>
+          )}
         </section>
         <footer className="modal-footer marketplace-footer">
-          <button type="button" className="secondary" onClick={close}>Fechar</button>
+          <button type="button" className="secondary" onClick={close}>
+            Fechar
+          </button>
         </footer>
       </div>
     </ModalShell>
@@ -2325,9 +2695,10 @@ function FinanceModal({
   const p = modal.type === "pot" ? modal.existing : null;
   const r = modal.type === "bill" ? modal.existing : null;
   const g = modal.type === "goal" ? modal.existing : null;
-  const defaultExpensePot = f.pots.find(
-    (x) => x.active && !x.reserve && potAllocationBase(x) === "remainder",
-  )?.id || "free";
+  const defaultExpensePot =
+    f.pots.find(
+      (x) => x.active && !x.reserve && potAllocationBase(x) === "remainder",
+    )?.id || "free";
   const [description, setDescription] = useState(
     old?.description || p?.name || r?.name || g?.name || "",
   );
@@ -2346,14 +2717,18 @@ function FinanceModal({
     old?.date || r?.start || g?.deadline || today(),
   );
   const [pot, setPot] = useState(
-    old?.pot ||
-      r?.pot ||
-      g?.pot ||
-      (modal.type === "entry" ? modal.presetPot : undefined) ||
-      (modal.type === "entry" && modal.kind === "expense" ? defaultExpensePot : "free"),
-  ),
+      old?.pot ||
+        r?.pot ||
+        g?.pot ||
+        (modal.type === "entry" ? modal.presetPot : undefined) ||
+        (modal.type === "entry" && modal.kind === "expense"
+          ? defaultExpensePot
+          : "free"),
+    ),
     [dest, setDest] = useState(
-      old?.destination || (modal.type === "entry" ? modal.presetDest : undefined) || "",
+      old?.destination ||
+        (modal.type === "entry" ? modal.presetDest : undefined) ||
+        "",
     );
   const [mode, setMode] = useState<"percent" | "fixed">(p?.mode || "percent"),
     [reserve, setReserve] = useState(p?.reserve || false),
@@ -2384,15 +2759,20 @@ function FinanceModal({
   const [setupBillValue, setSetupBillValue] = useState("");
   const [setupBillMonths, setSetupBillMonths] = useState(0);
   const [setupBillStart, setSetupBillStart] = useState(today());
-  const [setupMarketplacePct, setSetupMarketplacePct] = useState(f.marketplace.percent);
-  const [setupMarketplaceActive, setSetupMarketplaceActive] = useState(f.marketplace.active);
+  const [setupMarketplacePct, setSetupMarketplacePct] = useState(
+    f.marketplace.percent,
+  );
+  const [setupMarketplaceActive, setSetupMarketplaceActive] = useState(
+    f.marketplace.active,
+  );
   const [setupMarketplaceInitial, setSetupMarketplaceInitial] = useState("");
   useEffect(() => {
     if (modal.type !== "setup" || setupStep !== 3) return;
     const timer = window.setTimeout(close, 2200);
     return () => window.clearTimeout(timer);
   }, [modal.type, setupStep, close]);
-  const existingPolicy = old?.id && old.policy.length ? old.policy : contributionPolicy(f);
+  const existingPolicy =
+    old?.id && old.policy.length ? old.policy : contributionPolicy(f);
   const setupMarketplaceConfig = {
     ...f.marketplace,
     percent: setupMarketplacePct,
@@ -2422,7 +2802,9 @@ function FinanceModal({
         .reduce((sum, p) => sum + (withoutMarketplace[p.id] || 0), 0);
       setupMarketplaceAvailable = Math.max(
         0,
-        amount - grossAllocated - Math.min(commitments, amount - grossAllocated),
+        amount -
+          grossAllocated -
+          Math.min(commitments, amount - grossAllocated),
       );
       const firstMarketplaceCents = parseOptionalMoney(setupMarketplaceInitial);
       const firstPolicy: Pot[] = [
@@ -2495,7 +2877,11 @@ function FinanceModal({
     try {
       if (!setupBillName.trim()) throw new Error("Informe o nome da conta.");
       const cents = parseMoney(setupBillValue);
-      if (!Number.isInteger(setupBillMonths) || setupBillMonths < 0 || setupBillMonths > 1200)
+      if (
+        !Number.isInteger(setupBillMonths) ||
+        setupBillMonths < 0 ||
+        setupBillMonths > 1200
+      )
         throw new Error("Informe de 0 a 1.200 meses.");
       const bill: Recurrence = {
         id: uid(),
@@ -2540,8 +2926,13 @@ function FinanceModal({
             throw new Error(
               `O aporte não cobre os patrimônios e as contas deste período. Faltam ${cash(setupMonthlyCommitment - Math.max(0, amount - grossAllocated))}.`,
             );
-          const firstMarketplaceCents = parseOptionalMoney(setupMarketplaceInitial);
-          const marketplaceLimit = Math.max(0, amount - grossAllocated - setupMonthlyCommitment);
+          const firstMarketplaceCents = parseOptionalMoney(
+            setupMarketplaceInitial,
+          );
+          const marketplaceLimit = Math.max(
+            0,
+            amount - grossAllocated - setupMonthlyCommitment,
+          );
           if (firstMarketplaceCents > marketplaceLimit)
             throw new Error(
               `Depois de patrimônios e contas, há ${cash(marketplaceLimit)} disponível para o Mercado Livre.`,
@@ -2580,8 +2971,16 @@ function FinanceModal({
             firstPolicy,
           );
           first.policy = structuredClone(firstPolicy);
-          first.allocations = allocateContribution(amount, firstPolicy, commitments);
-          next = { ...next, configured: true, entries: [...next.entries, first] };
+          first.allocations = allocateContribution(
+            amount,
+            firstPolicy,
+            commitments,
+          );
+          next = {
+            ...next,
+            configured: true,
+            entries: [...next.entries, first],
+          };
           const ok = await commit(() => next, true);
           if (ok) setSetupStep(3);
           return;
@@ -2611,8 +3010,7 @@ function FinanceModal({
             description,
             pot,
             destination: dest,
-            status:
-              modal.kind === "expense" ? (old?.status || "paid") : "paid",
+            status: modal.kind === "expense" ? old?.status || "paid" : "paid",
             policy: modal.kind === "income" ? existingPolicy : [],
             source: old?.id ? old.source : "",
           },
@@ -2646,10 +3044,11 @@ function FinanceModal({
           const selectedPot = f.pots.find((x) => x.id === pot);
           if (!selectedPot || selectedPot.reserve || pot === "free")
             throw new Error("Escolha o pote correto para este gasto.");
-          const available = balances(
-            { ...f, entries: f.entries.filter((e) => e.id !== candidate.id) },
-            date,
-          ).buckets[pot] || 0;
+          const available =
+            balances(
+              { ...f, entries: f.entries.filter((e) => e.id !== candidate.id) },
+              date,
+            ).buckets[pot] || 0;
           if (available < amount)
             throw new Error(
               `Este pote tem apenas ${cash(Math.max(0, available))} disponível. O gasto não pode usar saldo de outro pote.`,
@@ -2662,7 +3061,11 @@ function FinanceModal({
           );
           const available =
             pot === "free"
-              ? Math.max(0, (transferBalances.buckets.free || 0) - transferBalances.pending)
+              ? Math.max(
+                  0,
+                  (transferBalances.buckets.free || 0) -
+                    transferBalances.pending,
+                )
               : transferBalances.buckets[pot] || 0;
           if (available < amount)
             throw new Error(
@@ -2809,12 +3212,18 @@ function FinanceModal({
     </>
   );
   const ruleOptions = f.pots
-    .filter((p) => p.active && !p.reserve && potAllocationBase(p) === "remainder")
+    .filter(
+      (p) => p.active && !p.reserve && potAllocationBase(p) === "remainder",
+    )
     .map((p) => (
-      <option key={p.id} value={p.id}>{p.name}</option>
+      <option key={p.id} value={p.id}>
+        {p.name}
+      </option>
     ));
   const expenseOptions = f.pots
-    .filter((p) => p.active && !p.reserve && potAllocationBase(p) === "remainder")
+    .filter(
+      (p) => p.active && !p.reserve && potAllocationBase(p) === "remainder",
+    )
     .map((p) => (
       <option key={p.id} value={p.id}>
         {p.name} · {cash(Math.max(0, balances(f, date).buckets[p.id] || 0))}
@@ -2825,10 +3234,18 @@ function FinanceModal({
     .filter((r) => r.start.slice(0, 7) <= date.slice(0, 7))
     .reduce((sum, r) => sum + r.cents, 0);
   const setupGrossPct = setupTargets
-    .filter((p) => p.active && p.mode === "percent" && potAllocationBase(p) === "gross")
+    .filter(
+      (p) =>
+        p.active && p.mode === "percent" && potAllocationBase(p) === "gross",
+    )
     .reduce((sum, p) => sum + p.value, 0);
   const setupRemainderPct = setupPots
-    .filter((p) => p.active && p.mode === "percent" && potAllocationBase(p) === "remainder")
+    .filter(
+      (p) =>
+        p.active &&
+        p.mode === "percent" &&
+        potAllocationBase(p) === "remainder",
+    )
     .reduce((sum, p) => sum + p.value, 0);
   return (
     <ModalShell title={title} onClose={close}>
@@ -2852,10 +3269,15 @@ function FinanceModal({
             {setupStep === 0 && (
               <section className="setup-step">
                 <div className="setup-intro">
-                  <span className="setup-icon"><CalendarDays size={21} /></span>
+                  <span className="setup-icon">
+                    <CalendarDays size={21} />
+                  </span>
                   <div>
                     <h3>Primeiro, o que já sai todo mês?</h3>
-                    <p>Cadastre contas fixas e dívidas. Elas serão separadas antes da distribuição dos potes.</p>
+                    <p>
+                      Cadastre contas fixas e dívidas. Elas serão separadas
+                      antes da distribuição dos potes.
+                    </p>
                   </div>
                 </div>
                 <div className="setup-bill-editor">
@@ -2880,7 +3302,9 @@ function FinanceModal({
                       min="0"
                       max="1200"
                       value={setupBillMonths}
-                      onChange={(e) => setSetupBillMonths(Number(e.target.value))}
+                      onChange={(e) =>
+                        setSetupBillMonths(Number(e.target.value))
+                      }
                     />
                   </Field>
                   <Field label="Primeiro vencimento">
@@ -2890,34 +3314,55 @@ function FinanceModal({
                       onChange={(e) => setSetupBillStart(e.target.value)}
                     />
                   </Field>
-                  <button type="button" className="secondary setup-add-bill" onClick={addSetupBill}>
+                  <button
+                    type="button"
+                    className="secondary setup-add-bill"
+                    onClick={addSetupBill}
+                  >
                     <Plus size={16} /> Adicionar conta
                   </button>
-                  <small className="muted">Use 0 meses para uma conta recorrente sem prazo, como aluguel, água ou internet.</small>
+                  <small className="muted">
+                    Use 0 meses para uma conta recorrente sem prazo, como
+                    aluguel, água ou internet.
+                  </small>
                 </div>
                 <div className="setup-bill-list">
                   {setupBills.map((bill) => (
                     <div key={bill.id} className="setup-bill-row">
                       <span>
                         <strong>{bill.name}</strong>
-                        <small>{bill.count ? `${bill.count} meses` : "Recorrente"} · vence a partir de {displayDate(bill.start)}</small>
+                        <small>
+                          {bill.count ? `${bill.count} meses` : "Recorrente"} ·
+                          vence a partir de {displayDate(bill.start)}
+                        </small>
                       </span>
                       <b>{cash(bill.cents)}</b>
                       <button
                         type="button"
                         className="icon-button"
                         aria-label={`Remover ${bill.name}`}
-                        onClick={() => setSetupBills((items) => items.filter((x) => x.id !== bill.id))}
+                        onClick={() =>
+                          setSetupBills((items) =>
+                            items.filter((x) => x.id !== bill.id),
+                          )
+                        }
                       >
                         <Trash2 size={16} />
                       </button>
                     </div>
                   ))}
-                  {!setupBills.length && <p className="muted">Nenhuma conta adicionada ainda. Você pode continuar se não tiver compromissos fixos.</p>}
+                  {!setupBills.length && (
+                    <p className="muted">
+                      Nenhuma conta adicionada ainda. Você pode continuar se não
+                      tiver compromissos fixos.
+                    </p>
+                  )}
                 </div>
                 <div className="setup-total-line">
                   <span>Total mensal cadastrado</span>
-                  <strong>{cash(setupBills.reduce((sum, x) => sum + x.cents, 0))}</strong>
+                  <strong>
+                    {cash(setupBills.reduce((sum, x) => sum + x.cents, 0))}
+                  </strong>
                 </div>
               </section>
             )}
@@ -2925,15 +3370,20 @@ function FinanceModal({
             {setupStep === 1 && (
               <section className="setup-step setup-contribution-step">
                 <div className="setup-intro">
-                  <span className="setup-icon"><Wallet size={21} /></span>
+                  <span className="setup-icon">
+                    <Wallet size={21} />
+                  </span>
                   <div>
                     <h3>Agora informe o aporte inicial</h3>
-                    <p>É o valor bruto disponível hoje. O app separa patrimônios e contas; depois você define manualmente quanto vai para o Mercado Livre.</p>
+                    <p>
+                      É o valor bruto disponível hoje. O app separa patrimônios
+                      e contas; depois você define manualmente quanto vai para o
+                      Mercado Livre.
+                    </p>
                   </div>
                 </div>
                 <Field label="Aporte inicial (R$)">
                   <input
-                    autoFocus
                     inputMode="decimal"
                     required
                     value={value}
@@ -2942,12 +3392,26 @@ function FinanceModal({
                   />
                 </Field>
                 <Field label="Data do aporte">
-                  <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
                 </Field>
                 <div className="setup-math-card">
-                  <span><small>Contas do período</small><b>{cash(setupMonthlyCommitment)}</b></span>
-                  <span><small>Patrimônios</small><b>calculados sobre o bruto</b></span>
-                  <p>Na próxima etapa você escolhe o valor inicial do Mercado Livre. Só depois os potes dividem o saldo restante.</p>
+                  <span>
+                    <small>Contas do período</small>
+                    <b>{cash(setupMonthlyCommitment)}</b>
+                  </span>
+                  <span>
+                    <small>Patrimônios</small>
+                    <b>calculados sobre o bruto</b>
+                  </span>
+                  <p>
+                    Na próxima etapa você escolhe o valor inicial do Mercado
+                    Livre. Só depois os potes dividem o saldo restante.
+                  </p>
                 </div>
               </section>
             )}
@@ -2955,25 +3419,43 @@ function FinanceModal({
             {setupStep === 2 && selectedSetupPot && (
               <section className="setup-step setup-pots-stage">
                 <div className="setup-intro">
-                  <span className="setup-icon"><Target size={21} /></span>
+                  <span className="setup-icon">
+                    <Target size={21} />
+                  </span>
                   <div>
                     <h3>Monte o seu plano financeiro</h3>
-                    <p>Use as setas para trocar de pote e arraste o marcador ao redor do círculo. As porcentagens avançam de 1 em 1.</p>
+                    <p>
+                      Use as setas para trocar de pote e arraste o marcador ao
+                      redor do círculo. As porcentagens avançam de 1 em 1.
+                    </p>
                   </div>
                 </div>
 
                 <div className="setup-plan-summary">
-                  <div><small>Patrimônios · aporte bruto</small><strong>{setupGrossPct}%</strong></div>
-                  <div><small>Outros potes · depois das contas e do Mercado Livre</small><strong>{setupRemainderPct}%</strong></div>
+                  <div>
+                    <small>Patrimônios · aporte bruto</small>
+                    <strong>{setupGrossPct}%</strong>
+                  </div>
+                  <div>
+                    <small>
+                      Outros potes · depois das contas e do Mercado Livre
+                    </small>
+                    <strong>{setupRemainderPct}%</strong>
+                  </div>
                 </div>
 
                 <div className="setup-marketplace-first">
                   <div className="setup-marketplace-head">
-                    <span className="marketplace-icon"><Store size={20} /></span>
+                    <span className="marketplace-icon">
+                      <Store size={20} />
+                    </span>
                     <span>
                       <small>PRIMEIRO APORTE · VALOR MANUAL</small>
                       <strong>Mercado Livre</strong>
-                      <p>Primeiro são separados patrimônios e contas. Você escolhe quanto da sobra vai para a operação.</p>
+                      <p>
+                        Primeiro são separados patrimônios e contas. Você
+                        escolhe quanto da sobra vai para a operação.
+                      </p>
                     </span>
                     <span className="setup-marketplace-limit">
                       <small>Disponível antes dos potes</small>
@@ -2985,7 +3467,9 @@ function FinanceModal({
                       <input
                         inputMode="decimal"
                         value={setupMarketplaceInitial}
-                        onChange={(e) => setSetupMarketplaceInitial(e.target.value)}
+                        onChange={(e) =>
+                          setSetupMarketplaceInitial(e.target.value)
+                        }
                         placeholder="0,00"
                       />
                     </Field>
@@ -3002,24 +3486,33 @@ function FinanceModal({
                         <input
                           type="checkbox"
                           checked={setupMarketplaceActive}
-                          onChange={(e) => setSetupMarketplaceActive(e.target.checked)}
+                          onChange={(e) =>
+                            setSetupMarketplaceActive(e.target.checked)
+                          }
                         />{" "}
                         Aplicar automaticamente nos próximos aportes
                       </label>
                     </div>
                   </div>
                   <small className="muted">
-                    O percentual futuro é independente dos 100% dos potes e será calculado somente sobre o que restar depois de patrimônios e contas.
+                    O percentual futuro é independente dos 100% dos potes e será
+                    calculado somente sobre o que restar depois de patrimônios e
+                    contas.
                   </small>
                 </div>
 
-                <div className="setup-orbit" aria-label="Visão circular dos potes">
+                <div
+                  className="setup-orbit"
+                  aria-label="Visão circular dos potes"
+                >
                   <div className="setup-orbit-center">
                     <strong>100%</strong>
                     <small>limite por base</small>
                   </div>
                   {setupTargets.map((item, i) => {
-                    const angle = (-90 + (i * 360) / Math.max(1, setupTargets.length)) * (Math.PI / 180);
+                    const angle =
+                      (-90 + (i * 360) / Math.max(1, setupTargets.length)) *
+                      (Math.PI / 180);
                     const left = 50 + Math.cos(angle) * 39;
                     const top = 50 + Math.sin(angle) * 39;
                     return (
@@ -3027,12 +3520,22 @@ function FinanceModal({
                         type="button"
                         key={`orbit-${item.id}`}
                         className={`setup-orbit-pot ${i === setupSelected ? "selected" : ""}`}
-                        style={{ left: `${left}%`, top: `${top}%`, "--pot-color": item.color } as any}
+                        style={
+                          {
+                            left: `${left}%`,
+                            top: `${top}%`,
+                            "--pot-color": item.color,
+                          } as any
+                        }
                         onClick={() => setSetupSelected(i)}
                         aria-label={`${item.name}: ${item.value}%`}
                       >
                         <PotSymbol symbol={potSymbol(item)} />
-                        <span>{item.id === "patrimonio_manuela" ? "Manuela" : item.name.replace("Desfrute ", "")}</span>
+                        <span>
+                          {item.id === "patrimonio_manuela"
+                            ? "Manuela"
+                            : item.name.replace("Desfrute ", "")}
+                        </span>
                         <b>{item.value}%</b>
                       </button>
                     );
@@ -3043,8 +3546,16 @@ function FinanceModal({
                   <div className="setup-pot-identity">
                     <PotSymbol symbol={potSymbol(selectedSetupPot)} />
                     <span>
-                      <small>{potAllocationBase(selectedSetupPot) === "gross" ? "Calculado sobre o aporte bruto" : "Calculado depois de contas, patrimônios e Mercado Livre"}</small>
-                      <strong>{selectedSetupPot.id === "patrimonio_manuela" ? "Patrimônio Manuela" : selectedSetupPot.name}</strong>
+                      <small>
+                        {potAllocationBase(selectedSetupPot) === "gross"
+                          ? "Calculado sobre o aporte bruto"
+                          : "Calculado depois de contas, patrimônios e Mercado Livre"}
+                      </small>
+                      <strong>
+                        {selectedSetupPot.id === "patrimonio_manuela"
+                          ? "Patrimônio Manuela"
+                          : selectedSetupPot.name}
+                      </strong>
                     </span>
                   </div>
                   <PercentageControl
@@ -3052,14 +3563,21 @@ function FinanceModal({
                     value={selectedSetupPot.value}
                     color={selectedSetupPot.color}
                     step={1}
-                    amountLabel={preview[selectedSetupPot.id] != null ? cash(preview[selectedSetupPot.id]) : undefined}
+                    amountLabel={
+                      preview[selectedSetupPot.id] != null
+                        ? cash(preview[selectedSetupPot.id])
+                        : undefined
+                    }
                     maxAllowed={
-                      100 - setupTargets
-                        .filter((x, i) =>
-                          i !== setupSelected &&
-                          x.active &&
-                          x.mode === "percent" &&
-                          potAllocationBase(x) === potAllocationBase(selectedSetupPot),
+                      100 -
+                      setupTargets
+                        .filter(
+                          (x, i) =>
+                            i !== setupSelected &&
+                            x.active &&
+                            x.mode === "percent" &&
+                            potAllocationBase(x) ===
+                              potAllocationBase(selectedSetupPot),
                         )
                         .reduce((sum, x) => sum + x.value, 0)
                     }
@@ -3069,7 +3587,9 @@ function FinanceModal({
                       } else {
                         setSetupPots((items) =>
                           items.map((x) =>
-                            x.id === selectedSetupPot.id ? { ...x, value: nextValue } : x,
+                            x.id === selectedSetupPot.id
+                              ? { ...x, value: nextValue }
+                              : x,
                           ),
                         );
                       }
@@ -3082,11 +3602,20 @@ function FinanceModal({
                     type="button"
                     className="icon-button carousel-arrow"
                     aria-label="Pote anterior"
-                    onClick={() => setSetupSelected((setupSelected - 1 + setupTargets.length) % setupTargets.length)}
+                    onClick={() =>
+                      setSetupSelected(
+                        (setupSelected - 1 + setupTargets.length) %
+                          setupTargets.length,
+                      )
+                    }
                   >
                     <ChevronLeft size={20} />
                   </button>
-                  <div className="setup-pot-carousel" role="listbox" aria-label="Escolher pote">
+                  <div
+                    className="setup-pot-carousel"
+                    role="listbox"
+                    aria-label="Escolher pote"
+                  >
                     {setupTargets.map((item, i) => (
                       <button
                         type="button"
@@ -3095,14 +3624,22 @@ function FinanceModal({
                         key={item.id}
                         className={i === setupSelected ? "selected" : ""}
                         onClick={() => setSetupSelected(i)}
-                        onPointerDown={(e) => { e.currentTarget.dataset.startY = String(e.clientY); }}
+                        onPointerDown={(e) => {
+                          e.currentTarget.dataset.startY = String(e.clientY);
+                        }}
                         onPointerUp={(e) => {
-                          const startY = Number(e.currentTarget.dataset.startY || e.clientY);
+                          const startY = Number(
+                            e.currentTarget.dataset.startY || e.clientY,
+                          );
                           if (startY - e.clientY > 28) setSetupSelected(i);
                         }}
                       >
                         <PotSymbol symbol={potSymbol(item)} />
-                        <span>{item.id === "patrimonio_manuela" ? "Manuela" : item.name}</span>
+                        <span>
+                          {item.id === "patrimonio_manuela"
+                            ? "Manuela"
+                            : item.name}
+                        </span>
                         <b>{item.value}%</b>
                       </button>
                     ))}
@@ -3111,12 +3648,19 @@ function FinanceModal({
                     type="button"
                     className="icon-button carousel-arrow"
                     aria-label="Próximo pote"
-                    onClick={() => setSetupSelected((setupSelected + 1) % setupTargets.length)}
+                    onClick={() =>
+                      setSetupSelected(
+                        (setupSelected + 1) % setupTargets.length,
+                      )
+                    }
                   >
                     <ChevronRight size={20} />
                   </button>
                 </div>
-                <small className="muted setup-swipe-hint">Passe pelas opções e arraste um pote para cima para focar nele.</small>
+                <small className="muted setup-swipe-hint">
+                  Passe pelas opções e arraste um pote para cima para focar
+                  nele.
+                </small>
 
                 {Object.keys(preview).length > 0 && (
                   <div className="allocation-preview setup-preview">
@@ -3125,7 +3669,14 @@ function FinanceModal({
                       .filter(([, amount]) => amount > 0)
                       .map(([id, amount]) => (
                         <div key={id}>
-                          <span>{id === MARKETPLACE_ID ? "Mercado Livre" : setupTargets.find((x) => x.id === id)?.name || (id === "free" ? "Contas + saldo não alocado" : "Sem distribuição")}</span>
+                          <span>
+                            {id === MARKETPLACE_ID
+                              ? "Mercado Livre"
+                              : setupTargets.find((x) => x.id === id)?.name ||
+                                (id === "free"
+                                  ? "Contas + saldo não alocado"
+                                  : "Sem distribuição")}
+                          </span>
                           <b>{cash(amount)}</b>
                         </div>
                       ))}
@@ -3136,11 +3687,18 @@ function FinanceModal({
 
             {setupStep === 3 && (
               <section className="setup-ready" aria-live="polite">
-                <div className="ready-check"><Check size={34} /></div>
+                <div className="ready-check">
+                  <Check size={34} />
+                </div>
                 <span className="eyebrow">PLANO CONFIGURADO</span>
                 <h2>Seu planejamento está pronto.</h2>
-                <p>Patrimônios, contas, Mercado Livre e potes já foram calculados. Você será levado ao dashboard.</p>
-                <button type="button" className="primary" onClick={close}>Ir para o Dashboard</button>
+                <p>
+                  Patrimônios, contas, Mercado Livre e potes já foram
+                  calculados. Você será levado ao dashboard.
+                </p>
+                <button type="button" className="primary" onClick={close}>
+                  Ir para o Dashboard
+                </button>
               </section>
             )}
           </div>
@@ -3148,7 +3706,6 @@ function FinanceModal({
         {modal.type !== "setup" && modal.type !== "rule" && (
           <Field label={modal.type === "entry" ? "Descrição" : "Nome"}>
             <input
-              autoFocus
               required
               value={description}
               onChange={(e) => suggest(e.target.value)}
@@ -3164,7 +3721,6 @@ function FinanceModal({
         {modal.type === "rule" && (
           <Field label="Descrição contém">
             <input
-              autoFocus
               required
               value={ruleText}
               onChange={(e) => setRuleText(e.target.value)}
@@ -3185,7 +3741,8 @@ function FinanceModal({
                     x.active &&
                     x.mode === "percent" &&
                     x.id !== p?.id &&
-                    potAllocationBase(x) === (p ? potAllocationBase(p) : "remainder"),
+                    potAllocationBase(x) ===
+                      (p ? potAllocationBase(p) : "remainder"),
                 )
                 .reduce((sum, x) => sum + x.value, 0)
             }
@@ -3193,7 +3750,8 @@ function FinanceModal({
             onChange={(n) => setValue(String(n))}
           />
         ) : (
-          modal.type !== "rule" && modal.type !== "setup" && (
+          modal.type !== "rule" &&
+          modal.type !== "setup" && (
             <Field
               label={
                 modal.type === "pot"
@@ -3403,7 +3961,8 @@ function FinanceModal({
                         <span>
                           {id === MARKETPLACE_ID
                             ? "Mercado Livre"
-                            : next.find((p) => p.id === id)?.name || "Sem distribuição"}
+                            : next.find((p) => p.id === id)?.name ||
+                              "Sem distribuição"}
                         </span>
                         <b>{cash(v)}</b>
                       </div>
@@ -3482,9 +4041,8 @@ function FinanceModal({
             {Object.entries(preview).map(([id, v]) => (
               <div key={id}>
                 <span>
-                  {existingPolicy.find(
-                    (p) => p.id === id,
-                  )?.name || "Sem distribuição"}
+                  {existingPolicy.find((p) => p.id === id)?.name ||
+                    "Sem distribuição"}
                 </span>
                 <b>{cash(v)}</b>
               </div>
@@ -3495,21 +4053,33 @@ function FinanceModal({
           setupStep < 3 && (
             <footer className="modal-footer setup-footer">
               {setupStep === 0 ? (
-                <button type="button" className="secondary" onClick={close}>Cancelar</button>
+                <button type="button" className="secondary" onClick={close}>
+                  Cancelar
+                </button>
               ) : (
-                <button type="button" className="secondary" onClick={() => setSetupStep((s) => Math.max(0, s - 1))}>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setSetupStep((s) => Math.max(0, s - 1))}
+                >
                   <ChevronLeft size={16} /> Voltar
                 </button>
               )}
               <button className="primary" type="submit" disabled={saving}>
-                {saving ? "Salvando…" : setupStep === 2 ? "Finalizar planejamento" : "Continuar"}
+                {saving
+                  ? "Salvando…"
+                  : setupStep === 2
+                    ? "Finalizar planejamento"
+                    : "Continuar"}
                 {!saving && <ChevronRight size={16} />}
               </button>
             </footer>
           )
         ) : (
           <footer className="modal-footer">
-            <button type="button" className="secondary" onClick={close}>Cancelar</button>
+            <button type="button" className="secondary" onClick={close}>
+              Cancelar
+            </button>
             <button className="primary" type="submit" disabled={saving}>
               {saving ? "Salvando…" : "Salvar"}
             </button>
@@ -3552,7 +4122,6 @@ function ResetDialog({
         </div>
         <Field label="Digite REINICIAR para confirmar">
           <input
-            autoFocus
             autoComplete="off"
             value={text}
             onChange={(e) => setText(e.target.value)}

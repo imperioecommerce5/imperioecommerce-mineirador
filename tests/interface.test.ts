@@ -21,6 +21,11 @@ async function openApp(
     value: structuredClone,
   });
   Object.defineProperty(dom.window.crypto, "randomUUID", { value: randomUUID });
+  dom.window.matchMedia = (() => ({
+    matches: true,
+    addEventListener() {},
+    removeEventListener() {},
+  })) as any;
   dom.window.confirm = () => true;
   dom.window.URL.createObjectURL = () => "blob:demo";
   dom.window.URL.revokeObjectURL = () => {};
@@ -229,7 +234,10 @@ test("interface: escolha direta entre Rhuan e Anne, sem senha e sem acesso Googl
   try {
     assert.match(dom.window.document.body.textContent || "", /Quem está/);
     assert.doesNotMatch(dom.window.document.body.textContent || "", /Google/);
-    assert.doesNotMatch(dom.window.document.body.textContent || "", /Senha numérica/);
+    assert.doesNotMatch(
+      dom.window.document.body.textContent || "",
+      /Senha numérica/,
+    );
     assert.match(dom.window.document.body.textContent || "", /Rhuan/);
     assert.match(dom.window.document.body.textContent || "", /Anne/);
     (
@@ -257,15 +265,12 @@ test("interface: escolha direta entre Rhuan e Anne, sem senha e sem acesso Googl
     await sleep();
     const f = JSON.parse(dom.window.localStorage.getItem("imperio_demo")!);
     assert.equal(
-      f.entries.find((e: any) => e.description === "Aporte da Anne")
-        .createdBy,
+      f.entries.find((e: any) => e.description === "Aporte da Anne").createdBy,
       "esposa",
     );
     assert.match(dom.window.document.body.textContent || "", /Por Anne/);
     (
-      dom.window.document.querySelector(
-        '[aria-label="Trocar perfil"]',
-      ) as HTMLElement
+      dom.window.document.querySelector(".sidebar-bottom button") as HTMLElement
     ).click();
     await sleep();
     assert.ok(dom.window.document.querySelector(".profile-picker"));
@@ -353,7 +358,7 @@ test("interface: porcentagem arrastável respeita orçamento e potes possuem sí
           '[aria-label="Porcentagem do pote valor"]',
         ) as HTMLInputElement
       ).value,
-      "32",
+      "52",
     );
     Object.getOwnPropertyDescriptor(
       dom.window.HTMLInputElement.prototype,
@@ -419,7 +424,7 @@ test("interface: reset guarda cópia, reabre configuração e permite recuperar"
     await sleep();
     assert.equal(
       dom.window.document.querySelectorAll('input[type="range"]').length,
-      7,
+      0,
     );
     (
       dom.window.document.querySelector('[aria-label="Fechar"]') as HTMLElement
@@ -435,6 +440,66 @@ test("interface: reset guarda cópia, reabre configuração e permite recuperar"
     );
     assert.equal(restored.configured, true);
     assert.equal(restored.entries.length, 3);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("interface: perfil conjunto somente leitura, privacidade e painel de ações", async () => {
+  const dom = await openApp();
+  try {
+    const before = dom.window.localStorage.getItem("imperio_demo");
+    (
+      dom.window.document.querySelector(
+        '[aria-label="Abrir meu perfil financeiro"]',
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    assert.match(dom.window.document.body.textContent || "", /Rhuan e Anne/);
+    assert.ok(dom.window.document.querySelector(".family-rank"));
+    assert.equal(dom.window.localStorage.getItem("imperio_demo"), before);
+    (
+      dom.window.document.querySelector(
+        '[aria-label="Ocultar valores"]',
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    assert.equal(dom.window.document.querySelector(".family-bars"), null);
+    assert.match(
+      dom.window.document.body.textContent || "",
+      /Valores e gráfico ocultos/,
+    );
+    (
+      dom.window.document.querySelector(
+        '[aria-label="Nova movimentação"]',
+      ) as HTMLElement
+    ).click();
+    await sleep();
+    assert.equal(
+      dom.window.document.querySelectorAll(".quick-grid button").length,
+      5,
+    );
+    assert.ok(dom.window.document.querySelector('[role="dialog"]'));
+    (
+      dom.window.document.querySelector('[aria-label="Fechar"]') as HTMLElement
+    ).click();
+    await sleep();
+    click(dom, "Visão geral");
+    await sleep();
+    assert.equal(dom.window.document.querySelector(".family-bars"), null);
+    assert.equal(
+      dom.window.document.querySelectorAll(".patrimony-tile").length,
+      2,
+    );
+    (
+      dom.window.document.querySelector(".patrimony-tile") as HTMLElement
+    ).click();
+    await sleep();
+    assert.match(
+      dom.window.document.querySelector('[role="dialog"]')?.textContent || "",
+      /Saldo protegido/,
+    );
+    assert.equal(dom.window.localStorage.getItem("imperio_demo"), before);
   } finally {
     dom.window.close();
   }

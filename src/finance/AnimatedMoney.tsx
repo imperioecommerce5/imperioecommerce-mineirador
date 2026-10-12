@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, CSSProperties } from "react";
 import { money } from "./model";
 
 type Tag = "strong" | "b" | "span";
@@ -16,7 +16,7 @@ export function AnimatedMoney({
   className?: string;
   duration?: number;
 }) {
-  const initial = hidden ? cents : 0;
+  const initial = cents;
   const previous = useRef(initial);
   const [display, setDisplay] = useState(initial);
 
@@ -27,7 +27,7 @@ export function AnimatedMoney({
     if (
       hidden ||
       typeof window === "undefined" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
       !Number.isFinite(cents)
     ) {
       setDisplay(cents);
@@ -54,7 +54,13 @@ export function AnimatedMoney({
 
   const Tag = tag;
   return (
-    <Tag className={className} aria-label={hidden ? "Valor oculto" : money(cents)}>
+    <Tag
+      style={
+        { "--money-chars": hidden ? 8 : money(cents).length } as CSSProperties
+      }
+      className={className}
+      aria-label={hidden ? "Valor oculto" : money(cents)}
+    >
       {hidden ? "R$ ••••" : money(display)}
     </Tag>
   );
