@@ -33,6 +33,8 @@ export type Allocation = Record<string, number>;
 export type Entry = {
   id: string;
   kind: "income" | "expense" | "transfer";
+  /** Entrada em um destino escolhido ou aporte distribuído automaticamente. Sem campo = aporte histórico. */
+  incomeMode?: "direct" | "distributed";
   description: string;
   cents: number;
   date: string;
@@ -385,6 +387,20 @@ export function allocateContribution(
   return result;
 }
 
+/** Entrada direta: dinheiro NOVO recebido, sem redistribuir a outros potes. */
+export function directIncomeAllocations(
+  cents: number,
+  destination: string,
+  f: Pick<Finance, "pots" | "marketplace">,
+): Allocation {
+  if (!Number.isSafeInteger(cents) || cents <= 0)
+    throw new Error("Informe um valor positivo.");
+  const allowed = destination === "free" || destination === MARKETPLACE_ID ||
+    f.pots.some((pot) => pot.id === destination && pot.active);
+  if (!allowed) throw new Error("Escolha um pote de destino válido.");
+  return { [destination]: cents };
+}
+
 // Mantido como atalho para chamadas existentes sem compromissos mensais.
 export function allocate(cents: number, pots: Pot[]): Allocation {
   return allocateContribution(cents, pots, 0);
@@ -434,7 +450,10 @@ export function entry(
     description: input.description.trim(),
     updatedAt: timestamp,
     policy,
-    allocations: input.kind === "income" ? allocate(input.cents, policy) : {},
+    allocations: input.kind === "income"
+      ? (input.incomeMode === "direct" && input.allocations
+          ? input.allocations : allocate(input.cents, policy))
+      : {},
   };
 }
 export function balances(f: Finance, through = today()) {
@@ -873,6 +892,9 @@ export function validateFinance(f: any): asserts f is Finance {
       (e.kind === "transfer" && (!e.destination || e.pot === e.destination))
     )
       throw new Error("Tipo ou destino de lançamento inválido.");
+    if (e.incomeMode !== undefined &&
+        (e.kind !== "income" || !["direct", "distributed"].includes(e.incomeMode)))
+      throw new Error("Modo de entrada inválido no backup.");
     if (e.kind === "income") validatePots(e.policy);
     if (
       [e.createdBy, e.updatedBy].some(

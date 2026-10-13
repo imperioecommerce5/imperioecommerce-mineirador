@@ -1012,3 +1012,141 @@ body,
 @media (prefers-reduced-motion:reduce) {
   .finance-app .pot-grid .pot-card.pot-card-refined { transition: none; }
 }
+
+
+/* V5.3 — Painel de movimento: iPhone/iPad sem zoom automático ou arraste lateral. */
+.finance-app .finance-v53-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  isolation: isolate;
+}
+.finance-app .finance-v53-sheet {
+  display: block;
+  width: min(560px, calc(100vw - 24px));
+  max-width: min(560px, calc(100vw - 24px));
+  min-width: 0;
+  max-height: min(90dvh, calc(var(--visual-height, 100dvh) - 12px));
+  overflow-y: auto;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.finance-app .finance-v53-sheet *,
+.finance-app .finance-v53-sheet *::before,
+.finance-app .finance-v53-sheet *::after { box-sizing: border-box; }
+.finance-app .finance-v53-sheet .modal-form,
+.finance-app .finance-v53-sheet .field,
+.finance-app .finance-v53-sheet .v5-amount-group,
+.finance-app .finance-v53-sheet .v53-destination { min-width: 0; max-width: 100%; }
+.finance-app .finance-v53-sheet .modal-form { overflow-x: clip; }
+.finance-app .finance-v53-sheet input:not([type="checkbox"]),
+.finance-app .finance-v53-sheet select,
+.finance-app .finance-v53-sheet textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 16px !important; /* iOS Safari só evita zoom de foco >=16px */
+  line-height: 1.35;
+  touch-action: manipulation;
+}
+.finance-app .finance-v53-sheet .v5-amount-group .v5-amount-input {
+  font-size: clamp(24px, 6vw, 34px) !important;
+  letter-spacing: -.025em;
+}
+.finance-app .finance-v53-sheet .finance-v5-entry-tabs {
+  width: 100%; min-width: 0;
+  display: grid; grid-template-columns: repeat(3,minmax(0,1fr));
+  margin: 0; padding: 9px 14px 5px; gap: 8px;
+  border-radius: 0; background: transparent;
+}
+.finance-app .finance-v53-sheet .finance-v5-entry-tabs button {
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  min-width: 0; min-height: 83px; gap: 3px;
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 7px 3px 9px;
+  background: var(--soft); color: var(--muted);
+  font-size: 12px; font-weight: 700; line-height: 1.2;
+}
+.finance-app .finance-v53-sheet .finance-v5-entry-tabs button.selected {
+  background: color-mix(in srgb, var(--green) 22%, var(--surface));
+  border-color: color-mix(in srgb, var(--green) 60%, var(--border));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 15%, transparent);
+}
+.finance-app .finance-v53-sheet .finance-v5-entry-tabs .pot-symbol-3d {
+  position: static; width: 43px; height: 43px;
+  object-fit: contain; transform: none;
+  filter: drop-shadow(0 3px 3px #0002);
+}
+.finance-app .finance-v53-sheet .v53-destination {
+  display: grid; gap: 6px;
+  border: 1px solid var(--border); border-radius: 13px;
+  background: var(--soft); padding: 12px 13px;
+}
+.finance-app .finance-v53-sheet .v53-destination > p {
+  font-size: 11px; line-height: 1.5; color: var(--muted);
+}
+.finance-app .finance-v53-sheet .modal-footer {
+  position: sticky; bottom: 0; z-index: 3;
+  background: var(--surface);
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+}
+@media (max-width: 800px), (max-width: 1366px) and (pointer: coarse) {
+  .finance-app .finance-v53-backdrop {
+    display: flex; align-items: flex-end; justify-content: center;
+    top: var(--visual-top, 0px);
+    right: 0; bottom: auto; left: 0;
+    height: var(--visual-height, 100dvh);
+    padding: 0;
+  }
+  .finance-app .finance-v53-sheet {
+    width: 100%; max-width: 100%;
+    height: auto;
+    max-height: calc(var(--visual-height, 100dvh) - 6px);
+    border-radius: 24px 24px 0 0;
+    overflow-x: clip;
+  }
+  .finance-app .finance-v53-sheet > header { padding: 14px 17px; }
+  .finance-app .finance-v53-sheet .modal-form {
+    padding: 12px 17px calc(18px + env(safe-area-inset-bottom));
+    gap: 13px;
+  }
+}
+@media (max-width: 370px) {
+  .finance-app .finance-v53-sheet .finance-v5-entry-tabs { gap: 5px; padding-inline: 10px; }
+  .finance-app .finance-v53-sheet .finance-v5-entry-tabs .pot-symbol-3d { width: 38px; height: 38px; }
+}
+/* 3D matte em áreas financeiras selecionadas: indicadores, linha do tempo e seções. */
+.finance-app .home-v52-balance-title .pot-symbol-3d {
+  width: 25px; height: 25px; flex: 0 0 25px;
+  object-fit: contain; transform: none; filter: drop-shadow(0 2px 2px #0002);
+}
+.finance-app .ledger-v52-icon .pot-symbol-3d {
+  width: 36px; height: 36px; object-fit: contain;
+  transform: none; filter: drop-shadow(0 2px 2px #0002);
+}
+.finance-app .finance-v53-page-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.finance-app .finance-v53-page-icon {
+  display: grid; place-items: center;
+  width: 41px; height: 41px; flex: 0 0 41px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--soft);
+}
+.finance-app .finance-v53-page-icon .pot-symbol-3d {
+  width: 39px; height: 39px; transform: none; object-fit: contain;
+  filter: drop-shadow(0 3px 3px #0002);
+}
+
+.finance-app .finance-v53-goal-icon .pot-symbol-3d {
+  width: 42px; height: 42px; object-fit: contain;
+  transform: none; filter: drop-shadow(0 3px 3px #0002);
+}

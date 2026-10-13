@@ -42,6 +42,7 @@ import {
   User,
   Menu as MenuIcon,
   Crown,
+  ReceiptText,
 } from "lucide-react";
 import { useFinance } from "../finance/useFinance";
 import {
@@ -59,6 +60,7 @@ import {
   uid,
   allocate,
   allocateContribution,
+  directIncomeAllocations,
   pendingCommitmentsForMonth,
   potAllocationBase,
   validatePots,
@@ -76,6 +78,7 @@ import {
   validateMarketplace,
 } from "../finance/model";
 import "../finance/finance.css";
+import "../finance/dashboard-v5-2.css";
 type View =
   "home" | "ledger" | "pots" | "bills" | "goals" | "settings" | "profile";
 const navViews: Exclude<View, "profile">[] = [
@@ -90,6 +93,7 @@ type Modal =
   | {
       type: "entry";
       kind: Entry["kind"];
+      incomeMode?: "direct" | "distributed";
       existing?: Entry;
       presetPot?: string;
       presetDest?: string;
@@ -127,6 +131,18 @@ const kindNames = {
   transfer: "Transferência",
 };
 const displayDate = (s: string) => s.split("-").reverse().join("/");
+const ledgerDayTitle = (date: string, reference = today()) => {
+  if (date === reference) return "Hoje";
+  const yesterday = new Date(`${reference}T12:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  if (date === yesterday.toISOString().slice(0, 10)) return "Ontem";
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
+};
+const ledgerMonthTitle = (month: string) =>
+  new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${month}-01T12:00:00Z`));
 const parseOptionalMoney = (value: string) => {
   const raw = value.trim();
   if (!raw || /^0+(?:[,.]0{1,2})?$/.test(raw)) return 0;
@@ -144,10 +160,12 @@ function ModalShell({
   title,
   onClose,
   children,
+  entrySheet = false,
 }: {
   title: string;
   onClose: () => void;
   children: any;
+  entrySheet?: boolean;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -188,10 +206,29 @@ function ModalShell({
     };
     document.addEventListener("keydown", fn);
     const old = document.body.style.overflow;
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyWidth = document.body.style.width;
+    const originalBodyLeft = document.body.style.left;
+    const pageScroll = window.scrollY;
     document.body.style.overflow = "hidden";
+    // iOS Safari: impede pan horizontal do fundo ao focar valor/data/select.
+    if (entrySheet) {
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${pageScroll}px`;
+      document.body.style.left = "0";
+      document.body.style.width = "100%";
+    }
     return () => {
       document.removeEventListener("keydown", fn);
       document.body.style.overflow = old;
+      if (entrySheet) {
+        document.body.style.position = originalBodyPosition;
+        document.body.style.top = originalBodyTop;
+        document.body.style.left = originalBodyLeft;
+        document.body.style.width = originalBodyWidth;
+        window.scrollTo(0, pageScroll);
+      }
       viewport?.removeEventListener("resize", updateViewport);
       viewport?.removeEventListener("scroll", updateViewport);
       document.documentElement.style.removeProperty("--visual-height");
@@ -200,9 +237,9 @@ function ModalShell({
     };
   }, []);
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className={`modal-backdrop${entrySheet ? " finance-v53-backdrop" : ""}`} onClick={onClose}>
       <section
-        className="modal"
+        className={`modal${entrySheet ? " finance-v53-sheet" : ""}`}
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
@@ -263,6 +300,7 @@ export default function FinanceCenterView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [patrimonyDetail, setPatrimonyDetail] = useState<string | null>(null);
   const [potDetail, setPotDetail] = useState<string | null>(null);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{
     value: number;
     balance: number;
@@ -314,14 +352,17 @@ export default function FinanceCenterView({
       const movement = changed[changed.length - 1];
       if (movement) {
         const after = balances(saved);
-        const market = movement.source.startsWith("marketplace:");
+        const market = movement.source.startsWith("marketplace:") ||
+          (movement.kind === "income" && movement.destination === MARKETPLACE_ID);
         const bucket = market
           ? MARKETPLACE_ID
           : movement.kind === "transfer"
             ? movement.destination
             : movement.kind === "expense"
               ? movement.pot
-              : "";
+              : movement.kind === "income" && movement.incomeMode === "direct"
+                ? movement.destination
+                : "";
         const label = market
           ? "Mercado Livre"
           : bucket
@@ -353,10 +394,8 @@ export default function FinanceCenterView({
                 ? "Conta paga"
                 : "Gasto registrado"
               : movement.kind === "income"
-                ? market
-                  ? "Entrada registrada"
-                  : "Aporte realizado"
-                : "Aporte realizado",
+                ? movement.incomeMode === "direct" ? "Entrada registrada" : "Aporte distribuído"
+                : "Transferência realizada",
         );
       } else {
         setConfirmation(null);
@@ -407,27 +446,18 @@ export default function FinanceCenterView({
   const pending = f.entries
     .filter((e) => !e.deleted && e.kind === "expense" && e.status === "pending")
     .sort((a, b) => a.date.localeCompare(b.date));
+  // Resumo de mês usado em Ajustes e na exportação: mantido após a limpeza da Home V5.2.
   const currentEntries = f.entries.filter(
     (e) => !e.deleted && e.date.slice(0, 7) === month,
   );
   const income = currentEntries
-    .filter(
-      (e) =>
-        e.kind === "income" &&
-        e.status === "paid" &&
-        e.date <= today() &&
-        !e.source.startsWith("marketplace:"),
-    )
-    .reduce((s, e) => s + e.cents, 0);
+    .filter((e) => e.kind === "income" && e.status === "paid" &&
+      e.date <= today() && !e.source.startsWith("marketplace:"))
+    .reduce((sum, e) => sum + e.cents, 0);
   const expense = currentEntries
-    .filter(
-      (e) =>
-        e.kind === "expense" &&
-        e.status === "paid" &&
-        e.date <= today() &&
-        !e.source.startsWith("marketplace:"),
-    )
-    .reduce((s, e) => s + e.cents, 0);
+    .filter((e) => e.kind === "expense" && e.status === "paid" &&
+      e.date <= today() && !e.source.startsWith("marketplace:"))
+    .reduce((sum, e) => sum + e.cents, 0);
   const filtered = f.entries
     .filter(
       (e) =>
@@ -580,102 +610,94 @@ export default function FinanceCenterView({
       "Saldo livre distribuído entre os potes",
     );
   }
+  // O extrato apresenta o registro existente, sem criar uma segunda transação:
+  // aportes entre potes têm sinal neutro porque não representam nova renda.
   function ledgerRow(e: Entry) {
-    const Icon =
-      e.kind === "income"
-        ? ArrowDownLeft
-        : e.kind === "transfer"
-          ? ArrowRightLeft
-          : ArrowUpRight;
+    const isMarketplace = e.source.startsWith("marketplace:") ||
+      e.pot === MARKETPLACE_ID || e.destination === MARKETPLACE_ID;
+    const isRecurring = !!f.recurrences.find((rec) => rec.id === e.source);
+    const context = e.kind === "transfer"
+      ? `Transferência interna · ${potName(e.pot)} → ${potName(e.destination)}`
+      : e.kind === "income"
+        ? e.incomeMode === "direct"
+          ? `Entrada · ${potName(e.destination || Object.keys(e.allocations).find((id) => e.allocations[id] > 0) || "free")}`
+          : isMarketplace ? "Entrada · Mercado Livre" : "Aporte · divisão automática"
+        : `${isRecurring ? (e.status === "pending" ? "Pagamento pendente" : "Pagamento confirmado") : "Saída"} · ${potName(e.pot)}`;
+    const entrySymbol = isMarketplace ? "market"
+      : e.kind === "transfer" ? "investment"
+      : e.kind === "income"
+        ? e.incomeMode === "direct"
+          ? potSymbol(f.pots.find((p) => p.id === e.destination) || {id: e.destination, name: potName(e.destination)} as Pot)
+          : "investment"
+        : isRecurring ? "debts" : potSymbol(f.pots.find((p) => p.id === e.pot) || {id: e.pot, name: potName(e.pot)} as Pot);
+    const expanded = expandedEntryId === e.id;
     return (
-      <div className={`ledger-row ${e.deleted ? "deleted" : ""}`} key={e.id}>
-        <span className={`entry-icon ${e.kind}`}>
-          <Icon size={18} />
-        </span>
-        <div className="entry-info">
-          <strong>{e.description}</strong>
-          <small>
-            {displayDate(e.date)} ·{" "}
-            {e.kind === "income" ? "Entrada · distribuição automática" : potName(e.pot)}
-            {e.kind === "transfer" ? ` → ${potName(e.destination)}` : ""}
-            {e.date > today() ? " · Agendado" : ""}
-          </small>
-          <span className="entry-author">
-            Por {actorName(e.createdBy)}
-            {e.updatedBy && e.updatedBy !== e.createdBy
-              ? ` · Última alteração: ${actorName(e.updatedBy)}`
-              : ""}
-          </span>
-        </div>
-        <span className={`badge ${e.status === "pending" ? "warning" : ""}`}>
-          {e.deleted
-            ? "Excluído"
-            : e.status === "pending"
-              ? "Pendente"
-              : kindNames[e.kind]}
-        </span>
-        <strong
-          className={`entry-value ${e.kind === "income" ? "positive" : ""}`}
+      <article className={`ledger-v52-item${e.deleted ? " is-deleted" : ""}`} key={e.id}>
+        <button
+          type="button"
+          className="ledger-v52-row-main"
+          aria-expanded={expanded}
+          aria-label={`${e.description}, ${context}, ${cash(e.cents)}. ${expanded ? "Recolher detalhes" : "Ver detalhes"}`}
+          onClick={() => setExpandedEntryId(expanded ? null : e.id)}
         >
-          {e.kind === "expense" ? "−" : e.kind === "income" ? "+" : ""}
-          {cash(e.cents)}
-        </strong>
-        <div className="row-actions">
-          {e.deleted ? (
-            <button
-              aria-label="Restaurar lançamento"
-              onClick={() => restore(e)}
-            >
-              <RotateCcw size={16} />
-            </button>
-          ) : (
-            <>
-              {e.status === "pending" && (
-                <button
-                  disabled={saving}
-                  aria-label="Marcar como pago hoje"
-                  title="Marcar como pago hoje"
-                  onClick={() => pay(e)}
-                >
-                  <Check size={16} />
-                </button>
+          <span className={`ledger-v52-icon ${e.kind}${isMarketplace ? " market" : ""}`}>
+            <PotSymbol symbol={entrySymbol} />
+          </span>
+          <span className="ledger-v52-entry-copy">
+            <strong>{e.description}</strong>
+            <small>{context}</small>
+            {(e.deleted || e.status === "pending" || e.date > today()) && (
+              <span className={`ledger-v52-state${e.deleted ? " deleted" : ""}`}>
+                {e.deleted ? "Excluído" : e.date > today() ? "Agendado" : "Pendente"}
+              </span>
+            )}
+          </span>
+          <span className={`ledger-v52-amount ${e.kind}${e.status === "pending" ? " pending" : ""}`}>
+            {e.kind === "income" ? "+ " : e.kind === "expense" ? "− " : ""}
+            {cash(e.cents)}
+          </span>
+          <ChevronRight size={15} className={`ledger-v52-chevron${expanded ? " expanded" : ""}`} />
+        </button>
+        {expanded && (
+          <div className="ledger-v52-details">
+            <div className="ledger-v52-details-grid">
+              <span>Data <strong>{displayDate(e.date)}</strong></span>
+              <span>Tipo <strong>{e.kind === "income" ? e.incomeMode === "direct" ? "Entrada" : "Aporte distribuído" : e.kind === "expense" ? "Saída" : "Transferência"}</strong></span>
+              <span>Status <strong>{e.deleted ? "Excluído" : e.status === "pending" ? "Pendente" : "Confirmado"}</strong></span>
+              <span>Registrado por <strong>{actorName(e.createdBy)}</strong></span>
+            </div>
+            {e.updatedBy && e.updatedBy !== e.createdBy && (
+              <p>Última alteração: {actorName(e.updatedBy)}</p>
+            )}
+            {e.kind === "transfer" && <p>Transferência entre saldos. Não soma como renda.</p>}
+            <div className="ledger-v52-actions">
+              {e.deleted ? (
+                <button className="secondary" onClick={() => restore(e)}><RotateCcw size={15} /> Restaurar</button>
+              ) : (
+                <>
+                  {e.status === "pending" && (
+                    <button className="secondary" disabled={saving} onClick={() => pay(e)}>
+                      <Check size={15} /> Marcar como pago
+                    </button>
+                  )}
+                  <button className="secondary" onClick={() => open({ type: "entry", kind: e.kind, existing: e })}>
+                    <Pencil size={15} /> Editar
+                  </button>
+                  <button className="secondary" onClick={() => open({
+                    type: "entry", kind: e.kind,
+                    existing: { ...e, id: "", date: today(), policy: [], source: "" },
+                  })}>
+                    <Copy size={15} /> Repetir
+                  </button>
+                  <button className="secondary danger-action" onClick={() => softDelete(e)}>
+                    <Trash2 size={15} /> Excluir
+                  </button>
+                </>
               )}
-              <button
-                aria-label="Editar lançamento"
-                onClick={() =>
-                  open({ type: "entry", kind: e.kind, existing: e })
-                }
-              >
-                <Pencil size={15} />
-              </button>
-              <button
-                aria-label="Repetir lançamento"
-                onClick={() =>
-                  open({
-                    type: "entry",
-                    kind: e.kind,
-                    existing: {
-                      ...e,
-                      id: "",
-                      date: today(),
-                      policy: [],
-                      source: "",
-                    },
-                  })
-                }
-              >
-                <Copy size={15} />
-              </button>
-              <button
-                aria-label="Excluir lançamento"
-                onClick={() => softDelete(e)}
-              >
-                <Trash2 size={15} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
+        )}
+      </article>
     );
   }
   return (
@@ -759,14 +781,21 @@ export default function FinanceCenterView({
           </div>
         </header>
         <main className="content view-transition" key={view}>
-          <div className="page-heading">
+          <div className={`page-heading${view === "home" ? " home-v52-heading" : view === "ledger" ? " ledger-v52-heading" : ""}`}>
             <div>
               <p className="eyebrow">
                 {view === "home"
                   ? "SEU PLANEJAMENTO, EM DIA"
                   : "MEU IMPÉRIO FINANCEIRO"}
               </p>
-              <h1>{labels[view]}</h1>
+              <div className="finance-v53-page-title">
+                {(view === "bills" || view === "goals" || view === "profile") && (
+                  <span className="finance-v53-page-icon" aria-hidden="true">
+                    <PotSymbol symbol={view === "bills" ? "debts" : view === "goals" ? "goal" : "pig"} />
+                  </span>
+                )}
+                <h1>{labels[view]}</h1>
+              </div>
               <p>
                 {view === "home"
                   ? "Clareza para decidir. Consistência para construir."
@@ -795,7 +824,7 @@ export default function FinanceCenterView({
                 <button
                   className="primary"
                   disabled={saving || !f.configured}
-                  onClick={() => open({ type: "entry", kind: "income" })}
+                  onClick={() => open({ type: "entry", kind: "income", incomeMode: "distributed" })}
                 >
                   <Plus size={17} /> Registrar aporte
                 </button>
@@ -845,110 +874,71 @@ export default function FinanceCenterView({
             </details>
           )}
           {view === "home" && (
-            <>
-              <section className="balance-grid">
-                <div className="balance-main">
-                  <span className="eyebrow">LIVRE PARA GASTAR</span>
+            <div className="home-v52">
+              <section className="home-v52-balances" aria-label="Resumo de saldos">
+                <div className="home-v52-balance available">
+                  <div className="home-v52-balance-title">
+                    <span>Livre para gastar</span><PotSymbol symbol="wallet" />
+                  </div>
                   <AnimatedMoney cents={b.free} hidden={hidden} tag="strong" />
-                  <p>
-                    Saldo em conta menos reservas e contas pendentes até este
-                    mês.
-                  </p>
-                  <div>
-                    <span>Reservas protegidas</span>
-                    <ShieldCheck size={18} />
-                  </div>
+                  <small>Disponível agora</small>
                 </div>
-                <div className="balance-card">
-                  <span>Saldo em conta</span>
-                  <AnimatedMoney
-                    cents={b.account}
-                    hidden={hidden}
-                    tag="strong"
-                  />
-                  <small>Entradas menos pagamentos realizados</small>
-                  <hr />
-                  <div>
-                    <span>Reservas pessoais</span>
-                    <AnimatedMoney
-                      cents={b.personalReserved}
-                      hidden={hidden}
-                      tag="b"
-                    />
+                <div className="home-v52-balance account">
+                  <div className="home-v52-balance-title">
+                    <span>Saldo em conta</span><PotSymbol symbol="investment" />
                   </div>
-                  <div>
-                    <span>Reserva Mercado Livre</span>
-                    <AnimatedMoney
-                      cents={b.marketplace}
-                      hidden={hidden}
-                      tag="b"
-                    />
-                  </div>
-                  <div>
-                    <span>Contas pendentes até este mês</span>
-                    <AnimatedMoney cents={b.pending} hidden={hidden} tag="b" />
-                  </div>
+                  <AnimatedMoney cents={b.account} hidden={hidden} tag="strong" />
+                  <small>Saldo registrado</small>
                 </div>
               </section>
-              <section
-                className="patrimony-strip"
-                aria-label="Patrimônios protegidos"
-              >
-                {["nosso_patrimonio", "patrimonio_manuela"].map((id) => (
-                  <button
-                    className="patrimony-tile"
-                    key={id}
-                    onClick={() => setPatrimonyDetail(id)}
-                    aria-label={`Ver detalhes de ${id === "nosso_patrimonio" ? "Nosso Patrimônio" : "Patrimônio Manuela"}`}
-                  >
-                    <span className="patrimony-icon">
-                      <PotSymbol symbol={id === "patrimonio_manuela" ? "baby" : "pig"} />
-                    </span>
-                    <small>
-                      {id === "nosso_patrimonio"
-                        ? "Nosso Patrimônio"
-                        : "Patrimônio Manuela"}
-                    </small>
-                    <AnimatedMoney
-                      cents={Math.max(0, b.buckets[id] || 0)}
-                      hidden={hidden}
-                      tag="strong"
-                    />
-                    <span className="protected-label">
-                      <ShieldCheck size={12} /> Protegido{" "}
-                      <ChevronRight size={12} />
-                    </span>
-                  </button>
-                ))}
+              <section className="home-v52-patrimonies" aria-label="Patrimônios protegidos">
+                <div className="home-v52-section-heading">
+                  <h2>Nosso patrimônio</h2>
+                  <span className="home-v52-protected-label"><ShieldCheck size={14} /> Reservas protegidas</span>
+                </div>
+                <div className="home-v52-patrimony-grid">
+                  {(["nosso_patrimonio", "patrimonio_manuela"] as const).map((id) => (
+                    <button
+                      type="button" className="home-v52-patrimony-card" key={id}
+                      aria-label={`Ver detalhes de ${id === "nosso_patrimonio" ? "Nosso Patrimônio" : "Patrimônio Manuela"}`}
+                      onClick={() => setPatrimonyDetail(id)}
+                    >
+                      <span className="home-v52-patrimony-top">
+                        <span className="home-v52-patrimony-icon"><PotSymbol symbol={id === "patrimonio_manuela" ? "baby" : "pig"} /></span>
+                        <ChevronRight size={15} aria-hidden="true" />
+                      </span>
+                      <span className="home-v52-patrimony-name">
+                        {id === "nosso_patrimonio" ? "Patrimônio familiar" : "Patrimônio Manuela"}
+                      </span>
+                      <AnimatedMoney cents={Math.max(0, b.buckets[id] || 0)} hidden={hidden} tag="strong" />
+                    </button>
+                  ))}
+                </div>
               </section>
-              <button
-                type="button"
-                className="marketplace-card"
-                onClick={() => open({ type: "marketplace" })}
-                aria-label="Gerenciar Mercado Livre"
-              >
-                <span className="marketplace-icon">
-                  <PotSymbol symbol="market" />
-                </span>
-                <span className="marketplace-copy">
-                  <small>RESERVA EMPRESARIAL</small>
-                  <strong>Mercado Livre</strong>
-                  <span>
-                    {f.marketplace.active
+              <section className="home-v52-business" aria-label="Reserva Mercado Livre">
+                <div className="home-v52-section-heading">
+                  <h2>Reserva Mercado Livre</h2>
+                  <span className="home-v52-business-caption">Separada do dinheiro pessoal</span>
+                </div>
+                <button
+                  type="button" className="home-v52-marketplace-row"
+                  onClick={() => open({ type: "marketplace" })}
+                  aria-label="Consultar reserva e movimentações do Mercado Livre"
+                >
+                  <span className="home-v52-marketplace-icon"><PotSymbol symbol="market" /></span>
+                  <span className="home-v52-marketplace-copy">
+                    <strong>Mercado Livre</strong>
+                    <small>{f.marketplace.active
                       ? `${f.marketplace.percent}% da sobra após patrimônios e contas`
-                      : "Percentual automático pausado"}
+                      : "Separação automática pausada"}</small>
                   </span>
-                </span>
-                <span className="marketplace-balance">
-                  <small>Saldo reservado</small>
-                  <AnimatedMoney
-                    cents={b.marketplace}
-                    hidden={hidden}
-                    tag="strong"
-                  />
-                </span>
-                <ChevronRight size={18} />
-              </button>
+                  <span className="home-v52-marketplace-value">
+                    <AnimatedMoney cents={b.marketplace} hidden={hidden} tag="strong" />
+                    <small>Reserva empresarial</small>
+                  </span>
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </section>
               {b.free < 0 && (
                 <div className="notice danger">
                   As reservas e contas pendentes superam o saldo em conta.
@@ -1037,159 +1027,47 @@ export default function FinanceCenterView({
                   Revise transferências e pagamentos anteriores.
                 </div>
               )}
-              <section className="two-columns">
-                <div className="panel">
-                  <header className="section-heading">
-                    <div>
-                      <h2>Próximos pagamentos</h2>
-                      <p>
-                        {pending.length}{" "}
-                        {pending.length === 1
-                          ? "conta pendente"
-                          : "contas pendentes"}
-                      </p>
-                    </div>
-                    <button
-                      className="text-button"
-                      onClick={() => setView("bills")}
-                    >
-                      Ver contas <ChevronRight size={15} />
-                    </button>
-                  </header>
-                  {pending.slice(0, 4).map((e) => (
-                    <div className="bill-row" key={e.id}>
-                      <div className="date-box">
-                        <b>{e.date.slice(8)}</b>
-                        <span>{e.date.slice(5, 7)}</span>
-                      </div>
-                      <div>
+              <section className="home-v52-payments" aria-label="Próximos pagamentos">
+                <div className="home-v52-section-heading">
+                  <div>
+                    <h2>Próximos pagamentos</h2>
+                    <span className="home-v52-bill-count">{pending.length} {pending.length === 1 ? "conta pendente" : "contas pendentes"}</span>
+                  </div>
+                  <button type="button" className="text-button" onClick={() => setView("bills")}>Ver contas <ChevronRight size={16} /></button>
+                </div>
+                <div className="home-v52-payment-list">
+                  {pending.slice(0, 3).map((e) => (
+                    <div className="home-v52-payment" key={e.id}>
+                      <span className="home-v52-payment-date"><b>{e.date.slice(8)}</b><small>{e.date.slice(5, 7)}</small></span>
+                      <span className="home-v52-payment-copy">
                         <strong>{e.description}</strong>
                         <small className={e.date < today() ? "overdue" : ""}>
-                          {e.date < today()
-                            ? "Vencida"
-                            : e.date === today()
-                              ? "Vence hoje"
-                              : displayDate(e.date)}
+                          {e.date < today() ? "Vencida" : e.date === today() ? "Vence hoje" : displayDate(e.date)}
                         </small>
-                      </div>
-                      <b>{cash(e.cents)}</b>
-                      <button
-                        className="icon-button"
-                        disabled={saving}
-                        aria-label="Registrar pagamento hoje"
-                        onClick={() => pay(e)}
-                      >
-                        <Check size={17} />
-                      </button>
+                      </span>
+                      <span className="home-v52-payment-value">{cash(e.cents)}</span>
+                      <button type="button" className="home-v52-pay-action" disabled={saving}
+                        aria-label={`Marcar ${e.description} como pago`} title="Marcar como pago"
+                        onClick={() => pay(e)}><Check size={17}/></button>
                     </div>
                   ))}
                   {!pending.length && (
-                    <div className="empty-state">
-                      Nenhuma conta pendente.
-                      <small>
-                        Cadastre contas recorrentes para acompanhar os próximos
-                        vencimentos.
-                      </small>
+                    <div className="home-v52-payment-empty">
+                      <Check size={18} /> Nenhuma conta pendente no momento.
                     </div>
                   )}
                 </div>
-                <div className="panel">
-                  <header className="section-heading">
-                    <div>
-                      <h2>Movimento do mês</h2>
-                      <p>Valores pagos até hoje</p>
-                    </div>
-                    <input
-                      aria-label="Mês do resumo"
-                      type="month"
-                      value={month}
-                      onChange={(e) => setMonth(e.target.value)}
-                    />
-                  </header>
-                  <div className="month-stat">
-                    <span>Aportes</span>
-                    <b className="positive">{cash(income)}</b>
-                  </div>
-                  <div className="month-stat">
-                    <span>Gastos</span>
-                    <b>{cash(expense)}</b>
-                  </div>
-                  <div className="month-stat total">
-                    <span>Resultado</span>
-                    <b>{cash(income - expense)}</b>
-                  </div>
-                  <p className="muted">
-                    {income
-                      ? `${Math.round((expense / income) * 100)}% dos aportes utilizados em gastos.`
-                      : "Registre um aporte para acompanhar o resultado."}
-                  </p>
-                </div>
               </section>
-              <header className="section-heading">
-                <div>
-                  <h2>Suas prioridades</h2>
-                  <p>Distribuição e saldo de cada pote</p>
-                </div>
-                <button className="text-button" onClick={() => setView("pots")}>
-                  Gerenciar potes <ChevronRight size={15} />
-                </button>
-              </header>
-              <section className="pot-grid">
-                {pots.map((p) => (
-                  <PotCard
-                    key={p.id}
-                    pot={p}
-                    balance={b.buckets[p.id] || 0}
-                    funded={b.funded[p.id] || 0}
-                    spent={
-                      p.rollover
-                        ? b.spent[p.id] || 0
-                        : f.entries
-                            .filter(
-                              (e) =>
-                                !e.deleted &&
-                                e.kind === "expense" &&
-                                e.status === "paid" &&
-                                e.pot === p.id &&
-                                e.date.slice(0, 7) === today().slice(0, 7) &&
-                                e.date <= today(),
-                            )
-                            .reduce((s, e) => s + e.cents, 0)
-                    }
-                    cash={cash}
-                    hidden={hidden}
-                    goalTarget={f.goals.find((g) => g.pot === p.id)?.target}
-                    onOpen={() => setPotDetail(p.id)}
-                    onEdit={() => open({ type: "pot", existing: p })}
-                  />
-                ))}
-              </section>
-              <section className="panel">
-                <header className="section-heading">
-                  <h2>Últimas movimentações</h2>
-                  <button
-                    className="text-button"
-                    onClick={() => setView("ledger")}
-                  >
-                    Abrir extrato <ChevronRight size={15} />
-                  </button>
-                </header>
-                {f.entries
-                  .filter((e) => !e.deleted)
-                  .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))
-                  .slice(0, 5)
-                  .map(ledgerRow)}
-                {!f.entries.length && (
-                  <div className="empty-state">
-                    Seu primeiro aporte começa esta história.
-                  </div>
-                )}
-              </section>
-            </>
+              <button type="button" className="home-v52-profile-link" onClick={() => setView("profile")}>
+                <span className="home-v52-profile-icon"><Crown size={19} strokeWidth={1.7} /></span>
+                <span><strong>Evolução da família</strong><small>Acompanhar conquistas e progresso no Perfil</small></span>
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+            </div>
           )}
           {view === "ledger" && (
-            <>
-              <div className="toolbar">
+            <div className="ledger-v52">
+              <div className="toolbar ledger-v52-toolbar">
                 <label className="search">
                   <Search size={17} />
                   <input
@@ -1248,16 +1126,12 @@ export default function FinanceCenterView({
                   Excluídos
                 </label>
               </div>
-              <section className="panel">
-                <header className="section-heading">
+              <section className="panel ledger-v52-panel">
+                <header className="section-heading ledger-v52-panel-header">
                   <div>
-                    <h2>{filtered.length} movimentações</h2>
-                    <p>
-                      {month} ·{" "}
-                      {f.closedMonths.includes(month)
-                        ? "Mês fechado"
-                        : "Mês aberto"}
-                    </p>
+                    <small>Movimentações registradas</small>
+                    <h2>{ledgerMonthTitle(month)}</h2>
+                    <p>{filtered.length} {filtered.length === 1 ? "movimentação" : "movimentações"} · {f.closedMonths.includes(month) ? "Mês fechado" : "Mês aberto"}</p>
                   </div>
                   <button
                     className="secondary"
@@ -1297,8 +1171,8 @@ export default function FinanceCenterView({
                 </header>
                 {Array.from(new Set(filtered.map((e) => e.date))).map(
                   (date) => (
-                    <section className="timeline-day" key={date}>
-                      <h3>{date === today() ? "Hoje" : displayDate(date)}</h3>
+                    <section className="ledger-v52-day" key={date} aria-label={`Movimentações de ${ledgerDayTitle(date)}`}>
+                      <div className="ledger-v52-day-heading"><span className="ledger-v52-day-dot"/><h3>{ledgerDayTitle(date)}</h3><span className="ledger-v52-day-rule"/></div>
                       {filtered.filter((e) => e.date === date).map(ledgerRow)}
                     </section>
                   ),
@@ -1309,12 +1183,11 @@ export default function FinanceCenterView({
                   </div>
                 )}
               </section>
-              <div className="notice">
-                Ao editar um aporte, sua divisão original é mantida e os valores
-                são recalculados. Novas porcentagens só valem para novos
-                aportes.
+              <div className="notice ledger-v52-help">
+                Transferências entre potes não são novas entradas de dinheiro. Ao editar um aporte,
+                a distribuição original é preservada; novos percentuais valem apenas para novos aportes.
               </div>
-            </>
+            </div>
           )}
           {view === "pots" && (
             <>
@@ -1534,8 +1407,8 @@ export default function FinanceCenterView({
                   return (
                     <article className="goal-card" key={g.id}>
                       <header>
-                        <span className="entry-icon transfer">
-                          <Target size={20} />
+                        <span className="entry-icon transfer finance-v53-goal-icon">
+                          <PotSymbol symbol="goal" />
                         </span>
                         <button
                           className="icon-button"
@@ -2145,7 +2018,7 @@ export default function FinanceCenterView({
         modal && (
           <FinanceModal
             modal={modal}
-            onChangeEntryKind={(kind) => setModal({type:"entry",kind, ...(kind === "transfer" ? {presetPot:"free"} : {})})}
+            onChangeEntryKind={(kind, incomeMode) => setModal({type:"entry",kind, ...(incomeMode ? {incomeMode} : {}), ...(kind === "transfer" ? {presetPot:"free"} : {})})}
             f={f}
             saving={saving}
             cash={cash}
@@ -2672,7 +2545,7 @@ function FinanceModal({
   commit,
 }: {
   modal: Exclude<Modal, null | { type: "reset" } | { type: "marketplace" }>;
-  onChangeEntryKind: (kind: Entry["kind"]) => void;
+  onChangeEntryKind: (kind: Entry["kind"], incomeMode?: "direct" | "distributed") => void;
   f: Finance;
   saving: boolean;
   cash: (v: number) => string;
@@ -2687,6 +2560,17 @@ function FinanceModal({
     f.pots.find(
       (x) => x.active && !x.reserve && potAllocationBase(x) === "remainder",
     )?.id || "free";
+  // A navegação entre abas não desmonta o formulário: descrição, valor e data permanecem.
+  const [movementMode, setMovementMode] = useState<
+    "direct" | "expense" | "distributed" | "transfer"
+  >(
+    modal.type === "entry"
+      ? modal.kind === "income"
+        ? (modal.incomeMode || old?.incomeMode ||
+            (old?.source.startsWith("marketplace:") ? "direct" : "distributed"))
+        : modal.kind
+      : "expense",
+  );
   const [description, setDescription] = useState(
     old?.description || p?.name || r?.name || g?.name || "",
   );
@@ -2718,6 +2602,12 @@ function FinanceModal({
         (modal.type === "entry" ? modal.presetDest : undefined) ||
         "",
     );
+  // A última entrada direta salva o destino em destination; dados históricos continuam compatíveis.
+  const [directDest, setDirectDest] = useState<string>(
+    old?.incomeMode === "direct" || old?.source.startsWith("marketplace:")
+      ? old.destination || Object.keys(old.allocations).find((key) => old.allocations[key] > 0) || "free"
+      : "free",
+  );
   const [mode, setMode] = useState<"percent" | "fixed">(p?.mode || "percent"),
     [reserve, setReserve] = useState(p?.reserve || false),
     [rollover, setRollover] = useState(p?.rollover ?? true),
@@ -2772,7 +2662,7 @@ function FinanceModal({
   let setupMarketplaceAvailable = 0;
   let preview: Record<string, number> = {};
   try {
-    if (modal.type === "entry" && modal.kind === "income") {
+    if (modal.type === "entry" && modal.kind === "income" && movementMode === "distributed") {
       preview = allocateContribution(
         parseMoney(value),
         existingPolicy,
@@ -2814,7 +2704,7 @@ function FinanceModal({
   } catch {}
   const title =
     modal.type === "entry"
-      ? `${old?.id ? "Editar" : "Registrar"} ${kindNames[modal.kind].toLowerCase()}`
+      ? `${old?.id ? "Editar" : "Registrar"} ${modal.kind === "income" && movementMode === "distributed" ? "aporte" : modal.kind === "expense" ? "saída" : kindNames[modal.kind].toLowerCase()}`
       : modal.type === "pot"
         ? p
           ? "Editar pote"
@@ -2999,7 +2889,10 @@ function FinanceModal({
             date,
             description,
             pot,
-            destination: dest,
+            destination: modal.kind === "income" && movementMode === "direct" ? directDest : dest,
+            incomeMode: modal.kind === "income"
+              ? movementMode === "direct" ? "direct" : "distributed"
+              : undefined,
             status: modal.kind === "expense" ? old?.status || "paid" : "paid",
             policy: modal.kind === "income" ? existingPolicy : [],
             source: old?.id ? old.source : "",
@@ -3007,11 +2900,13 @@ function FinanceModal({
           f.pots,
         );
         if (modal.kind === "income") {
-          candidate.allocations = allocateContribution(
-            amount,
-            existingPolicy,
-            pendingCommitmentsForMonth(f, date),
-          );
+          candidate.allocations = movementMode === "direct"
+            ? directIncomeAllocations(amount, directDest, f)
+            : allocateContribution(
+                amount,
+                existingPolicy,
+                pendingCommitmentsForMonth(f, date),
+              );
         }
         const duplicates = f.entries.some(
           (e) =>
@@ -3238,20 +3133,24 @@ function FinanceModal({
     )
     .reduce((sum, p) => sum + p.value, 0);
   return (
-    <ModalShell title={modal.type === "entry" && !old ? "Nova movimentação" : title} onClose={close}>
-      {modal.type === "entry" && !old && (
+    <ModalShell title={modal.type === "entry" && !old ? "Nova movimentação" : title} onClose={close} entrySheet={modal.type === "entry"}>
+      {modal.type === "entry" && !old && modal.kind !== "transfer" && (
         <div className="finance-v5-entry-tabs" role="group" aria-label="Tipo de movimentação">
-          {(["income", "expense", "transfer"] as Entry["kind"][]).map((k) => (
-            <button key={k} type="button" className={modal.kind === k ? "selected" : ""}
-              aria-pressed={modal.kind === k}
+          {([
+            { key: "direct", kind: "income", label: "Entrada", symbol: "wallet" },
+            { key: "expense", kind: "expense", label: "Saída", symbol: "basket" },
+            { key: "distributed", kind: "income", label: "Aporte", symbol: "investment" },
+          ] as const).map(({ key, kind, label, symbol }) => (
+            <button key={key} type="button" className={movementMode === key ? "selected" : ""}
+              aria-pressed={movementMode === key}
               onClick={() => {
-                if (k === "expense") setPot(defaultExpensePot);
-                if (k !== "expense") setPot("free");
-                if (k === "transfer") setDest("");
+                setMovementMode(key);
+                if (key === "expense") setPot(defaultExpensePot);
+                else setPot("free");
                 setFormError("");
-                onChangeEntryKind(k);
+                onChangeEntryKind(kind, key === "expense" ? undefined : key);
               }}>
-              {k === "income" ? "Entrada" : k === "expense" ? "Gasto" : "Aporte"}
+              <PotSymbol symbol={symbol} /><span>{label}</span>
             </button>
           ))}
         </div>
@@ -3723,7 +3622,27 @@ function FinanceModal({
                 placeholder="0,00"
               />
             </Field>
-            <small>{modal.kind === "income" ? "O valor recebido será distribuído conforme seu planejamento." : modal.kind === "expense" ? "O gasto será descontado apenas do pote selecionado." : "Aporte entre saldo livre e pote: sem alterar o saldo da conta."}</small>
+            <small>{movementMode === "direct"
+              ? "Dinheiro novo: você escolhe um destino. Não será dividido automaticamente."
+              : movementMode === "distributed"
+                ? "Dinheiro novo, como salário ou vendas: divisão automática entre patrimônios, contas, Mercado Livre e potes, conforme suas regras."
+                : movementMode === "expense"
+                  ? "O valor sai somente do pote selecionado, respeitando o saldo disponível."
+                  : "Transferência interna entre saldos: não adiciona dinheiro à conta."}</small>
+          </div>
+        )}
+        {modal.type === "entry" && modal.kind === "income" && movementMode === "direct" && (
+          <div className="v53-destination">
+            <Field label="Para qual pote vai esta entrada?">
+              <select required value={directDest} onChange={(e) => setDirectDest(e.target.value)}>
+                <option value="free">Saldo livre (sem distribuição)</option>
+                {f.pots.filter((item) => item.active || item.id === directDest).map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+                <option value={MARKETPLACE_ID}>Reserva Mercado Livre</option>
+              </select>
+            </Field>
+            <p>100% do valor irá para o destino escolhido, sem aplicar os percentuais do aporte.</p>
           </div>
         )}
         {modal.type !== "setup" && modal.type !== "rule" && (
@@ -3735,7 +3654,7 @@ function FinanceModal({
               maxLength={120}
               placeholder={
                 modal.type === "entry"
-                  ? "Ex.: vendas Mercado Livre"
+                  ? movementMode === "direct" ? "Ex.: reembolso, venda avulsa" : movementMode === "distributed" ? "Ex.: salário, vendas da semana" : "Ex.: supermercado, combustível"
                   : "Um nome fácil de identificar"
               }
             />
@@ -3871,7 +3790,7 @@ function FinanceModal({
             })}
             .{" "}
             {modal.kind === "income"
-              ? "Este aporte mantém os percentuais originais."
+              ? movementMode === "distributed" ? "Este aporte mantém a política original de distribuição." : "Entrada destinada a um único pote."
               : ""}
           </div>
         )}
