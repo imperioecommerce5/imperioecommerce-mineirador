@@ -2890,9 +2890,12 @@ function FinanceModal({
             description,
             pot,
             destination: modal.kind === "income" && movementMode === "direct" ? directDest : dest,
-            incomeMode: modal.kind === "income"
-              ? movementMode === "direct" ? "direct" : "distributed"
-              : undefined,
+            ...(modal.kind === "income"
+              ? {
+                  incomeMode:
+                    movementMode === "direct" ? "direct" : "distributed",
+                }
+              : {}),
             status: modal.kind === "expense" ? old?.status || "paid" : "paid",
             policy: modal.kind === "income" ? existingPolicy : [],
             source: old?.id ? old.source : "",
