@@ -20,6 +20,7 @@ export function FamilyProfile({
   hidden: boolean;
 }) {
   const evolution = familyEvolution(f);
+  const thisMonth = evolution.history.find((m) => m.month === today().slice(0, 7));
   const [selected, setSelected] = useState(today().slice(0, 7));
   const [period, setPeriod] = useState(6);
   const [medal, setMedal] = useState<string | null>(null);
@@ -68,14 +69,18 @@ export function FamilyProfile({
               ? `· ${evolution.next - evolution.xp} para o próximo nível`
               : "· Nível máximo alcançado"}
           </small>
+          <small>
+            Destinado aos patrimônios neste mês: {cash(thisMonth?.saved || 0)}.
+            O XP do mês é apurado quando ele termina.
+          </small>
         </div>
       </section>
       <section className="profile-grid">
         <div className="panel family-chart">
           <header className="section-heading">
             <div>
-              <h2>Aportes aos patrimônios</h2>
-              <p>Distribuição dos aportes pessoais</p>
+              <h2>Valores destinados aos patrimônios</h2>
+              <p>Entradas e transferências para as reservas protegidas</p>
             </div>
             <div className="period-switch" aria-label="Período do gráfico">
               {[6, 12].map((n) => (
@@ -130,8 +135,9 @@ export function FamilyProfile({
             </div>
           )}
           <p className="muted">
-            Toque em um mês para consultar. Meses sem registros aparecem com
-            valor zero; não comprovam ausência de atividade.
+            Toque em um mês para consultar. Inclui transferências do Mercado Livre
+            para os patrimônios, sem tratá-las como novas receitas. Meses sem
+            registros aparecem com zero e não comprovam ausência de atividade.
           </p>
         </div>
         <div className="panel insights-panel">
@@ -201,8 +207,9 @@ export function FamilyProfile({
         </p>
         <p>
           O mês atual só pontua após terminar. Exclusões e correções recalculam
-          a evolução. Mercado Livre e transferências não geram XP. Não é uma
-          nota de crédito nem uma comparação com outras famílias.
+          a evolução. Transferências, inclusive do Mercado Livre para patrimônios,
+          aparecem nos valores destinados às reservas, mas não geram XP por si.
+          Não é uma nota de crédito nem uma comparação com outras famílias.
         </p>
         <p>
           O histórico atual não registra todas as datas originais de vencimento
