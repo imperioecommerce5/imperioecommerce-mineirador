@@ -67,6 +67,18 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    // Restrição de origem e tamanho reduz requisições indevidas, mas não
+    // substitui autenticação real. Proteger o deploy antes de expor na web.
+    const origin = req.headers?.origin;
+    const forwardedProto = req.headers?.["x-forwarded-proto"] || "https";
+    const host = req.headers?.["x-forwarded-host"] || req.headers?.host;
+    if (origin && host && origin !== `${forwardedProto}://${host}`)
+      return send(res, 403, { error: "Origem não autorizada." });
+    if (req.headers?.["content-type"] &&
+        !String(req.headers["content-type"]).startsWith("application/json"))
+      return send(res, 415, { error: "Formato inválido." });
+    if (typeof req.body === "string" && req.body.length > 2048)
+      return send(res, 413, { error: "Solicitação muito grande." });
     const body =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
     const profile = body.profile as Profile;

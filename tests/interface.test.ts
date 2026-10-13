@@ -218,7 +218,7 @@ test("interface: conta recorrente gera pendência, pagamento afeta saldo e trans
     );
     click(dom, "Potes");
     await sleep();
-    click(dom, "Transferir entre potes");
+    click(dom, "Aportar do saldo livre");
     await sleep();
     assert.match(
       dom.window.document.querySelector('[role="dialog"]')?.textContent || "",
@@ -335,7 +335,7 @@ test("interface: porcentagem arrastável respeita orçamento e potes possuem sí
   const dom = await openApp();
   try {
     assert.ok(
-      dom.window.document.querySelectorAll("svg.pot-symbol").length >= 7,
+      dom.window.document.querySelectorAll("img.pot-symbol-3d").length >= 7,
     );
     click(dom, "Potes");
     await sleep();
@@ -476,10 +476,10 @@ test("interface: perfil conjunto somente leitura, privacidade e painel de açõe
     ).click();
     await sleep();
     assert.equal(
-      dom.window.document.querySelectorAll(".quick-grid button").length,
-      5,
+      dom.window.document.querySelectorAll(".finance-v5-entry-tabs button").length,
+      3,
     );
-    assert.ok(dom.window.document.querySelector('[role="dialog"]'));
+    assert.match(dom.window.document.querySelector('[role="dialog"]')?.textContent || "", /Nova movimentação/);
     (
       dom.window.document.querySelector('[aria-label="Fechar"]') as HTMLElement
     ).click();

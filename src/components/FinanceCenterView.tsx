@@ -40,7 +40,7 @@ import {
   Activity,
   Sparkles,
   User,
-  Store,
+  Menu as MenuIcon,
   Crown,
 } from "lucide-react";
 import { useFinance } from "../finance/useFinance";
@@ -122,7 +122,7 @@ const icons = {
   profile: User,
 };
 const kindNames = {
-  income: "Aporte",
+  income: "Entrada",
   expense: "Gasto",
   transfer: "Transferência",
 };
@@ -258,10 +258,11 @@ export default function FinanceCenterView({
     [hidden, setHidden] = useState(false),
     [surplusDismissed, setSurplusDismissed] = useState(false);
   const [dark, setDark] = useState(
-    () => storage.getItem("imperio_visual") === "dark",
+    () => storage.getItem("imperio_visual") !== "light",
   );
-  const [quickActions, setQuickActions] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [patrimonyDetail, setPatrimonyDetail] = useState<string | null>(null);
+  const [potDetail, setPotDetail] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{
     value: number;
     balance: number;
@@ -355,7 +356,7 @@ export default function FinanceCenterView({
                 ? market
                   ? "Entrada registrada"
                   : "Aporte realizado"
-                : "Transferência realizada",
+                : "Aporte realizado",
         );
       } else {
         setConfirmation(null);
@@ -595,7 +596,7 @@ export default function FinanceCenterView({
           <strong>{e.description}</strong>
           <small>
             {displayDate(e.date)} ·{" "}
-            {e.kind === "income" ? "Distribuição automática" : potName(e.pot)}
+            {e.kind === "income" ? "Entrada · distribuição automática" : potName(e.pot)}
             {e.kind === "transfer" ? ` → ${potName(e.destination)}` : ""}
             {e.date > today() ? " · Agendado" : ""}
           </small>
@@ -901,7 +902,7 @@ export default function FinanceCenterView({
                     aria-label={`Ver detalhes de ${id === "nosso_patrimonio" ? "Nosso Patrimônio" : "Patrimônio Manuela"}`}
                   >
                     <span className="patrimony-icon">
-                      <PiggyBank size={18} />
+                      <PotSymbol symbol={id === "patrimonio_manuela" ? "baby" : "pig"} />
                     </span>
                     <small>
                       {id === "nosso_patrimonio"
@@ -927,7 +928,7 @@ export default function FinanceCenterView({
                 aria-label="Gerenciar Mercado Livre"
               >
                 <span className="marketplace-icon">
-                  <Store size={20} />
+                  <PotSymbol symbol="market" />
                 </span>
                 <span className="marketplace-copy">
                   <small>RESERVA EMPRESARIAL</small>
@@ -1157,6 +1158,8 @@ export default function FinanceCenterView({
                     }
                     cash={cash}
                     hidden={hidden}
+                    goalTarget={f.goals.find((g) => g.pot === p.id)?.target}
+                    onOpen={() => setPotDetail(p.id)}
                     onEdit={() => open({ type: "pot", existing: p })}
                   />
                 ))}
@@ -1326,7 +1329,7 @@ export default function FinanceCenterView({
                   className="secondary"
                   onClick={() => open({ type: "entry", kind: "transfer" })}
                 >
-                  <ArrowRightLeft size={17} /> Transferir entre potes
+                  <ArrowRightLeft size={17} /> Aportar do saldo livre
                 </button>
                 <span className="muted">
                   {pots
@@ -1353,7 +1356,7 @@ export default function FinanceCenterView({
                 onClick={() => open({ type: "marketplace" })}
               >
                 <span className="marketplace-icon">
-                  <Store size={19} />
+                  <PotSymbol symbol="market" />
                 </span>
                 <span>
                   <small>FORA DOS POTES · RESERVA EMPRESARIAL</small>
@@ -1398,6 +1401,8 @@ export default function FinanceCenterView({
                     }
                     cash={cash}
                     hidden={hidden}
+                    goalTarget={f.goals.find((g) => g.pot === p.id)?.target}
+                    onOpen={() => setPotDetail(p.id)}
                     onEdit={() => open({ type: "pot", existing: p })}
                   />
                 ))}
@@ -1945,91 +1950,16 @@ export default function FinanceCenterView({
           )}
         </main>
         <nav className="mobile-nav" aria-label="Navegação principal">
-          {navViews.map((v, index) => {
+          {(["home", "pots"] as View[]).map((v) => {
             const Icon = icons[v];
-            return (
-              <Fragment key={v}>
-                {index === 3 && (
-                  <button
-                    type="button"
-                    className="nav-new-movement"
-                    aria-label="Nova movimentação"
-                    title="Nova movimentação"
-                    disabled={saving || !f.configured}
-                    onClick={() => setQuickActions(true)}
-                  >
-                    <span className="nav-new-circle"><Plus size={23} /></span>
-                    <span>Adicionar</span>
-                  </button>
-                )}
-                <button
-                  className={view === v ? "active" : ""}
-                  onClick={() => setView(v)}
-                  aria-current={view === v ? "page" : undefined}
-                >
-                  <Icon size={19} />
-                  <span>{v === "settings" ? "Ajustes" : v === "home" ? "Início" : labels[v]}</span>
-                </button>
-              </Fragment>
-            );
+            return <button key={v} className={view === v ? "active" : ""} onClick={() => { setView(v); setMenuOpen(false); }} aria-current={view === v ? "page" : undefined}><Icon size={19}/><span>{v === "home" ? "Início" : labels[v]}</span></button>;
           })}
+          <button type="button" className="nav-new-movement" aria-label="Nova movimentação" disabled={saving || !f.configured} onClick={() => open({type:"entry",kind:"expense"})}><span className="nav-new-circle"><Plus size={23}/></span><span>Adicionar</span></button>
+          <button className={view === "ledger" ? "active" : ""} onClick={() => {setView("ledger");setMenuOpen(false);}} aria-current={view === "ledger" ? "page" : undefined}><List size={19}/><span>Extrato</span></button>
+          <button className={menuOpen || (["bills","goals","settings","profile"] as View[]).includes(view) ? "active" : ""} onClick={() => setMenuOpen(v => !v)} aria-expanded={menuOpen} aria-controls="finance-more-menu" aria-label="Abrir menu"><MenuIcon size={19}/><span>Menu</span></button>
         </nav>
+        {menuOpen && <div id="finance-more-menu" className="finance-v5-menu" role="menu" aria-label="Outras seções">{(["profile","bills","goals","settings"] as View[]).map(v=>{const Icon=icons[v];return <button role="menuitem" key={v} onClick={()=>{setView(v);setMenuOpen(false);}}><Icon size={19}/>{v === "settings" ? "Ajustes" : v === "profile" ? "Meu Perfil" : labels[v]}</button>})}</div>}
       </div>
-      {quickActions && (
-        <ModalShell
-          title="Nova movimentação"
-          onClose={() => setQuickActions(false)}
-        >
-          <div className="quick-grid">
-            <button
-              onClick={() => {
-                setQuickActions(false);
-                open({ type: "entry", kind: "income" });
-              }}
-            >
-              <ArrowDownLeft />
-              Adicionar entrada / aporte
-              <small>Distribuir conforme o planejamento</small>
-            </button>
-            <button
-              onClick={() => {
-                setQuickActions(false);
-                open({ type: "entry", kind: "expense" });
-              }}
-            >
-              <ArrowUpRight />
-              Registrar gasto<small>Usar o saldo do pote escolhido</small>
-            </button>
-            <button
-              onClick={() => {
-                setQuickActions(false);
-                open({ type: "entry", kind: "transfer", presetPot: "free" });
-              }}
-            >
-              <PiggyBank />
-              Aportar em um pote<small>Destinar saldo sem distribuição</small>
-            </button>
-            <button
-              onClick={() => {
-                setQuickActions(false);
-                setView("bills");
-              }}
-            >
-              <CalendarDays />
-              Pagar conta<small>Escolher um compromisso pendente</small>
-            </button>
-            <button
-              onClick={() => {
-                setQuickActions(false);
-                open({ type: "marketplace" });
-              }}
-            >
-              <Store />
-              Mercado Livre<small>Movimentar a reserva empresarial</small>
-            </button>
-          </div>
-        </ModalShell>
-      )}
       {patrimonyDetail && (
         <ModalShell
           title={potName(patrimonyDetail)}
@@ -2088,6 +2018,49 @@ export default function FinanceCenterView({
           </div>
         </ModalShell>
       )}
+      {potDetail && (() => {
+        const p = f.pots.find((item) => item.id === potDetail);
+        if (!p) return null;
+        const balance = b.buckets[p.id] || 0;
+        const related = f.entries.filter(e => !e.deleted && (
+          e.pot === p.id || e.destination === p.id || (e.allocations[p.id] || 0) > 0
+        )).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+        return (
+          <ModalShell title={p.name} onClose={() => setPotDetail(null)}>
+            <section className="pot-detail-v5">
+              <div className="pot-detail-v5-head">
+                <PotSymbol symbol={potSymbol(p)} />
+                <div>
+                  <span>Saldo {p.reserve ? "protegido" : "disponível"}</span>
+                  <AnimatedMoney cents={Math.max(0, balance)} hidden={hidden} tag="strong" />
+                  <small>{p.mode === "percent" ? `${p.value}% da distribuição` : `${cash(Math.round(p.value * 100))} por aporte`}</small>
+                </div>
+              </div>
+              <div className="pot-detail-v5-stats">
+                <div><small>Total aportado</small><strong>{cash(b.funded[p.id] || 0)}</strong></div>
+                <div><small>Gastos registrados</small><strong>{cash(b.spent[p.id] || 0)}</strong></div>
+              </div>
+              <div className="pot-detail-v5-actions">
+                <button type="button" className="primary" onClick={() => {
+                  setPotDetail(null);
+                  open({type:"entry",kind:"transfer",presetPot:"free",presetDest:p.id});
+                }}><Plus size={16}/> Aportar</button>
+                {!p.reserve && <button type="button" className="secondary" onClick={() => {
+                  setPotDetail(null);
+                  open({type:"entry",kind:"expense",presetPot:p.id});
+                }}><ArrowUpRight size={16}/> Registrar gasto</button>}
+                <button type="button" className="secondary" onClick={() => {
+                  setPotDetail(null);
+                  open({type:"pot",existing:p});
+                }}><Pencil size={16}/> Editar</button>
+              </div>
+              {p.reserve && <div className="protected-label"><ShieldCheck size={15}/> Reserva protegida contra gastos comuns.</div>}
+              <h3>Últimas movimentações</h3>
+              {related.length ? related.map(ledgerRow) : <p className="muted">Nenhuma movimentação neste pote.</p>}
+            </section>
+          </ModalShell>
+        );
+      })()}
       {(toast || undo) && (
         <div
           className={`toast movement-confirmation ${confirmation?.market ? "market-confirmation" : ""}`}
@@ -2172,6 +2145,7 @@ export default function FinanceCenterView({
         modal && (
           <FinanceModal
             modal={modal}
+            onChangeEntryKind={(kind) => setModal({type:"entry",kind, ...(kind === "transfer" ? {presetPot:"free"} : {})})}
             f={f}
             saving={saving}
             cash={cash}
@@ -2194,6 +2168,8 @@ function PotCard({
   spent,
   cash,
   hidden,
+  goalTarget,
+  onOpen,
   onEdit,
 }: {
   pot: Pot;
@@ -2202,17 +2178,22 @@ function PotCard({
   spent: number;
   cash: (v: number) => string;
   hidden: boolean;
+  goalTarget?: number;
+  onOpen: () => void;
   onEdit: () => void;
 }) {
   const budget = balance + spent;
   const used =
     budget > 0 ? (spent / budget) * 100 : balance <= 0 && spent > 0 ? 100 : 0;
-  const remaining = Math.max(0, Math.min(1, budget > 0 ? balance / budget : balance > 0 ? 1 : 0));
-  const ringSegments = 8;
+  // A reserva protegida não recebe porcentagem fictícia. Aro de meta somente
+  // quando existe alvo real; gastos mostram a parcela do orçamento disponível.
+  const goalProgress = goalTarget && goalTarget > 0 ? Math.max(0, Math.min(1, balance / goalTarget)) : null;
+  const remaining = budget > 0 ? Math.max(0, Math.min(1, balance / budget)) : 0;
   const ringCircumference = 2 * Math.PI * 56;
-  const ringStep = ringCircumference / ringSegments;
-  const ringGap = 7;
-  const ringLength = ringStep - ringGap;
+  const ringProgress = p.reserve ? (goalProgress ?? 0) : remaining;
+  const ringLabel = p.reserve
+    ? (goalProgress === null ? "Protegido" : `${Math.round(goalProgress * 100)}% da meta`)
+    : (budget > 0 ? `${Math.round(remaining * 100)}% livre` : "Sem saldo");
   return (
     <article className="pot-card">
       <header>
@@ -2231,28 +2212,18 @@ function PotCard({
       >
         <Pencil size={14} />
       </button>
-      <div className="pot-art">
-        <svg className="pot-ring pot-ring-segmented" viewBox="0 0 120 120" aria-hidden="true">
-          {Array.from({ length: ringSegments }, (_, i) => {
-            const segmentProgress = Math.max(0, Math.min(1, remaining * ringSegments - i));
-            return (
-              <g key={i}>
-                <circle cx="60" cy="60" r="56" strokeDasharray={`${ringLength} ${ringCircumference}`} strokeDashoffset={-i * ringStep} />
-                {segmentProgress > 0 && (
-                  <circle className="pot-ring-fill" cx="60" cy="60" r="56"
-                    stroke={p.color}
-                    strokeDasharray={`${Math.max(0.01, ringLength * segmentProgress)} ${ringCircumference}`}
-                    strokeDashoffset={-i * ringStep} />
-                )}
-              </g>
-            );
-          })}
+      <button type="button" className="pot-art" onClick={onOpen}
+        aria-label={`Abrir detalhes do pote ${p.name}`}>
+        <svg className="pot-ring pot-ring-continuous" viewBox="0 0 120 120" aria-hidden="true">
+          <circle className="pot-ring-track" cx="60" cy="60" r="56" />
+          <circle className="pot-ring-fill" cx="60" cy="60" r="56"
+            style={{ stroke: p.color }}
+            strokeDasharray={`${ringProgress * ringCircumference} ${ringCircumference}`}
+            transform="rotate(-90 60 60)" />
         </svg>
         <PotSymbol symbol={potSymbol(p)} />
-        <span className="pot-percentage">
-          {p.mode === "percent" ? `${p.value}%` : "Fixo"}
-        </span>
-      </div>
+        <span className="pot-percentage">{ringLabel}</span>
+      </button>
       <h3>{p.name}</h3>
       <AnimatedMoney cents={balance} hidden={hidden} tag="strong" />
       <small>{p.reserve ? "Reservado" : "Disponível no pote"}</small>
@@ -2482,7 +2453,7 @@ function MarketplaceDialog({
         )}
         <section className="marketplace-hero">
           <span className="marketplace-icon marketplace-icon-large">
-            <Store size={25} />
+            <PotSymbol symbol="market" />
           </span>
           <div>
             <small>RESERVA EMPRESARIAL</small>
@@ -2687,6 +2658,7 @@ function MarketplaceDialog({
 
 function FinanceModal({
   modal,
+  onChangeEntryKind,
   f,
   saving,
   cash,
@@ -2694,6 +2666,7 @@ function FinanceModal({
   commit,
 }: {
   modal: Exclude<Modal, null | { type: "reset" } | { type: "marketplace" }>;
+  onChangeEntryKind: (kind: Entry["kind"]) => void;
   f: Finance;
   saving: boolean;
   cash: (v: number) => string;
@@ -3008,7 +2981,9 @@ function FinanceModal({
             "Reabra os meses fechados antes de alterar um lançamento deste período.",
           );
         if (modal.kind === "transfer" && (!dest || pot === dest))
-          throw new Error("Escolha potes diferentes para origem e destino.");
+          throw new Error("Escolha origem e destino diferentes.");
+        if (modal.kind === "transfer" && !old?.id && pot !== "free")
+          throw new Error("Aportes novos só podem sair do saldo livre. Não é permitido cruzar potes.");
         const candidate = entry(
           {
             ...(old?.id ? old : {}),
@@ -3257,7 +3232,24 @@ function FinanceModal({
     )
     .reduce((sum, p) => sum + p.value, 0);
   return (
-    <ModalShell title={title} onClose={close}>
+    <ModalShell title={modal.type === "entry" && !old ? "Nova movimentação" : title} onClose={close}>
+      {modal.type === "entry" && !old && (
+        <div className="finance-v5-entry-tabs" role="group" aria-label="Tipo de movimentação">
+          {(["income", "expense", "transfer"] as Entry["kind"][]).map((k) => (
+            <button key={k} type="button" className={modal.kind === k ? "selected" : ""}
+              aria-pressed={modal.kind === k}
+              onClick={() => {
+                if (k === "expense") setPot(defaultExpensePot);
+                if (k !== "expense") setPot("free");
+                if (k === "transfer") setDest("");
+                setFormError("");
+                onChangeEntryKind(k);
+              }}>
+              {k === "income" ? "Entrada" : k === "expense" ? "Gasto" : "Aporte"}
+            </button>
+          ))}
+        </div>
+      )}
       <form onSubmit={submit} className="modal-form">
         {formError && (
           <div className="notice danger" role="alert">
@@ -3456,7 +3448,7 @@ function FinanceModal({
                 <div className="setup-marketplace-first">
                   <div className="setup-marketplace-head">
                     <span className="marketplace-icon">
-                      <Store size={20} />
+                      <PotSymbol symbol="market" />
                     </span>
                     <span>
                       <small>PRIMEIRO APORTE · VALOR MANUAL</small>
@@ -3712,6 +3704,22 @@ function FinanceModal({
             )}
           </div>
         )}
+        {modal.type === "entry" && (
+          <div className="v5-amount-group">
+            <Field label="Valor (R$)">
+              <input
+                className="v5-amount-input"
+                inputMode="decimal"
+                autoComplete="off"
+                required
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,00"
+              />
+            </Field>
+            <small>{modal.kind === "income" ? "O valor recebido será distribuído conforme seu planejamento." : modal.kind === "expense" ? "O gasto será descontado apenas do pote selecionado." : "Aporte entre saldo livre e pote: sem alterar o saldo da conta."}</small>
+          </div>
+        )}
         {modal.type !== "setup" && modal.type !== "rule" && (
           <Field label={modal.type === "entry" ? "Descrição" : "Nome"}>
             <input
@@ -3760,7 +3768,8 @@ function FinanceModal({
           />
         ) : (
           modal.type !== "rule" &&
-          modal.type !== "setup" && (
+          modal.type !== "setup" &&
+          modal.type !== "entry" && (
             <Field
               label={
                 modal.type === "pot"
@@ -3784,7 +3793,7 @@ function FinanceModal({
             </Field>
           )
         )}
-        {((modal.type === "entry" && modal.kind !== "expense") ||
+        {(modal.type === "entry" ||
           modal.type === "bill" ||
           modal.type === "goal") && (
           <Field
@@ -3825,7 +3834,7 @@ function FinanceModal({
               {modal.type === "entry" && modal.kind === "expense"
                 ? expenseOptions
                 : modal.type === "entry" && modal.kind === "transfer"
-                  ? transferSourceOptions
+                  ? (old?.id ? transferSourceOptions : <option value="free">Saldo livre</option>)
                   : ruleOptions}
             </select>
           </Field>

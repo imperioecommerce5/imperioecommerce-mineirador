@@ -630,3 +630,144 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .finance-app .nav-new-circle { transition: none; }
 }
+
+/* V4: anel continuo premium e simbolos 3D foscos; sem alterar regras financeiras. */
+.finance-app .pot-ring-continuous circle { fill:none; stroke-width:5; }
+.finance-app .pot-ring-continuous .pot-ring-track { stroke:var(--border); }
+.finance-app .pot-ring-continuous .pot-ring-fill {
+  stroke-linecap:round; transition:stroke-dasharray .65s cubic-bezier(.2,.8,.2,1);
+}
+.finance-app .pot-card .pot-symbol { filter:saturate(.78) contrast(.96); }
+.finance-app .pot-card .pot-symbol-object { transform-origin:60px 60px; transition:transform .25s ease; }
+@media (hover:hover) { .finance-app .pot-card:hover .pot-symbol-object { transform:translateY(-2px); } }
+@media (prefers-reduced-motion:reduce) {
+  .finance-app .pot-ring-continuous .pot-ring-fill,
+  .finance-app .pot-card .pot-symbol-object { transition:none; }
+}
+
+/* V5 — bottom navigation, movement sheet and premium controls */
+.finance-app .finance-v5-entry-tabs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 18px;padding:5px;background:var(--surface,rgba(120,140,125,.10));border-radius:14px}
+.finance-app .finance-v5-entry-tabs button {border:0;border-radius:10px;padding:12px 5px;background:transparent;color:var(--muted);font-weight:650;font-size:14px}
+.finance-app .finance-v5-entry-tabs button.selected {background:#32664d;color:#fff;box-shadow:0 2px 9px #0002}
+.finance-app .finance-v5-menu {position:fixed;z-index:70;bottom:calc(78px + env(safe-area-inset-bottom));right:12px;min-width:200px;display:grid;gap:4px;background:var(--panel,#202c29);border:1px solid var(--border,#52625a);border-radius:17px;padding:8px;box-shadow:0 14px 35px #0004}
+.finance-app .finance-v5-menu button {display:flex;align-items:center;gap:12px;text-align:left;border:0;background:transparent;color:var(--text,#f1f5f2);padding:12px;border-radius:10px;font-size:14px}
+.finance-app .finance-v5-menu button:focus-visible,.finance-app .finance-v5-menu button:hover {background:#49785a33}
+@media (max-width:800px),(max-width:1366px) and (pointer:coarse){.finance-app .mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.finance-app input,.finance-app textarea,.finance-app select{font-size:max(16px,1rem)}
+
+/* V5: ícones 3D foscos integrados ao arco contínuo; sem brilho artificial. */
+.finance-app .pot-card .pot-symbol { filter: saturate(.72) contrast(.96); overflow: visible; }
+.finance-app .pot-card .pot-symbol-object { transform-origin:60px 60px; }
+.finance-app .pot-card .pot-art { isolation:isolate; }
+.finance-app .pot-card .pot-ring-continuous .pot-ring-fill { stroke-linecap:round; }
+
+
+/* V5 Final: ícones 3D foscos individuais e arco contínuo limpo. */
+.finance-app .pot-card {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  text-align: center;
+  padding: 16px 14px 14px;
+  box-shadow: 0 5px 18px #0617100b;
+}
+.finance-app .pot-card header { align-items: center; text-align: left; }
+.finance-app .pot-card .pot-edit-button { position: absolute; right: 9px; top: 37px; z-index: 3; }
+.finance-app .pot-card .pot-art {
+  width: min(100%, 154px); height: 154px; margin: 8px auto 6px;
+  position: relative; display: grid; place-items: center; isolation: isolate;
+}
+.finance-app .pot-card .pot-art .pot-ring {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform: rotate(-90deg); overflow: visible;
+}
+.finance-app .pot-card .pot-ring-continuous circle {stroke-width: 5;}
+.finance-app .pot-card .pot-ring-continuous .pot-ring-track { stroke: var(--border); opacity: .8; }
+.finance-app .pot-card .pot-ring-continuous .pot-ring-fill { transition: stroke-dasharray .6s ease; }
+.finance-app .pot-symbol-3d {
+  width: 77%; height: 77%; object-fit: contain; position: relative;
+  user-select: none; flex-shrink: 0; filter: drop-shadow(0 5px 4px #0002);
+  transform: translateY(-4px); transition: transform .25s ease;
+}
+.finance-app .pot-card .pot-symbol-3d { filter: drop-shadow(0 5px 4px #0002); }
+.finance-app .pot-card:hover .pot-symbol-3d { transform: translateY(-7px); }
+.finance-app .pot-card .pot-percentage {
+  position: absolute; top: auto; right: auto; bottom: 1px; left: 50%;
+  transform: translateX(-50%); z-index: 2; white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 5px 9px; line-height: 1.2;
+  border-radius: 999px; font-size: 11px; font-weight: 650;
+}
+.finance-app .pot-card h3 { margin-top: 5px; min-height: 0; font-size: 14px; }
+.finance-app .pot-card > strong { display: block; font-size: clamp(16px, 2.4vw, 25px); white-space: nowrap; letter-spacing: -.025em; }
+.finance-app .pot-card .spending-bar {height: 4px;opacity:.65;}
+.finance-app .symbol-picker .pot-symbol-3d {width: 70px; height: 64px;filter:drop-shadow(0 3px 4px #0002);}
+.finance-app .setup-pot .pot-symbol-3d {object-fit: contain;}
+.finance-app .modal:has(.finance-v5-entry-tabs) { max-width: 560px; }
+.finance-app .v5-amount-group { display: grid; gap: 7px; }
+.finance-app .v5-amount-group .field { margin: 0; }
+.finance-app .v5-amount-group .v5-amount-input {
+  font-size: clamp(27px, 5vw, 36px) !important;
+  font-weight: 750; font-variant-numeric: tabular-nums;
+  letter-spacing: -.045em; min-height: 66px; line-height: 1.1;
+  border-radius: 13px; background: var(--soft); color: var(--text);
+}
+.finance-app .v5-amount-group > small { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.finance-app .finance-v5-entry-tabs button.selected {background:#23694f;box-shadow:none;}
+.finance-app .finance-v5-menu {background:var(--surface);}
+.finance-app .timeline-day > h3 {position:relative; font-size:12px; font-weight:750; text-transform:none; border:0; padding:16px 0 6px;}
+.finance-app .timeline-day .ledger-row {border-top:1px solid var(--border); padding:14px 2px; gap:10px;}
+.finance-app .timeline-day .entry-icon {border-radius:13px;}
+.finance-app .timeline-day .entry-info strong {font-size:13px;font-weight:650;}
+.finance-app .timeline-day .entry-value {font-variant-numeric:tabular-nums;}
+@media(max-width:800px),(max-width:1366px) and (pointer:coarse) {
+  .finance-app .mobile-nav {grid-template-columns:repeat(5,minmax(0,1fr));}
+  .finance-app .mobile-nav .nav-new-movement { position:static;transform:none;margin:0;}
+  .finance-app .nav-new-circle { width:46px; height:46px; }
+  .finance-app .modal:has(.finance-v5-entry-tabs) {border-radius:23px 23px 0 0;}
+  .finance-app .pot-card {padding:14px 8px;}
+  .finance-app .pot-card .pot-art {width:min(100%,136px);height:136px; margin:8px auto 10px;}
+  .finance-app .pot-card > strong {font-size:clamp(14px,4.1vw,22px);}
+  .finance-app .pot-card .pot-edit-button {top:30px;right:4px;}
+  .finance-app .pot-card h3 {font-size:13px;min-height:32px;}
+  .finance-app .pot-card .pot-percentage {font-size:10px;padding:4px 7px;}
+  .finance-app .pot-symbol-3d {width:78%;height:78%;}
+  .finance-app .timeline-day .ledger-row {display:grid;grid-template-columns:35px minmax(0,1fr) auto;align-items:center;gap:5px 10px;}
+  .finance-app .timeline-day .entry-info {grid-column:2;min-width:0;}
+  .finance-app .timeline-day .entry-info small {font-size:10px;}
+  .finance-app .timeline-day .entry-value {grid-column:3;grid-row:1;justify-self:end;min-width:0;font-size:13px;}
+  .finance-app .timeline-day .badge {grid-column:2;margin:0;justify-self:start;}
+  .finance-app .timeline-day .row-actions {grid-column:3;grid-row:2 / span 2;justify-content:end;max-width:100%;flex:initial;}
+  .finance-app .timeline-day .row-actions button {padding:7px;}
+  .finance-app .timeline-day .entry-icon {grid-column:1;grid-row:1 / span 2;}
+}
+@media(max-width:380px){
+  .finance-app .pot-card .pot-art {height:120px;width:120px;}
+  .finance-app .pot-card .pot-percentage {font-size:9px;}
+  .finance-app .patrimony-tile strong {font-size:clamp(10px,3.1vw,14px);}
+}
+@media(prefers-reduced-motion:reduce){.finance-app .pot-symbol-3d {transition:none;}}
+
+.finance-app .pot-card .pot-art .pot-ring { transform: none; }
+.finance-app .patrimony-icon .pot-symbol-3d {width:32px;height:32px;object-fit:contain;transform:none;}
+.finance-app .marketplace-icon .pot-symbol-3d {width:37px;height:37px;object-fit:contain;transform:none;}
+.finance-app .symbol-picker .pot-symbol-3d {transform:none;}
+
+/* Detalhes individuais dos potes: círculo tocável, sem menus intermediários. */
+.finance-app button.pot-art {appearance:none;background:transparent;border:0;padding:0;color:inherit;cursor:pointer;}
+.finance-app button.pot-art:focus-visible {outline:2px solid var(--green);outline-offset:3px;border-radius:50%;}
+.finance-app .pot-detail-v5 {padding:20px;display:grid;gap:18px;min-width:0;}
+.finance-app .pot-detail-v5-head {display:flex;align-items:center;gap:14px;padding:15px;border:1px solid var(--border);background:var(--soft);border-radius:16px;}
+.finance-app .pot-detail-v5-head .pot-symbol-3d {width:100px;height:100px;transform:none;}
+.finance-app .pot-detail-v5-head > div {display:grid;gap:6px;min-width:0;}
+.finance-app .pot-detail-v5-head span,.finance-app .pot-detail-v5-head small {color:var(--muted);font-size:12px;}
+.finance-app .pot-detail-v5-head strong {font-size:clamp(22px,6vw,32px);white-space:nowrap;}
+.finance-app .pot-detail-v5-stats {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.finance-app .pot-detail-v5-stats > div {display:grid;gap:6px;padding:13px;border:1px solid var(--border);border-radius:12px;}
+.finance-app .pot-detail-v5-stats small {color:var(--muted);font-size:11px;}
+.finance-app .pot-detail-v5-stats strong {font-size:14px;white-space:nowrap;}
+.finance-app .pot-detail-v5-actions {display:flex;flex-wrap:wrap;gap:8px;}
+.finance-app .pot-detail-v5-actions button {display:flex;align-items:center;justify-content:center;gap:7px;flex:1;min-width:115px;}
+.finance-app .pot-detail-v5 > h3 {font-size:14px;}
+@media(max-width:420px){.finance-app .pot-detail-v5-head .pot-symbol-3d {width:75px;height:75px;}.finance-app .pot-detail-v5-stats strong{font-size:12px;}}
