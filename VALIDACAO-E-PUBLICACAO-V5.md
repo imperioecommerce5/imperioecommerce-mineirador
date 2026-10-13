@@ -1,6 +1,6 @@
 # Meu Império Financeiro — V5 | Código completo
 
-Este ZIP reúne o código-fonte completo do aplicativo, os 15 ícones 3D foscos com transparência, as funcionalidades anteriores preservadas e as alterações V5.
+Este ZIP reúne o código-fonte completo do aplicativo, os 15 ícones 3D foscos com transparência, as funcionalidades anteriores preservadas e as alterações V5, incluindo o refinamento dos cards V5.1 descrito em `ALTERACOES-POTES-V5.1.md`.
 
 ## Implementado no código
 
@@ -15,10 +15,11 @@ Este ZIP reúne o código-fonte completo do aplicativo, os 15 ícones 3D foscos 
 
 ## Validação realizada aqui
 
-- 39 arquivos TS/TSX/JS analisados sintaticamente: sem erros de parsing.
+- 40 arquivos TS/TSX/JS analisados sintaticamente: sem erros de parsing.
 - 51 caminhos de imports relativos verificados: nenhum arquivo ausente.
 - 27 testes da lógica de finanças, evolução e handler de acesso: aprovados.
 - 2 testes sobre presença dos ícones 3D e elementos V5: aprovados.
+- 3 testes adicionais de composição dos cards circulares na V5.1: aprovados (32 no total).
 - Todos os 15 WebP confirmados 384x384 com transparência.
 
 ## Não validado aqui

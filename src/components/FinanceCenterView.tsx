@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type CSSProperties } from "react";
 import { FamilyProfile } from "../finance/FamilyProfile";
 import { familyEvolution } from "../finance/evolution";
 import "../finance/refinements.css";
@@ -2164,9 +2164,9 @@ export default function FinanceCenterView({
 function PotCard({
   pot: p,
   balance,
-  funded,
+  funded: _funded,
   spent,
-  cash,
+  cash: _cash,
   hidden,
   goalTarget,
   onOpen,
@@ -2182,70 +2182,76 @@ function PotCard({
   onOpen: () => void;
   onEdit: () => void;
 }) {
+  // A porcentagem reflete somente valores reais. Reservas sem meta não
+  // recebem um progresso fictício; despesas usam a proporção disponível.
   const budget = balance + spent;
-  const used =
-    budget > 0 ? (spent / budget) * 100 : balance <= 0 && spent > 0 ? 100 : 0;
-  // A reserva protegida não recebe porcentagem fictícia. Aro de meta somente
-  // quando existe alvo real; gastos mostram a parcela do orçamento disponível.
-  const goalProgress = goalTarget && goalTarget > 0 ? Math.max(0, Math.min(1, balance / goalTarget)) : null;
+  const used = budget > 0 ? Math.min(100, Math.max(0, (spent / budget) * 100)) : 0;
   const remaining = budget > 0 ? Math.max(0, Math.min(1, balance / budget)) : 0;
-  const ringCircumference = 2 * Math.PI * 56;
+  const goalProgress =
+    goalTarget && goalTarget > 0
+      ? Math.max(0, Math.min(1, balance / goalTarget))
+      : null;
   const ringProgress = p.reserve ? (goalProgress ?? 0) : remaining;
-  const ringLabel = p.reserve
-    ? (goalProgress === null ? "Protegido" : `${Math.round(goalProgress * 100)}% da meta`)
-    : (budget > 0 ? `${Math.round(remaining * 100)}% livre` : "Sem saldo");
+  const circumference = 2 * Math.PI * 56;
+  const noBalance = !p.reserve && balance <= 0;
+  const badgeText = p.reserve
+    ? "Protegido"
+    : noBalance && spent > 0
+      ? "Limite atingido"
+      : noBalance
+        ? "Sem saldo"
+        : `${Math.round(remaining * 100)}% livre`;
+  const footerText = p.reserve
+    ? goalProgress !== null
+      ? `${Math.round(goalProgress * 100)}% da meta`
+      : "Reserva protegida"
+    : budget > 0
+      ? `${Math.round(used)}% utilizado`
+      : "Sem movimentações";
+  const status = p.reserve ? "protected" : noBalance ? "empty" : "available";
+
   return (
-    <article className="pot-card">
-      <header>
-        <span className="pot-dot" style={{ background: p.color }} />
-        <span>
-          {p.reserve ? "Reserva" : "Gastos"} ·{" "}
-          {p.mode === "percent"
-            ? `${p.value}%`
-            : cash(Math.round(p.value * 100)) + " / aporte"}
-        </span>
-      </header>
+    <article
+      className={`pot-card pot-card-refined pot-card-${status}`}
+      style={{ "--pot-accent": p.color } as CSSProperties}
+    >
       <button
+        type="button"
         className="icon-button pot-edit-button"
         aria-label={`Editar ${p.name}`}
+        title={`Editar ${p.name}`}
         onClick={onEdit}
       >
         <Pencil size={14} />
       </button>
-      <button type="button" className="pot-art" onClick={onOpen}
-        aria-label={`Abrir detalhes do pote ${p.name}`}>
+      <button
+        type="button"
+        className="pot-art"
+        onClick={onOpen}
+        aria-label={`Abrir detalhes do pote ${p.name}. ${badgeText}.`}
+      >
         <svg className="pot-ring pot-ring-continuous" viewBox="0 0 120 120" aria-hidden="true">
           <circle className="pot-ring-track" cx="60" cy="60" r="56" />
-          <circle className="pot-ring-fill" cx="60" cy="60" r="56"
+          <circle
+            className="pot-ring-fill"
+            cx="60"
+            cy="60"
+            r="56"
             style={{ stroke: p.color }}
-            strokeDasharray={`${ringProgress * ringCircumference} ${ringCircumference}`}
-            transform="rotate(-90 60 60)" />
+            strokeDasharray={`${ringProgress * circumference} ${circumference}`}
+            transform="rotate(-90 60 60)"
+          />
         </svg>
         <PotSymbol symbol={potSymbol(p)} />
-        <span className="pot-percentage">{ringLabel}</span>
       </button>
-      <h3>{p.name}</h3>
+      <span className={`pot-percentage pot-status-${status}`}>
+        {badgeText}
+      </span>
+      <h3 title={p.name}>{p.name}</h3>
       <AnimatedMoney cents={balance} hidden={hidden} tag="strong" />
-      <small>{p.reserve ? "Reservado" : "Disponível no pote"}</small>
-      <div className="spending-bar">
-        <span
-          style={{
-            width: `${Math.min(100, Math.max(0, used))}%`,
-            background: used >= 100 ? "#be5145" : p.color,
-          }}
-        />
-      </div>
-      <footer>
-        <span>
-          {p.rollover
-            ? "Saldo acumulativo"
-            : "Sobra redistribuída no fechamento"}
-        </span>
-        {!p.reserve && used >= 80 && (
-          <b className={used >= 100 ? "overdue" : ""}>
-            {used >= 100 ? "Limite atingido" : "80% utilizado"}
-          </b>
-        )}
+      <small>{p.reserve ? "Valor reservado" : "Disponível no pote"}</small>
+      <footer aria-label={footerText}>
+        <span className="pot-footer-label">{footerText}</span>
       </footer>
     </article>
   );
