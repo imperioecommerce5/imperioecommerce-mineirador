@@ -25,6 +25,19 @@ import {
   uid,
 } from "./model";
 const KEY = "meu_imperio_finance_v2";
+/**
+ * O estado Finance é uma estrutura JSON. O Firebase não aceita `undefined`,
+ * inclusive em lançamentos antigos e políticas históricas dos potes.
+ * A serialização remove apenas propriedades opcionais `undefined`, sem
+ * recalcular saldos, mexer em distribuições ou excluir movimentações.
+ */
+export function financeForFirestore(finance: Finance): Finance {
+  const json = JSON.stringify(finance);
+  if (!json) throw new Error("Não foi possível preparar o financeiro para salvar.");
+  const prepared = JSON.parse(json) as Finance;
+  validateFinance(prepared);
+  return prepared;
+}
 export function demoData(): Finance {
   const f = empty();
   f.configured = true;
@@ -177,12 +190,15 @@ export function useFinance(demo: boolean, actor: Actor) {
             );
             next.revision = current.revision + 1;
             validateFinance(next);
+            // Evita erro do Firestore ao salvar campos opcionais undefined
+            // presentes em dados históricos ou em lançamentos editados.
+            const nextForFirestore = financeForFirestore(next);
             // Keep every legacy field as a rollback copy; only financeV2 is written.
             if (
               new TextEncoder().encode(
                 JSON.stringify({
                   ...(snap.exists() ? snap.data() : {}),
-                  financeV2: next,
+                  financeV2: nextForFirestore,
                 }),
               ).length > 850000
             )
@@ -191,12 +207,12 @@ export function useFinance(demo: boolean, actor: Actor) {
               );
             if (backupBefore)
               tx.set(doc(db, "imperio_finance_backups", backupId), {
-                financeV2: current,
+                financeV2: financeForFirestore(current),
                 createdAt: serverTimestamp(),
                 createdBy: actor,
               });
-            tx.set(target, { financeV2: next }, { merge: true });
-            return next;
+            tx.set(target, { financeV2: nextForFirestore }, { merge: true });
+            return nextForFirestore;
           });
           storage.setItem(KEY, JSON.stringify(saved));
         }
