@@ -1,9 +1,21 @@
-import { Finance, balances, today } from "./model";
+import { Finance, balances, today, MARKETPLACE_ID } from "./model";
 
 // Read-only projection: never writes XP, changes a balance or migrates a record.
 export function familyEvolution(f: Finance, asOf = today()) {
+  // Conta transferências reais para os patrimônios no gráfico, sem tratá-las
+  // como receita adicional ou permitir que transferências gerem XP.
+  const patrimonies = new Set(["nosso_patrimonio", "patrimonio_manuela"]);
+  const isPatrimonyTransfer = (e: Finance["entries"][number]) =>
+    e.kind === "transfer" &&
+    patrimonies.has(e.destination) &&
+    !patrimonies.has(e.pot) &&
+    (e.pot === MARKETPLACE_ID || e.pot === "free" ||
+      f.pots.some((p) => p.id === e.pot && !p.reserve));
   const rows = f.entries.filter(
-    (e) => !e.deleted && e.date <= asOf && !e.source.startsWith("marketplace:"),
+    (e) =>
+      !e.deleted &&
+      e.date <= asOf &&
+      (!e.source.startsWith("marketplace:") || isPatrimonyTransfer(e)),
   );
   const months = [...new Set(rows.map((e) => e.date.slice(0, 7)))].sort();
   const history = months.map((month) => {
@@ -15,7 +27,7 @@ export function familyEvolution(f: Finance, asOf = today()) {
     const expense = paid
       .filter((e) => e.kind === "expense")
       .reduce((n, e) => n + e.cents, 0);
-    const saved = paid
+    const allocated = paid
       .filter((e) => e.kind === "income")
       .reduce(
         (n, e) =>
@@ -24,6 +36,12 @@ export function familyEvolution(f: Finance, asOf = today()) {
           (e.allocations.patrimonio_manuela || 0),
         0,
       );
+    const transferred = paid
+      .filter(isPatrimonyTransfer)
+      .reduce((n, e) => n + e.cents, 0);
+    // Valor efetivamente destinado aos patrimônios; a transferência não
+    // aumenta o saldo em conta e não vira um novo lançamento de receita.
+    const saved = allocated + transferred;
     const completed = month < asOf.slice(0, 7);
     const hasBills = entries.some(
       (e) =>
@@ -36,7 +54,7 @@ export function familyEvolution(f: Finance, asOf = today()) {
     // Each criterion counts once per completed month, regardless of amount or transaction count.
     const xp = completed
       ? (income > 0 ? 20 : 0) +
-        (saved > 0 ? 20 : 0) +
+        (allocated > 0 ? 20 : 0) +
         (balanced ? 20 : 0) +
         (billsClear ? 20 : 0)
       : 0;
@@ -45,6 +63,8 @@ export function familyEvolution(f: Finance, asOf = today()) {
       income,
       expense,
       saved,
+      allocated,
+      transferred,
       completed,
       balanced,
       billsClear,
@@ -123,8 +143,8 @@ export function familyEvolution(f: Finance, asOf = today()) {
         ? "Patrimônios recebendo aportes"
         : "Acompanhem os aportes",
       text: current?.saved
-        ? "A distribuição deste mês já destinou recursos aos patrimônios da família."
-        : "Ainda não há distribuição de aporte aos patrimônios neste mês. Confiram o planejamento antes do próximo recebimento.",
+        ? "Neste mês houve entradas ou transferências registradas para os patrimônios da família."
+        : "Ainda não há entradas ou transferências para os patrimônios neste mês. Confiram o planejamento antes do próximo recebimento.",
     },
     {
       good: b.free >= 0,
